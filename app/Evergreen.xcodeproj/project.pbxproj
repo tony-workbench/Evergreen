@@ -1,0 +1,399 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		7A1000000000000000000027 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7A100000000000000000000A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7A1000000000000000000006;
+			remoteInfo = Evergreen;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		7A1000000000000000000001 /* Evergreen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Evergreen.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7A1000000000000000000010 /* Evergreen.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Evergreen.entitlements; sourceTree = "<group>"; };
+		7A1000000000000000000020 /* EvergreenTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EvergreenTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B8F1030730B0ECF60058A375 /* Evergreen.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Evergreen.xcconfig; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		7A1000000000000000000002 /* Evergreen */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Evergreen;
+			sourceTree = "<group>";
+		};
+		7A1000000000000000000021 /* EvergreenTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EvergreenTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		7A1000000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A1000000000000000000022 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		7A1000000000000000000004 = {
+			isa = PBXGroup;
+			children = (
+				7A1000000000000000000002 /* Evergreen */,
+				7A1000000000000000000021 /* EvergreenTests */,
+				7A1000000000000000000010 /* Evergreen.entitlements */,
+				B8F1030430B0ECDB0058A375 /* Frameworks */,
+				B8F1030730B0ECF60058A375 /* Evergreen.xcconfig */,
+				7A1000000000000000000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		7A1000000000000000000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				7A1000000000000000000001 /* Evergreen.app */,
+				7A1000000000000000000020 /* EvergreenTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B8F1030430B0ECDB0058A375 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		7A1000000000000000000006 /* Evergreen */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A1000000000000000000007 /* Build configuration list for PBXNativeTarget "Evergreen" */;
+			buildPhases = (
+				7A1000000000000000000008 /* Sources */,
+				7A1000000000000000000003 /* Frameworks */,
+				7A1000000000000000000009 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				7A1000000000000000000002 /* Evergreen */,
+			);
+			name = Evergreen;
+			packageProductDependencies = (
+			);
+			productName = Evergreen;
+			productReference = 7A1000000000000000000001 /* Evergreen.app */;
+			productType = "com.apple.product-type.application";
+		};
+		7A1000000000000000000025 /* EvergreenTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A1000000000000000000028 /* Build configuration list for PBXNativeTarget "EvergreenTests" */;
+			buildPhases = (
+				7A1000000000000000000023 /* Sources */,
+				7A1000000000000000000022 /* Frameworks */,
+				7A1000000000000000000024 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7A1000000000000000000026 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				7A1000000000000000000021 /* EvergreenTests */,
+			);
+			name = EvergreenTests;
+			packageProductDependencies = (
+			);
+			productName = EvergreenTests;
+			productReference = 7A1000000000000000000020 /* EvergreenTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7A100000000000000000000A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					7A1000000000000000000006 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					7A1000000000000000000025 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 7A1000000000000000000006;
+					};
+				};
+			};
+			buildConfigurationList = 7A100000000000000000000B /* Build configuration list for PBXProject "Evergreen" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 7A1000000000000000000004;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 7A1000000000000000000005 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				7A1000000000000000000006 /* Evergreen */,
+				7A1000000000000000000025 /* EvergreenTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7A1000000000000000000009 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A1000000000000000000024 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		7A1000000000000000000008 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A1000000000000000000023 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		7A1000000000000000000026 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7A1000000000000000000006 /* Evergreen */;
+			targetProxy = 7A1000000000000000000027 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		7A100000000000000000000C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B8F1030730B0ECF60058A375 /* Evergreen.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		7A100000000000000000000D /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B8F1030730B0ECF60058A375 /* Evergreen.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		7A100000000000000000000E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Evergreen.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Evergreen;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "I put your workouts on an Evergreen calendar and move them when a meeting lands on top. Your events stay on your phone.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "I read your workouts, heart rate, sleep and resting heart rate to learn your routine. The readings stay on this phone; only a short table of facts goes to the AI you connect, with your key.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.evergreentraining.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		7A100000000000000000000F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Evergreen.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Evergreen;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "I put your workouts on an Evergreen calendar and move them when a meeting lands on top. Your events stay on your phone.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "I read your workouts, heart rate, sleep and resting heart rate to learn your routine. The readings stay on this phone; only a short table of facts goes to the AI you connect, with your key.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.evergreentraining.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		7A1000000000000000000029 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.evergreentraining.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Evergreen.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Evergreen";
+			};
+			name = Debug;
+		};
+		7A100000000000000000002A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.evergreentraining.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Evergreen.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Evergreen";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7A1000000000000000000007 /* Build configuration list for PBXNativeTarget "Evergreen" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A100000000000000000000E /* Debug */,
+				7A100000000000000000000F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7A100000000000000000000B /* Build configuration list for PBXProject "Evergreen" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A100000000000000000000C /* Debug */,
+				7A100000000000000000000D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7A1000000000000000000028 /* Build configuration list for PBXNativeTarget "EvergreenTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A1000000000000000000029 /* Debug */,
+				7A100000000000000000002A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = 7A100000000000000000000A /* Project object */;
+}

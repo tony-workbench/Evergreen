@@ -1,0 +1,70 @@
+import SwiftUI
+
+/// Rain on an outdoor workout, in Today's hero: "Rain at 8:30 tomorrow.
+/// Move to 2 PM, or go indoors?" Move asks the calendar for the dry time;
+/// Indoors lists up to three gyms nearby with "Open in Maps"; Keep leaves
+/// the workout where it is. Nothing is bought and nothing has a price.
+struct RainCard: View {
+    let ask: RainAsk
+    var now = Date()
+    let onMove: () -> Void
+    let onKeep: () -> Void
+    /// Starts with the places open (the tour and screenshots).
+    var showsPlaces = false
+
+    @State private var indoors = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.sm) {
+            Text(RainWords.headline(ask, now: now))
+                .agentFont(22, relativeTo: .title2)
+                .foregroundStyle(Theme.accent)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(RainWords.detail(ask))
+                .font(.footnote)
+                .foregroundStyle(Theme.textMuted)
+            if indoors || showsPlaces {
+                ForEach(ask.places) { place in
+                    Rectangle().fill(Theme.rule).frame(height: 1)
+                    HStack(spacing: Theme.sm) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(place.name).font(.body).foregroundStyle(Theme.text)
+                            Text("\(place.distanceText) away").font(.footnote).foregroundStyle(Theme.textMuted)
+                        }
+                        Spacer(minLength: Theme.sm)
+                        Button("Open in Maps") { place.mapItem.openInMaps() }
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(Theme.text)
+                            .frame(minHeight: 44)
+                            .accessibilityLabel("Open \(place.name) in Maps")
+                    }
+                }
+            }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Theme.sm) { buttons }
+                VStack(spacing: Theme.sm) { buttons }
+            }
+            .padding(.top, Theme.sm)
+        }
+        .padding(Theme.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .agentCardBackground()
+    }
+
+    @ViewBuilder
+    private var buttons: some View {
+        if ask.intent != nil, ask.dryWindow != nil {
+            Button("Move", action: onMove)
+                .buttonStyle(PrimaryButtonStyle())
+                .accessibilityHint("Moves it to the dry time")
+        }
+        if !ask.places.isEmpty, !indoors, !showsPlaces {
+            Button("Indoors") { withAnimation(.easeInOut(duration: 0.2)) { indoors = true } }
+                .buttonStyle(GhostButtonStyle())
+                .accessibilityHint("Shows gyms nearby")
+        }
+        Button("Keep", action: onKeep)
+            .buttonStyle(GhostButtonStyle())
+            .accessibilityHint("Leaves the workout where it is")
+    }
+}

@@ -1,0 +1,29 @@
+FORMAT: this continues @Video1 from its last frame as the SAME continuous shot by the same camera. No cuts, no dissolves, no fades, no transitions of any kind: the camera only moves physically and slowly. Real-time motion; the characters keep moving the whole time, the picture never freezes. Handmade stop-motion miniature look: needle-felted wool and clay, shallow depth of field. No text, no speech.
+
+REFERENCES:
+@Video1 is the film so far: same room, same woman, same tree, same camera, same objects. Continue it; do not restart or replay it.
+@Image1 defines only the TREE puppet: cream-white felt in three scalloped tiers, thin green stitched outline, bead eyes, pink cheeks, thin wire arms, orange sneakers.
+@Image2 defines only the WOMAN puppet: black ponytail with an orange tie, pale cream felt face, small black bead eyes, no eyebrows, grey t-shirt, dark shorts.
+
+SIZES: the tree is 30 cm tall and the woman 120 cm: the top of the tree is level with her knee and with the chair seat, never higher, in every second of the film, also when they stand side by side at the door.
+
+ROOM, fixed: a short dark wooden desk against the far wall under a wooden window with an orange sunset; on the desk one stack of paper, a shut laptop, one coffee cup with a white lid, one phone; a plain four-legged wooden chair; one closed dark wooden door with a round knob in the right-hand wall. Dim cold blue light; the only warm colour is the sunset.
+
+FIRST FRAME: the last frame of @Video1: wide view of the room; she sits at the desk, the tree stands on the floor beside her chair; one pair of white running shoes stands on the floor beside the door.
+
+TIMELINE (the camera holds still for the whole 18 seconds; one action in each range):
+0-4s: The tree runs to the door and goes round BEHIND the two white running shoes, which stand side by side with their toes pointing toward her. It puts one hand flat on the heel of each shoe and pushes both shoes together across the floor, sliding them side by side like a small box, until they stop in front of her chair. It does not touch the laces. She watches it.
+4-5.5s: She puts both hands on the edge of the desk and pushes herself and the chair a little way back from the desk; the chair legs scrape.
+5.5-6.5s: She half rises from the seat and takes hold of the top of the chair back with her right hand.
+6.5-8.5s: Still half standing, she turns the chair a quarter turn to the right with that hand, so that the seat faces the door; the legs scrape on the floor. The chair turns only because she turns it by hand.
+8.5-10s: She sits back down on the turned chair, facing the door, both socked feet on the floor in front of her.
+10-12s: She picks up the right shoe, holds its opening wide with both hands, and slides her right foot in: toes first, then she pushes the heel down into it.
+12-14.5s: She lifts that knee, rests the heel on the front edge of the seat, and ties the lace with both hands, as in @Image3. Her back leans forward only slightly.
+14.5-16s: She lowers that foot and slides her left foot into the left shoe the same way.
+16-18s: She ties the left lace, then sits upright with both shoes on, hands on her knees, and smiles at the tree. The tree throws both arms up and bounces.
+
+AUDIO: continue the sound of @Video1 without a break; every sound soft and close. 1-4s two shoes sliding on wood. 4.5s and 7s short chair-leg scrapes. 11s and 15s a soft rubbery slide as each foot goes in. 13s and 16.5s small tugs of laces. A simple solo felt-piano melody continues quietly and grows a little warmer from 10s; it never restarts.
+
+SHOES: exactly one pair, two separate white running shoes. Each shoe is exactly as long as the tree is tall, and the shoes never change size. The two shoes are not joined to each other; their laces stay tucked on top of each shoe until she ties them.
+
+CONSTRAINTS: one continuous shot, no cuts. The camera does not move. Exactly one pair of running shoes, one cup, one phone, one stack of paper, one desk of unchanging length. She never folds her body down to the floor. The tree is always cream-white, never green, always knee-high. No text on screen.

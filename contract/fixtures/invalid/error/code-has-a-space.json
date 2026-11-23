@@ -1,0 +1,7 @@
+{
+  "ok": false,
+  "error": {
+    "code": "bad json",
+    "text": "The arguments are not JSON."
+  }
+}

@@ -1,0 +1,1 @@
+`workouts.json` holds 76 weeks planned by the Python rules of the original project, which this bundle was ported from (each case: its input and the Python answer), kept as plain JSON for `golden.test.mjs`.

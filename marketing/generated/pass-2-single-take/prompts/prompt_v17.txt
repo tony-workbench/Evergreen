@@ -1,0 +1,37 @@
+FORMAT: 30-second video, ONE continuous shot filmed by one camera. No cuts, no dissolves, no fades, no transitions of any kind: every change of framing is the camera physically moving. Real-time motion. Handmade stop-motion look: needle-felted wool and clay miniature, visible fibres, shallow depth of field. No on-screen text, no subtitles, no speech.
+
+SCENE: One evening, a worn-out woman falls asleep over her laptop; a small felt tree climbs out of her phone, shuts the laptop, brings her running shoes, and she heads out the door to run.
+
+REFERENCES:
+[Image1] defines only the TREE puppet: cream-white felt in three scalloped tiers, thin green stitched outline, bead eyes, pink cheeks, thin wire arms, orange sneakers. Do not copy its background.
+[Image2] defines only the WOMAN puppet: black wool ponytail with an orange tie, pale cream felt face, small black bead eyes, no eyebrows, grey t-shirt, dark shorts, white socks. Do not copy its background.
+[Image3] is the first frame and defines the room layout.
+[Image4] defines the over-the-shoulder framing and the objects on the desk.
+[Image5] defines how she sits sideways on the chair and how the tree drags the shoes.
+[Image6] defines the close-up of her hand on the door knob.
+[Image7] defines the last frame.
+
+SIZES: the woman is 120 cm tall seated on a 45 cm chair seat. The tree is 30 cm tall: one quarter of her height, its top level with her knee, no taller than the chair seat. These sizes never change.
+
+LOCATION: a small room, blue-grey plaster walls, dark wooden floor. Far wall: a wooden window with an orange sunset, and under it a dark wooden desk. The woman sits at the desk on a wooden chair with her back to the room, facing the laptop; the laptop screen faces her. On the desk, fixed for the whole film: LEFT of the laptop one tall stack of paper; RIGHT of the laptop one paper coffee cup with a white lid and one phone lying screen-up; on the laptop three yellow sticky notes with scribbles, two on the lower corners of the screen frame and one on the palm rest. Right-hand wall: one closed dark wooden door with a round knob; one pair of white running shoes on the floor beside it.
+
+LIGHTING: dim cold blue room lit by the laptop screen; the only warm colour is the sunset in the window, until the door opens.
+
+FIRST FRAME: exactly [Image3]. Wide view from the back of the room at her shoulder height; she is seen from behind, head propped on her left hand.
+
+TIMELINE (one action and one camera move in each range):
+0-3s: Camera dollies straight forward for 3 seconds, from the wide view to just behind her right shoulder, ending on the framing of [Image4]. She types with one finger of her right hand.
+3-6s: Camera holds still. Her head sinks forward, snaps back up, and she shakes it once.
+6-9s: Camera holds still. With her RIGHT hand she lifts the coffee cup, tips her head back and drinks, finds it empty, and sets it down on the same spot. Her left hand stays on the keyboard.
+9-11s: Camera holds still. She yawns, head tilting back, and rubs her right eye with her right fist.
+11-14s: Camera holds still. She folds her arms on the desk in front of the keyboard and lowers her head onto them, face turned right, eyes closed. She lies still for one second.
+14-17s: Camera tilts down a few degrees toward the phone. The phone lights soft green; the tree climbs out of the screen and stands on the desk beside it.
+17-20s: Camera holds still. The tree walks to the right side of the laptop and presses the screen down on its hinge until the laptop is shut and its light goes out. The woman lifts her head and stares at the tree, mouth a small round O.
+20-23s: Camera dollies back and sinks for 3 seconds to a low wide view with the chair on the left and the door on the right, as in [Image5]. The tree jumps to the floor, runs to the door, and drags the white running shoes by their laces across the floor to her. She swivels a quarter turn to her right on the seat, whole body together, legs out over the right side of the chair; the chair does not move.
+23-25.5s: Camera holds still. The tree throws both arms up and bounces. She smiles for the first time, laughs silently, pulls on both shoes and ties them.
+25.5-28s: Camera dollies forward behind her as she stands and walks to the door, the tree skipping at her left foot, and keeps moving in until it frames her right hand closing on the round door knob, as in [Image6].
+28-30s: Camera holds still, facing the doorway. She pulls the door open into the room; warm orange sunset light floods over them and the floor; she and the tree run out side by side onto the street, seen from behind, ending on [Image7].
+
+AUDIO: quiet room tone throughout. 0-3s slow one-finger typing. 8s hollow tap of the empty cup on wood. 10s a long yawn-breath. 13s soft thud of her head on her arms. 15s a small bright chime as the phone lights. 19s the click of the laptop closing. 21-23s laces dragging on wood. 27s the knob turning. 28s the door creaking open, then evening birdsong and two pairs of running footsteps. Music: one simple original solo felt-piano melody, sparse and low from 0s, a few brighter notes at 15s, warm and open from 28s, ending on one long note.
+
+CONSTRAINTS: one continuous shot, no cuts, no dissolves. Exactly one coffee cup, exactly one pair of running shoes, exactly three sticky notes. The tree is always cream-white, never green, always knee-high. No extra characters. No text on screen.

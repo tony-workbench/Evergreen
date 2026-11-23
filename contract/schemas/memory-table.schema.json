@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "memory-table.schema.json",
+  "title": "Memory table",
+  "description": "What memoryTable returns. May carry more fields.",
+  "type": "object",
+  "required": [
+    "ok",
+    "rows"
+  ],
+  "properties": {
+    "ok": {
+      "const": true
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "memory-row.schema.json"
+      }
+    }
+  }
+}

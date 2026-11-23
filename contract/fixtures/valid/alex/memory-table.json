@@ -1,0 +1,133 @@
+{
+  "ok": true,
+  "rows": [
+    {
+      "memoryId": "m-1",
+      "key": "mem:78adab0d",
+      "slot": "usual_slot/run/0/18",
+      "group": "routine",
+      "kind": "usual_slot",
+      "statement": "Running on Monday at 18:00 in 4 of the last 4 weeks.",
+      "data": {
+        "activity": "run",
+        "weekday": 0,
+        "hour": 18,
+        "minutes": 30,
+        "weeksSeen": 4,
+        "weeksTotal": 4
+      },
+      "state": "saved",
+      "confidence": 0.8,
+      "since": "2026-11-08",
+      "updated": "2026-11-08"
+    },
+    {
+      "memoryId": "m-2",
+      "key": "mem:c0945ad9",
+      "slot": "usual_slot/run/4/18",
+      "group": "routine",
+      "kind": "usual_slot",
+      "statement": "Running on Friday at 18:00 in 4 of the last 4 weeks.",
+      "data": {
+        "activity": "run",
+        "weekday": 4,
+        "hour": 18,
+        "minutes": 30,
+        "weeksSeen": 4,
+        "weeksTotal": 4
+      },
+      "state": "saved",
+      "confidence": 0.8,
+      "since": "2026-11-08",
+      "updated": "2026-11-08"
+    },
+    {
+      "memoryId": "m-3",
+      "key": "mem:93f2e8d7",
+      "slot": "usual_slot/strength/2/12",
+      "group": "routine",
+      "kind": "usual_slot",
+      "statement": "TraditionalStrengthTraining on Wednesday at 12:00 in 3 of the last 4 weeks.",
+      "data": {
+        "activity": "strength",
+        "weekday": 2,
+        "hour": 12,
+        "minutes": 45,
+        "weeksSeen": 3,
+        "weeksTotal": 4
+      },
+      "state": "saved",
+      "confidence": 0.8,
+      "since": "2026-11-08",
+      "updated": "2026-11-08"
+    },
+    {
+      "memoryId": "m-4",
+      "key": "mem:7b3538ea",
+      "slot": "usual_slot/yoga/6/9",
+      "group": "routine",
+      "kind": "usual_slot",
+      "statement": "Yoga on Sunday at 9:00 in 3 of the last 4 weeks.",
+      "data": {
+        "activity": "yoga",
+        "weekday": 6,
+        "hour": 9,
+        "minutes": 40,
+        "weeksSeen": 3,
+        "weeksTotal": 4
+      },
+      "state": "saved",
+      "confidence": 0.8,
+      "since": "2026-11-08",
+      "updated": "2026-11-08"
+    },
+    {
+      "memoryId": "m-5",
+      "key": "mem:841dfc5d",
+      "slot": "weekly_volume",
+      "group": "routine",
+      "kind": "weekly_volume",
+      "statement": "3.5 workouts and 124 minutes a week over the last 4 weeks.",
+      "data": {
+        "workoutsPerWeek": 3.5,
+        "minutesPerWeek": 124
+      },
+      "state": "saved",
+      "confidence": 0.8,
+      "since": "2026-11-08",
+      "updated": "2026-11-08"
+    },
+    {
+      "memoryId": "m-6",
+      "key": "mem:89eabb08",
+      "slot": "sleep",
+      "group": "body",
+      "kind": "sleep",
+      "statement": "Sleep averaged 7.73 hours over 7 days and 7.74 hours over 28 days.",
+      "data": {
+        "hours7d": 7.73,
+        "hours28d": 7.74
+      },
+      "state": "saved",
+      "confidence": 0.8,
+      "since": "2026-11-08",
+      "updated": "2026-11-08"
+    },
+    {
+      "memoryId": "m-7",
+      "key": "mem:b8fd734c",
+      "slot": "resting_hr",
+      "group": "body",
+      "kind": "resting_hr",
+      "statement": "Resting heart rate averaged 57.9 bpm over 7 days and 58 bpm over 28 days.",
+      "data": {
+        "bpm7d": 57.9,
+        "bpm28d": 58
+      },
+      "state": "saved",
+      "confidence": 0.8,
+      "since": "2026-11-08",
+      "updated": "2026-11-08"
+    }
+  ]
+}

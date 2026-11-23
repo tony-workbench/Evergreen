@@ -1,0 +1,24 @@
+Extend @Video1 forward by 10 seconds as the same shot, same camera, same lens, same height. Handmade stop-motion miniature, needle-felted wool and clay, shallow depth of field. Real-time motion; the picture never freezes. One continuous shot: no cuts, no dissolves, no fades. No text, no speech.
+
+STARTS ON the last frame of @Video1: wide view of the room; she sits at the desk with her back to the camera; the tree stands on the floor right of her chair; one small pair of white running shoes stands beside the closed door. For the first half second keep exactly this framing and this pose while the characters keep breathing and moving slightly; then the new action begins.
+
+REFERENCES: @Video1: the film so far; continue it, do not replay it. @Image1: the tree puppet, one view, look only. @Image2: the woman puppet, one view, look only. @Image3: the woman, the tree and one running shoe side by side, sizes only. @Image4: the chair turned, her sitting on it. @Image5: the tree pushing the shoes.
+
+SIZES, the same in every second: the woman is 120 cm tall. The tree is 32 cm: knee-high to her, its tip just below the seat of her chair, three coffee cups tall when it stands on the desk. Each running shoe is 18 cm, exactly her foot's length; the shoes never change size.
+
+FIXED: the short wooden desk under the sunset window, the stack of paper left of the laptop, one coffee cup with a white lid right of the laptop, one phone lying screen-up in front of the cup, the closed dark door in the right-hand wall. Nothing on the desk moves or turns unless a line below says so. Dim cold blue light.
+
+CAMERA: completely still.
+
+TIMELINE:
+0.5-2s: She pushes herself and the chair a little back from the desk; the legs scrape.
+2-3s: She half rises and grips the top of the chair back with her right hand.
+3-5s: She turns the chair a quarter turn to the right by hand, so the seat faces the tree and the door.
+5-6s: She sits down on it facing the tree, socked feet on the floor, hands on her knees, as in @Image4.
+6-10s: The tree runs to the door, goes behind the two shoes, puts one hand on each heel and pushes them side by side across the floor to her feet, as in @Image5. It never touches the laces.
+
+AUDIO: continue @Video1's sound without a break. 1s and 4s chair-leg scrapes. 7-10s two small shoes sliding on wood.
+
+ALWAYS: the chair turns only in her hand; she faces whatever she looks at; exactly one pair of shoes, each the size of her foot.
+
+Keep the exact look of the woman from @Image2 and of the tree from @Image1 for the whole clip. Keep the same colour grade, the same dusk light and the same light direction as @Video1 from the first frame to the last.

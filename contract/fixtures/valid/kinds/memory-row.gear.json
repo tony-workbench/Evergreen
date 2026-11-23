@@ -1,0 +1,17 @@
+{
+  "memoryId": "m-gear",
+  "key": "mem:gear",
+  "slot": "gear",
+  "group": "gear",
+  "kind": "gear",
+  "statement": "The daily trainers have 512 km on them.",
+  "data": {
+    "item": "Daily trainers",
+    "km": 512,
+    "boughtOn": "2026-05-02"
+  },
+  "state": "saved",
+  "confidence": 0.8,
+  "since": "2026-11-08",
+  "updated": "2026-11-08"
+}

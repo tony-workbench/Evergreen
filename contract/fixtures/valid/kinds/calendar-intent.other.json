@@ -1,0 +1,10 @@
+{
+  "kind": "add",
+  "activity": "other",
+  "title": "Rowing",
+  "minutes": 40,
+  "sessionId": "s-2026-11-11-other-1900",
+  "day": "2026-11-11",
+  "after": "19:00",
+  "exact": true
+}

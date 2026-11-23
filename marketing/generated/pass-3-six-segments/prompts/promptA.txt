@@ -1,0 +1,33 @@
+FORMAT: 22-second video, ONE continuous shot filmed by one camera. No cuts, no dissolves, no fades, no transitions of any kind: every change of framing is the camera physically moving. Real-time motion. The puppets may move with a slight hand-animated feel, but the CAMERA always moves perfectly smoothly at a constant speed, with no stutter, no skipped frames and no jumps. Handmade stop-motion look: needle-felted wool and clay miniature, visible fibres, shallow depth of field. No on-screen text, no subtitles, no speech.
+
+SCENE: One evening, a worn-out woman falls asleep over her laptop; a small felt tree climbs out of her phone and shuts the laptop, and she looks up.
+
+REFERENCES:
+@Image1 defines only the TREE puppet: cream-white felt in three scalloped tiers, thin green stitched outline, bead eyes, pink cheeks, thin wire arms, orange sneakers. Do not copy its background.
+@Image2 defines only the WOMAN puppet: black wool ponytail with an orange tie, pale cream felt face, small black bead eyes, no eyebrows, grey t-shirt, dark shorts, white socks. Do not copy its background.
+@Image3 is the first frame and defines the room layout.
+@Image4 defines the over-the-shoulder framing and the objects on the desk.
+@Image5 defines the tree standing on the desk beside the lit phone.
+@Image6 defines the tree pressing the laptop shut while she lifts her head.
+
+SIZES: the woman is 120 cm tall seated on a 45 cm chair seat. The tree is 30 cm tall: one quarter of her height, its top level with her knee, no taller than the chair seat. These sizes never change.
+
+LOCATION: a small room, blue-grey plaster walls, dark wooden floor. Far wall: a wooden window with an orange sunset, and under it a dark wooden desk. The woman sits at the desk on a wooden chair with her back to the room, facing the laptop; the laptop screen faces her. On the desk, fixed for the whole film: LEFT of the laptop one tall stack of paper; RIGHT of the laptop one paper coffee cup with a white lid and one phone lying screen-up; on the laptop three yellow sticky notes with scribbles, two on the lower corners of the screen frame and one on the palm rest. Right-hand wall: one closed dark wooden door with a round knob; one pair of white running shoes on the floor beside it.
+
+LIGHTING: dim cold blue room lit by the laptop screen; the only warm colour is the sunset in the window, until the door opens.
+
+FIRST FRAME: exactly @Image3. Wide view from the back of the room at her shoulder height; she is seen from behind, head propped on her left hand.
+
+TIMELINE (one action and one camera move in each range):
+0-4s: Camera dollies straight forward at one constant slow speed for 4 seconds, from the wide view to just behind her right shoulder, ending on the framing of @Image4. Nothing on the desk appears, disappears or changes during the move. She types with one finger of her right hand.
+4-7s: Camera holds still. Her head sinks forward, snaps back up, and she shakes it once.
+7-10s: Camera holds still. With her RIGHT hand she lifts the coffee cup, tips her head back and drinks, finds it empty, and sets it down on the same spot. Her left hand stays on the keyboard.
+10-12s: Camera holds still. She yawns the ordinary way: her shoulders rise, her mouth opens wide, her head tips back only slightly, and she raises her RIGHT hand loosely in front of her open mouth to cover the yawn, elbow low and close to her body; then her hand drops back to the desk and her shoulders sag. She does not throw her head far back and does not press a fist to her face.
+12-15s: Camera holds still. She folds her arms on the desk in front of the keyboard and lowers her head onto them, face turned right, eyes closed. She lies still for one second.
+15-18s: Camera holds still. The phone lights soft green; the tree climbs out of the screen and stands on the desk beside it, as in @Image5.
+18-21s: Camera holds still. The tree walks to the right side of the laptop, puts both small hands on the top edge of the screen and GENTLY lowers it on its hinge, slowly and carefully, taking two full seconds, until the laptop is closed and its light fades out, as in @Image6. It closes the laptop the way you would close it beside someone sleeping: no slam, no push, no bounce. The woman lifts her head and stares at the tree, mouth a small round O.
+21-22s: Camera holds still. She and the tree look at each other. Nothing else moves.
+
+AUDIO: quiet room tone throughout; every sound is soft and close, nothing loud or sharp. 0-4s slow one-finger typing. 9s hollow tap of the empty cup on wood. 11s a long yawn-breath. 14s soft thud of her head on her arms. 15s a small bright chime as the phone lights. 20s one very soft, muffled click as the laptop closes, quieter than the typing. Music: one simple original solo felt-piano melody, sparse and low from 0s, a few brighter notes at 15s, continuing softly to the end without resolving.
+
+CONSTRAINTS: one continuous shot, no cuts, no dissolves, smooth camera. Exactly one coffee cup, exactly three sticky notes, one stack of paper, one phone. The tree is always cream-white, never green, always small: no taller than the coffee cup and a half. No extra characters. No text on screen.

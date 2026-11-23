@@ -1,0 +1,20 @@
+{
+  "memoryId": "m-1",
+  "key": "mem:5b29c614",
+  "slot": "usual_slot/strength/3/18",
+  "group": "routine",
+  "kind": "usual_slot",
+  "statement": "FunctionalStrengthTraining on Thursday at 18:00 in 4 of the last 4 weeks.",
+  "data": {
+    "activity": "strength",
+    "weekday": 3,
+    "hour": 18,
+    "minutes": 40,
+    "weeksSeen": 4,
+    "weeksTotal": 4
+  },
+  "state": "saved",
+  "confidence": 0.8,
+  "since": "2026-11-08",
+  "updated": "2026-11-08"
+}

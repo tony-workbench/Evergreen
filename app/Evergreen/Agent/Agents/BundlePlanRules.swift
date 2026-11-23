@@ -1,0 +1,66 @@
+import Foundation
+
+/// The plan rules from the recommend-agent bundle (`planContext`,
+/// `checkPlan`, `recommendWeek`). What the rules read stays on the phone:
+/// the Health history, the busy times on the calendar and the memory rows.
+struct BundlePlanRules: PlanRules {
+    static let resource = "recommend-phone"
+    static let globals = ["planContext", "planBrief", "checkPlan", "recommendWeek"]
+
+    let bundle: JSBundle
+    /// Workouts, and sleep and resting heart rate by day.
+    var history: HistoryPayload
+    /// Busy times on the person's calendars: start and end only.
+    var busy: [Busy]
+    var timeZone: TimeZone
+
+    /// What every call is given: `planContext`'s input, which `checkPlan` takes as its `context`.
+    func input(rows: [MemoryRow], now: Date) -> JSONValue {
+        var input: JSONValue = [
+            "now": .string(LocalTime(now, in: timeZone).text),
+            "memory": ["rows": .from(rows)],
+            // The usual times the person stopped: the bundle's `stopped_slot` rule keeps sessions off them.
+            "stopped": .array(HandOff.rowsToStopped(rows.filter(\.isRejected))),
+            "history": .from(history),
+            "calendar": .array(busy.map { ["start": .string(LocalTime($0.start, in: timeZone).text), "end": .string(LocalTime($0.end, in: timeZone).text)] }),
+        ]
+        // A race the person has coming, from the goal they are remembered to have: the rules' own week tapers for it too.
+        let today = LocalTime(now, in: timeZone).day
+        if let race = rows.filter({ $0.kind == "goal" && $0.isUsable }).compactMap({ $0.data["date"]?.string }).filter({ $0 >= today }).min(),
+           case .object(var fields) = input {
+            fields["raceDate"] = .string(race)
+            input = .object(fields)
+        }
+        return input
+    }
+
+    func planContext(rows: [MemoryRow], now: Date) async -> JSONValue {
+        await bundle.call("planContext", input(rows: rows, now: now))
+    }
+
+    func planBrief(rows: [MemoryRow], now: Date) async -> [String] {
+        await bundle.call("planBrief", ["context": input(rows: rows, now: now)])["lines"]?.array?.compactMap(\.string) ?? []
+    }
+
+    func checkPlan(_ sessions: [PlanSession], summary: String, rows: [MemoryRow], now: Date) async -> [PlanViolation] {
+        let answer = await bundle.call("checkPlan", [
+            "plan": ["sessions": .from(sessions), "summary": .string(summary)], "context": input(rows: rows, now: now),
+        ])
+        // A check that can't be run passes nothing.
+        guard answer.isOK, let violations = answer["violations"]?.decoded([PlanViolation].self) else {
+            return [PlanViolation(code: "check_failed", text: answer["error"]?["text"]?.string ?? "The plan couldn’t be checked.")]
+        }
+        // `hints[i]` says how to fix `violations[i]`; the agent gets both in one line.
+        let hints = answer["hints"]?.array ?? []
+        return violations.enumerated().map { index, violation in
+            var violation = violation
+            if hints.indices.contains(index), let fix = hints[index]["fix"]?.string { violation.text += " Fix: \(fix)." }
+            return violation
+        }
+    }
+
+    func recommendWeek(rows: [MemoryRow], now: Date) async -> [PlanSession] {
+        let answer = await bundle.call("recommendWeek", input(rows: rows, now: now))
+        return answer.isOK ? answer["sessions"]?.decoded([PlanSession].self) ?? [] : []
+    }
+}

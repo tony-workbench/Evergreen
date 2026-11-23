@@ -1,0 +1,58 @@
+{
+  "ok": true,
+  "sessions": [
+    {
+      "id": "s-2026-11-09-run-1800",
+      "day": "2026-11-09",
+      "start": "2026-11-09T19:00:00-08:00",
+      "minutes": 45,
+      "activity": "run",
+      "intensity": "easy",
+      "reason": "You usually do this on Monday at 18:00.",
+      "basedOn": [
+        "mem:78adab0d",
+        "mem:841dfc5d"
+      ]
+    },
+    {
+      "id": "s-2026-11-10-run-0600",
+      "day": "2026-11-10",
+      "start": "2026-11-10T06:00:00-08:00",
+      "minutes": 50,
+      "activity": "run",
+      "intensity": "easy",
+      "reason": "You usually do this on Tuesday at 06:00.",
+      "basedOn": [
+        "mem:210b5eb9",
+        "mem:841dfc5d"
+      ]
+    },
+    {
+      "id": "s-2026-11-12-strength-1800",
+      "day": "2026-11-12",
+      "start": "2026-11-12T18:00:00-08:00",
+      "minutes": 40,
+      "activity": "strength",
+      "intensity": "steady",
+      "reason": "You usually do this on Thursday at 18:00.",
+      "basedOn": [
+        "mem:5b29c614",
+        "mem:841dfc5d"
+      ]
+    },
+    {
+      "id": "s-2026-11-15-long_run-0700",
+      "day": "2026-11-15",
+      "start": "2026-11-15T07:00:00-08:00",
+      "minutes": 100,
+      "activity": "long_run",
+      "intensity": "steady",
+      "reason": "You usually do this on Sunday at 07:00.",
+      "basedOn": [
+        "mem:61066c28",
+        "mem:841dfc5d"
+      ]
+    }
+  ],
+  "summary": "4 sessions at your usual times."
+}

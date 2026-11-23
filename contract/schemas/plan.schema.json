@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plan.schema.json",
+  "title": "Plan",
+  "description": "A proposed week. May carry more fields.",
+  "type": "object",
+  "required": [
+    "ok",
+    "sessions",
+    "summary"
+  ],
+  "properties": {
+    "ok": {
+      "const": true
+    },
+    "sessions": {
+      "type": "array",
+      "items": {
+        "$ref": "session.schema.json"
+      }
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

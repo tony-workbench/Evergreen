@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "calendar-result.schema.json",
+  "title": "Calendar result",
+  "description": "What calendarPlan and calendarReplan return. `state` is opaque. May carry more fields.",
+  "type": "object",
+  "required": [
+    "ok",
+    "kind",
+    "message",
+    "proposed",
+    "undoToken",
+    "state"
+  ],
+  "properties": {
+    "ok": {
+      "const": true
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "add",
+        "move",
+        "resize",
+        "cancel",
+        "race",
+        "question",
+        "none"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "proposed": {
+      "type": "array",
+      "items": {
+        "$ref": "preview-block.schema.json"
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "answers"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "answers": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "label"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "undoToken": {
+      "type": "string",
+      "minLength": 1
+    },
+    "replaces": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "type": "object"
+    }
+  }
+}

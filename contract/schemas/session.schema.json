@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "session.schema.json",
+  "title": "Session",
+  "description": "One proposed workout. `id` is stable for the same day, activity and start. `minutes` is 0 for rest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "day",
+    "start",
+    "minutes",
+    "activity",
+    "intensity",
+    "reason",
+    "basedOn"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "day": {
+      "type": "string",
+      "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+    },
+    "start": {
+      "type": "string",
+      "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d{1,3})?[+-]([01]\\d|2[0-3]):[0-5]\\d$"
+    },
+    "minutes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 240
+    },
+    "activity": {
+      "$ref": "activity.schema.json"
+    },
+    "intensity": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "steady",
+        "hard"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "basedOn": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,1782 @@
+(() => {
+  // src/pytime.mjs
+  var US_MIN = 6e7;
+  var US_HOUR = 36e8;
+  var US_DAY = 864e8;
+  var WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  var InputError = class extends Error {
+    constructor(code) {
+      super(code);
+      this.name = "InputError";
+      this.code = code;
+    }
+  };
+  var mod = (a, b) => (a % b + b) % b;
+  var p2 = (n) => String(n).padStart(2, "0");
+  var DT = /^(\d{4})-(\d\d)-(\d\d)[T ](\d\d):(\d\d)(?::(\d\d)(?:[.,](\d{1,6})\d*)?)?\s*(Z|z|[+-]\d\d(?::?\d\d)?)$/;
+  var DAY = /^(\d{4})-(\d\d)-(\d\d)$/;
+  function parseDay(v) {
+    const m = typeof v === "string" ? DAY.exec(v) : null;
+    if (!m) throw new InputError("bad_date");
+    const ms = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+    if (dayISO(ms / 864e5) !== v) throw new InputError("bad_date");
+    return ms / 864e5;
+  }
+  function parseDT(v) {
+    if (v && typeof v === "object" && Number.isFinite(v.mic) && Number.isFinite(v.off)) return v;
+    const m = typeof v === "string" ? DT.exec(v.trim()) : null;
+    if (!m) throw new InputError("bad_datetime");
+    let off = 0;
+    if (m[8] !== "Z" && m[8] !== "z") {
+      const d = m[8].replace(":", "");
+      off = (d[0] === "-" ? -1 : 1) * (+d.slice(1, 3) * 60 + +(d.slice(3, 5) || 0));
+    }
+    const day = parseDay(`${m[1]}-${m[2]}-${m[3]}`);
+    const mic = day * US_DAY + +m[4] * US_HOUR + +m[5] * US_MIN + +(m[6] || 0) * 1e6 + +(m[7] || "").padEnd(6, "0") - off * US_MIN;
+    return { mic, off };
+  }
+  var local = (dt) => dt.mic + dt.off * US_MIN;
+  var dayOf = (dt) => Math.floor(local(dt) / US_DAY);
+  var hourOf = (dt) => Math.floor(mod(local(dt), US_DAY) / US_HOUR);
+  var minuteOf = (dt) => Math.floor(mod(local(dt), US_HOUR) / US_MIN);
+  var weekdayOf = (day) => mod(day + 3, 7);
+  var dayISO = (day) => new Date(day * 864e5).toISOString().slice(0, 10);
+  var atDay = (day, off, hour = 0, minute = 0) => ({ mic: day * US_DAY + hour * US_HOUR + minute * US_MIN - off * US_MIN, off });
+  var addUs = (dt, mic) => ({ mic: dt.mic + mic, off: dt.off });
+  function isoDT(dt, z = false) {
+    const l = local(dt);
+    const inDay = mod(l, US_DAY);
+    const sec = Math.floor(mod(inDay, US_MIN) / 1e6);
+    const micro = mod(inDay, 1e6);
+    const a = Math.abs(dt.off);
+    const offset = z && dt.off === 0 ? "Z" : `${dt.off < 0 ? "-" : "+"}${p2(Math.floor(a / 60))}:${p2(a % 60)}`;
+    return `${dayISO(Math.floor(l / US_DAY))}T${p2(Math.floor(inDay / US_HOUR))}:${p2(Math.floor(mod(inDay, US_HOUR) / US_MIN))}:${p2(sec)}${micro ? `.${String(micro).padStart(6, "0")}` : ""}${offset}`;
+  }
+  function clock(hour, minute = 0) {
+    const h = mod(hour, 12) === 0 ? 12 : mod(hour, 12);
+    return `${h}${minute ? `:${p2(minute)}` : ""} ${mod(hour, 24) < 12 ? "AM" : "PM"}`;
+  }
+  var hhmm = (dt) => `${p2(hourOf(dt))}:${p2(minuteOf(dt))}`;
+
+  // src/pynum.mjs
+  function pyRound(x, n = 0) {
+    if (!Number.isFinite(x) || Math.abs(x) >= 1e21) return x;
+    const [int, frac] = Math.abs(x).toFixed(100).split(".");
+    const keep = frac.slice(0, n);
+    const rest = frac.slice(n);
+    let digits = BigInt(int + keep);
+    const half = `5${"0".repeat(rest.length - 1)}`;
+    if (rest > half || rest === half && digits % 2n === 1n) digits += 1n;
+    const s = digits.toString().padStart(n + 1, "0");
+    const out = Number(n ? `${s.slice(0, s.length - n)}.${s.slice(s.length - n)}` : s);
+    return x < 0 ? -out : out;
+  }
+  function pySum(values) {
+    let total = 0;
+    let c = 0;
+    for (const x of values) {
+      const t = total + x;
+      c += Math.abs(total) >= Math.abs(x) ? total - t + x : x - t + total;
+      total = t;
+    }
+    return c && Number.isFinite(c) ? total + c : total;
+  }
+  var f64 = new Float64Array(1);
+  var u64 = new BigUint64Array(f64.buffer);
+  function parts(x) {
+    f64[0] = x;
+    const bits = u64[0];
+    const e = Number(bits >> 52n & 0x7ffn);
+    const m = bits & 0xfffffffffffffn;
+    const mant = e === 0 ? m : m | 1n << 52n;
+    return { mant: bits >> 63n ? -mant : mant, exp: (e === 0 ? 1 : e) - 1075 };
+  }
+  function scale(x, e) {
+    for (; e > 0; e -= 1) x *= 2;
+    for (; e < 0; e += 1) x *= 0.5;
+    return x;
+  }
+  function pyMean(values) {
+    const ps = values.map(parts);
+    const emin = Math.min(...ps.map((p) => p.exp));
+    let sum = 0n;
+    for (const p of ps) sum += p.mant << BigInt(p.exp - emin);
+    if (sum === 0n) return 0;
+    const neg = sum < 0n;
+    const a = neg ? -sum : sum;
+    const n = BigInt(values.length);
+    const k = Math.max(0, 70 + n.toString(2).length - a.toString(2).length);
+    let q = (a << BigInt(k)) / n;
+    if ((a << BigInt(k)) % n !== 0n) q |= 1n;
+    const out = scale(Number(q), emin - k);
+    return neg ? -out : out;
+  }
+  function pyMedian(values) {
+    const s = [...values].sort((a, b) => a - b);
+    const n = s.length;
+    return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+  }
+  var pyFloat = (x) => Number.isInteger(x) ? `${x}.0` : String(x);
+
+  // data/workout_ideas/running.json
+  var running_default = {
+    ideas: [
+      {
+        id: "idea-last-long-run",
+        title: "Last long run",
+        kind: "easy run",
+        activityType: "Running",
+        minutes: null,
+        intensity: "easy",
+        phase: "taper",
+        when: "14 days out",
+        quote: "Do your last long run. Keep it steady, not heroic.",
+        sourceTitle: "Half Marathon Taper: 2-Week Plan Before Race Day",
+        source: "Runner's Blueprint"
+      },
+      {
+        id: "idea-short-tempo-run-or-reduced-interval-session",
+        title: "Short tempo run or reduced interval session",
+        kind: "other",
+        activityType: "Running",
+        minutes: null,
+        intensity: "moderate",
+        phase: "taper",
+        when: "10 to 12 days out",
+        quote: "Do your last real workout, such as a short tempo run or reduced interval session.",
+        sourceTitle: "Half Marathon Taper: 2-Week Plan Before Race Day",
+        source: "Runner's Blueprint"
+      },
+      {
+        id: "idea-relaxed-strides",
+        title: "Relaxed strides",
+        kind: "strides",
+        activityType: "Running",
+        minutes: null,
+        intensity: "easy",
+        phase: "race week",
+        when: "3 to 4 days out",
+        quote: "Add a few relaxed strides if your legs feel good.",
+        sourceTitle: "Half Marathon Taper: 2-Week Plan Before Race Day",
+        source: "Runner's Blueprint"
+      },
+      {
+        id: "idea-very-short-shakeout-jog",
+        title: "Very short shakeout jog",
+        kind: "shakeout",
+        activityType: "Running",
+        minutes: null,
+        intensity: "very easy",
+        phase: "race week",
+        when: "Day before",
+        quote: "Rest or do a very short shakeout jog. Nothing that leaves fatigue behind.",
+        sourceTitle: "Half Marathon Taper: 2-Week Plan Before Race Day",
+        source: "Runner's Blueprint"
+      },
+      {
+        id: "idea-strides",
+        title: "Strides",
+        kind: "strides",
+        activityType: "Running",
+        minutes: null,
+        intensity: "moderate",
+        phase: "taper",
+        when: "2-3 times during race week",
+        quote: "Strides (4-6 x 20-30 seconds) 2-3 times",
+        sourceTitle: "Taper Week Strategies 2026: Complete Guide to Pre-Race Tapering for Peak Performance",
+        source: "RunBikeCalc"
+      },
+      {
+        id: "idea-shakeout-jog",
+        title: "Shakeout jog",
+        kind: "shakeout",
+        activityType: "Running",
+        minutes: 15,
+        intensity: "very easy",
+        phase: "race week",
+        when: "day before the race",
+        quote: "Shakeout jog day before (15-20 min easy)",
+        sourceTitle: "Taper Week Strategies 2026: Complete Guide to Pre-Race Tapering for Peak Performance",
+        source: "RunBikeCalc"
+      },
+      {
+        id: "idea-light-stretching-and-mobility-work",
+        title: "Light stretching and mobility work",
+        kind: "mobility",
+        activityType: "Other",
+        minutes: null,
+        intensity: "very easy",
+        phase: "taper",
+        when: "during taper",
+        quote: "Light stretching and mobility work",
+        sourceTitle: "Taper Week Strategies 2026: Complete Guide to Pre-Race Tapering for Peak Performance",
+        source: "RunBikeCalc"
+      },
+      {
+        id: "idea-short-strides",
+        title: "Short strides",
+        kind: "strides",
+        activityType: "Running",
+        minutes: null,
+        intensity: "moderate",
+        phase: "race week",
+        when: "final 2-3 days",
+        quote: "Short strides (4x20 sec) with long rest",
+        sourceTitle: "Taper Week Strategies 2026: Complete Guide to Pre-Race Tapering for Peak Performance",
+        source: "RunBikeCalc"
+      },
+      {
+        id: "idea-foam-rolling-and-dynamic-stretching",
+        title: "Foam Rolling and Dynamic Stretching",
+        kind: "mobility",
+        activityType: "Other",
+        minutes: 15,
+        intensity: "very easy",
+        phase: "race week",
+        when: "Monday",
+        quote: "Spend 15 minutes on a foam roller or do some light dynamic stretching.",
+        sourceTitle: "How to Train the Week Before a Half Marathon: Taper Tips",
+        source: "Sport2gether"
+      },
+      {
+        id: "idea-sharpening-run-with-strides",
+        title: "Sharpening Run with Strides",
+        kind: "strides",
+        activityType: "Running",
+        minutes: 25,
+        intensity: "moderate",
+        phase: "race week",
+        when: "Tuesday",
+        quote: 'Run 20\u201330 minutes total. Include 3 or 4 "strides"\u2014these are 20-second accelerations where you reach about 90% of your max speed.',
+        sourceTitle: "How to Train the Week Before a Half Marathon: Taper Tips",
+        source: "Sport2gether"
+      },
+      {
+        id: "idea-easy-maintenance-run",
+        title: "Easy Maintenance Run",
+        kind: "easy run",
+        activityType: "Running",
+        minutes: 25,
+        intensity: "very easy",
+        phase: "race week",
+        when: "Wednesday",
+        quote: "20\u201330 minutes at a very relaxed, conversational pace.",
+        sourceTitle: "How to Train the Week Before a Half Marathon: Taper Tips",
+        source: "Sport2gether"
+      },
+      {
+        id: "idea-pre-race-shakeout",
+        title: "Pre-Race Shakeout",
+        kind: "shakeout",
+        activityType: "Running",
+        minutes: 12,
+        intensity: "very easy",
+        phase: "race week",
+        when: "Saturday",
+        quote: "A 10\u201315 minute shakeout run followed by 2 light strides.",
+        sourceTitle: "How to Train the Week Before a Half Marathon: Taper Tips",
+        source: "Sport2gether"
+      },
+      {
+        id: "idea-4-x-200m-speed-runs",
+        title: "4 x 200m speed runs",
+        kind: "strides",
+        activityType: "Running",
+        minutes: null,
+        intensity: "easy",
+        phase: "taper",
+        when: "Tuesday of Week 11 (2 weeks before race)",
+        quote: "Sprint at 3K pace to feel the rapid leg turnover rhythm",
+        sourceTitle: "Half Marathon Taper Strategy for the Final 2 Weeks: Preserving Your Leg Speed - \u904B\u52D5\u77E5\u8B58\uFF5CCT Yeh \u516C\u8DEF\u8ECA\u57FA\u5730",
+        source: "CT Yeh"
+      },
+      {
+        id: "idea-6-x-100m-strides",
+        title: "6 x 100m strides",
+        kind: "strides",
+        activityType: "Running",
+        minutes: null,
+        intensity: "easy",
+        phase: "race week",
+        when: "Tuesday of Week 12 (Race Week)",
+        quote: "Gradually accelerate to 90% of top speed, then decelerate naturally",
+        sourceTitle: "Half Marathon Taper Strategy for the Final 2 Weeks: Preserving Your Leg Speed - \u904B\u52D5\u77E5\u8B58\uFF5CCT Yeh \u516C\u8DEF\u8ECA\u57FA\u5730",
+        source: "CT Yeh"
+      },
+      {
+        id: "idea-3-km-at-goal-pace",
+        title: "3 km at goal pace",
+        kind: "other",
+        activityType: "Running",
+        minutes: null,
+        intensity: "moderate",
+        phase: "race week",
+        when: "Wednesday of Week 12 (Race Week)",
+        quote: "Insert 2\u20133 km at half marathon goal pace into easy runs to confirm \u201Cyour body remembers that rhythm\u201D",
+        sourceTitle: "Half Marathon Taper Strategy for the Final 2 Weeks: Preserving Your Leg Speed - \u904B\u52D5\u77E5\u8B58\uFF5CCT Yeh \u516C\u8DEF\u8ECA\u57FA\u5730",
+        source: "CT Yeh"
+      },
+      {
+        id: "idea-light-cross-training",
+        title: "Light cross-training",
+        kind: "cross-training",
+        activityType: "Yoga",
+        minutes: null,
+        intensity: "very easy",
+        phase: "taper",
+        when: "During the taper period",
+        quote: "Substitute light cross-training (swimming, yoga) for the urge to run more",
+        sourceTitle: "Half Marathon Taper Strategy for the Final 2 Weeks: Preserving Your Leg Speed - \u904B\u52D5\u77E5\u8B58\uFF5CCT Yeh \u516C\u8DEF\u8ECA\u57FA\u5730",
+        source: "CT Yeh"
+      },
+      {
+        id: "idea-overhead-squats",
+        title: "Overhead Squats",
+        kind: "mobility",
+        activityType: "FunctionalStrengthTraining",
+        minutes: null,
+        intensity: "easy",
+        phase: "any",
+        when: "before a run",
+        quote: "Start with 1 set x 10 reps.",
+        sourceTitle: "The Perfect Running Warm-Up: 5 Pre-Run Mobility Exercises",
+        source: "TrainingPeaks"
+      },
+      {
+        id: "idea-knee-bends",
+        title: "Knee Bends",
+        kind: "mobility",
+        activityType: "FunctionalStrengthTraining",
+        minutes: null,
+        intensity: "easy",
+        phase: "any",
+        when: "before a run",
+        quote: "Start with 8-10 reps and build to 15 reps for each leg.",
+        sourceTitle: "The Perfect Running Warm-Up: 5 Pre-Run Mobility Exercises",
+        source: "TrainingPeaks"
+      },
+      {
+        id: "idea-front-lunge",
+        title: "Front Lunge",
+        kind: "mobility",
+        activityType: "FunctionalStrengthTraining",
+        minutes: null,
+        intensity: "easy",
+        phase: "any",
+        when: "before a run",
+        quote: "Start with 1 set x 3-5 reps if lunges aren't part of your regular routine.",
+        sourceTitle: "The Perfect Running Warm-Up: 5 Pre-Run Mobility Exercises",
+        source: "TrainingPeaks"
+      },
+      {
+        id: "idea-side-lunge",
+        title: "Side Lunge",
+        kind: "mobility",
+        activityType: "FunctionalStrengthTraining",
+        minutes: null,
+        intensity: "easy",
+        phase: "any",
+        when: "before a run",
+        quote: "If you haven't been doing side lunges, start with 1 set x 3-5 reps.",
+        sourceTitle: "The Perfect Running Warm-Up: 5 Pre-Run Mobility Exercises",
+        source: "TrainingPeaks"
+      },
+      {
+        id: "idea-pre-race-easy-jog",
+        title: "Pre-Race Easy Jog",
+        kind: "easy run",
+        activityType: "Running",
+        minutes: 10,
+        intensity: "very easy",
+        phase: "race week",
+        when: "before the race",
+        quote: "Begin with a very easy jog for 10 minutes to raise core temperature without tiring yourself out.",
+        sourceTitle: "The Importance of the Pre-Race Warm-Up: A Routine to Activate the Body and Calm the Mind",
+        source: "Runlovers"
+      },
+      {
+        id: "idea-dynamic-mobility-and-drills",
+        title: "Dynamic Mobility and Drills",
+        kind: "mobility",
+        activityType: "Running",
+        minutes: 5,
+        intensity: "easy",
+        phase: "race week",
+        when: "before the race",
+        quote: "Follow with 5 minutes of dynamic mobility and drills to \u201Cwake up\u201D joints and tendons specifically.",
+        sourceTitle: "The Importance of the Pre-Race Warm-Up: A Routine to Activate the Body and Calm the Mind",
+        source: "Runlovers"
+      },
+      {
+        id: "idea-race-pace-strides",
+        title: "Race Pace Strides",
+        kind: "strides",
+        activityType: "Running",
+        minutes: 5,
+        intensity: "moderate",
+        phase: "race week",
+        when: "before the race",
+        quote: "Finish with 3\u20135 minutes of strides at race pace to \u201Ctrick\u201D your nervous system into readiness.",
+        sourceTitle: "The Importance of the Pre-Race Warm-Up: A Routine to Activate the Body and Calm the Mind",
+        source: "Runlovers"
+      },
+      {
+        id: "idea-dynamic-leg-swings",
+        title: "Dynamic leg swings",
+        kind: "mobility",
+        activityType: "Other",
+        minutes: null,
+        intensity: "easy",
+        phase: "any",
+        when: "before runs",
+        quote: "10 to 15 front-to-back swings and 10 to 15 side-to-side swings per leg.",
+        sourceTitle: "The Best Mobility Drills for Runners Who Want Fewer Injuries - Fitness Warrior Nation",
+        source: "Fitness Warrior Nation"
+      },
+      {
+        id: "idea-ankle-circles",
+        title: "Ankle circles",
+        kind: "mobility",
+        activityType: "Other",
+        minutes: null,
+        intensity: "easy",
+        phase: "any",
+        when: "before runs if your calves and ankles feel stiff",
+        quote: "10 to 15 controlled circles each direction per ankle.",
+        sourceTitle: "The Best Mobility Drills for Runners Who Want Fewer Injuries - Fitness Warrior Nation",
+        source: "Fitness Warrior Nation"
+      },
+      {
+        id: "idea-hip-flexor-stretch",
+        title: "Hip flexor stretch",
+        kind: "mobility",
+        activityType: "Other",
+        minutes: null,
+        intensity: "easy",
+        phase: "any",
+        when: "after a run or on recovery days",
+        quote: "20 to 30 seconds per side after a run or on recovery days.",
+        sourceTitle: "The Best Mobility Drills for Runners Who Want Fewer Injuries - Fitness Warrior Nation",
+        source: "Fitness Warrior Nation"
+      },
+      {
+        id: "idea-cat-cow",
+        title: "Cat-cow",
+        kind: "mobility",
+        activityType: "Other",
+        minutes: null,
+        intensity: "easy",
+        phase: "any",
+        when: "after long sitting and hard training",
+        quote: "8 to 12 slow cycles.",
+        sourceTitle: "The Best Mobility Drills for Runners Who Want Fewer Injuries - Fitness Warrior Nation",
+        source: "Fitness Warrior Nation"
+      },
+      {
+        id: "idea-10-minute-mobility-routine",
+        title: "10-Minute Mobility Routine",
+        kind: "mobility",
+        activityType: "Yoga",
+        minutes: 10,
+        intensity: "easy",
+        phase: "any",
+        when: "Before running or on rest days",
+        quote: "Try this practical 10-minute mobility routine for runners to loosen stiff hips and ankles.",
+        sourceTitle: "Mobility Exercises for Runners: 10-Minute Routine",
+        source: "Runner's Blueprint"
+      },
+      {
+        id: "idea-wall-ankle-rocks",
+        title: "Wall Ankle Rocks",
+        kind: "mobility",
+        activityType: "Yoga",
+        minutes: null,
+        intensity: "easy",
+        phase: "any",
+        when: "Before running or strength training",
+        quote: "Stiff ankles or heels lifting during squats: Start With Wall ankle rocks.",
+        sourceTitle: "Mobility Exercises for Runners: 10-Minute Routine",
+        source: "Runner's Blueprint"
+      },
+      {
+        id: "idea-standing-hip-circles-and-90-90-hip-switches",
+        title: "Standing Hip Circles and 90/90 Hip Switches",
+        kind: "mobility",
+        activityType: "Yoga",
+        minutes: null,
+        intensity: "easy",
+        phase: "any",
+        when: "Before running or during a separate session",
+        quote: "Hips feel stiff after sitting: Start With Standing hip circles and 90/90 hip switches.",
+        sourceTitle: "Mobility Exercises for Runners: 10-Minute Routine",
+        source: "Runner's Blueprint"
+      },
+      {
+        id: "idea-couch-stretch",
+        title: "Couch Stretch",
+        kind: "mobility",
+        activityType: "Yoga",
+        minutes: null,
+        intensity: "easy",
+        phase: "any",
+        when: "After running or on rest days",
+        quote: "Tightness through the front of the hip: Start With Couch stretch.",
+        sourceTitle: "Mobility Exercises for Runners: 10-Minute Routine",
+        source: "Runner's Blueprint"
+      },
+      {
+        id: "idea-test-new-shoes-on-a-long-run",
+        title: "Test new shoes on a long run",
+        kind: "easy run",
+        activityType: "Running",
+        minutes: null,
+        intensity: "easy",
+        phase: "new shoes",
+        when: "on one of your long-ish runs",
+        quote: "Test them out early, on one of your long-ish runs, to make sure they indeed will work for you.",
+        sourceTitle: "r/Marathon_Training on Reddit: How soon should I break in my new running shoes before a marathon?",
+        source: "Reddit"
+      },
+      {
+        id: "idea-short-test-runs-for-new-shoes",
+        title: "Short test runs for new shoes",
+        kind: "easy run",
+        activityType: "Running",
+        minutes: null,
+        intensity: "easy",
+        phase: "new shoes",
+        when: "before the marathon",
+        quote: "Try them on a few short runs and then on one of your final long runs just to make sure they don\u2019t start hurting in like hour 2.5.",
+        sourceTitle: "r/Marathon_Training on Reddit: How soon should I break in my new running shoes before a marathon?",
+        source: "Reddit"
+      },
+      {
+        id: "idea-taper-run-in-new-shoes",
+        title: "Taper run in new shoes",
+        kind: "easy run",
+        activityType: "Running",
+        minutes: null,
+        intensity: "easy",
+        phase: "taper",
+        when: "during your taper",
+        quote: "I\u2019d wear them during your taper to make sure they don\u2019t hurt your feet",
+        sourceTitle: "r/Marathon_Training on Reddit: How soon should I break in my new running shoes before a marathon?",
+        source: "Reddit"
+      },
+      {
+        id: "idea-long-run-in-race-shoes",
+        title: "Long run in race shoes",
+        kind: "easy run",
+        activityType: "Running",
+        minutes: null,
+        intensity: "easy",
+        phase: "new shoes",
+        when: "on one of your final long runs",
+        quote: "I give them at least one long run or approx ~2.5 - 3 hours.",
+        sourceTitle: "r/Marathon_Training on Reddit: How soon should I break in my new running shoes before a marathon?",
+        source: "Reddit"
+      },
+      {
+        id: "idea-long-runs-in-new-race-shoes",
+        title: "Long runs in new race shoes",
+        kind: "easy run",
+        activityType: "Running",
+        minutes: null,
+        intensity: "easy",
+        phase: "new shoes",
+        when: "4\u20136 weeks before race day",
+        quote: "Buy new race shoes 4\u20136 weeks before race day and use them for all your long runs to accumulate break-in miles safely.",
+        sourceTitle: "How Long to Break In Running Shoes? Miles, Not Days",
+        source: "RunnersConnect"
+      },
+      {
+        id: "idea-shoe-rotation-for-foam-recovery",
+        title: "Shoe rotation for foam recovery",
+        kind: "other",
+        activityType: "Running",
+        minutes: null,
+        intensity: "easy",
+        phase: "new shoes",
+        when: "24\u201348 hours between runs",
+        quote: "Alternating between two pairs during break-in gives each shoe time to recover between sessions.",
+        sourceTitle: "How Long to Break In Running Shoes? Miles, Not Days",
+        source: "RunnersConnect"
+      },
+      {
+        id: "idea-blister-prevention-routine",
+        title: "Blister prevention routine",
+        kind: "other",
+        activityType: "Other",
+        minutes: null,
+        intensity: "very easy",
+        phase: "new shoes",
+        when: "During break-in",
+        quote: "Synthetic or merino wool socks, anti-chafing balm, and 24\u201348 hour recovery between runs cut blister risk significantly during break-in.",
+        sourceTitle: "How Long to Break In Running Shoes? Miles, Not Days",
+        source: "RunnersConnect"
+      },
+      {
+        id: "idea-wear-new-shoes-around-the-house",
+        title: "Wear new shoes around the house",
+        kind: "other",
+        activityType: "Walking",
+        minutes: 180,
+        intensity: "very easy",
+        phase: "new shoes",
+        when: "When you first get your new shoes",
+        quote: "Wear them around the house for at least three hours a day.",
+        sourceTitle: "How to Break in New Running Shoes: Easy Tips for a Comfy Fit",
+        source: "My Elite Feet"
+      },
+      {
+        id: "idea-short-walks-in-new-shoes",
+        title: "Short walks in new shoes",
+        kind: "walk",
+        activityType: "Walking",
+        minutes: 15,
+        intensity: "very easy",
+        phase: "new shoes",
+        when: "Once your shoes feel comfortable at home",
+        quote: "These 10-15 minute walks help your feet adjust gradually.",
+        sourceTitle: "How to Break in New Running Shoes: Easy Tips for a Comfy Fit",
+        source: "My Elite Feet"
+      },
+      {
+        id: "idea-shorter-runs-at-half-distance",
+        title: "Shorter runs at half distance",
+        kind: "easy run",
+        activityType: "Running",
+        minutes: null,
+        intensity: "easy",
+        phase: "new shoes",
+        when: "After a few days of short walks",
+        quote: "After a few days, progress to shorter runs and cover about half your usual distance.",
+        sourceTitle: "How to Break in New Running Shoes: Easy Tips for a Comfy Fit",
+        source: "My Elite Feet"
+      },
+      {
+        id: "idea-alternate-old-and-new-shoes",
+        title: "Alternate old and new shoes",
+        kind: "other",
+        activityType: "Running",
+        minutes: null,
+        intensity: "easy",
+        phase: "new shoes",
+        when: "During the break-in period",
+        quote: "Switch things up by alternating between your old shoes and your new running shoes.",
+        sourceTitle: "How to Break in New Running Shoes: Easy Tips for a Comfy Fit",
+        source: "My Elite Feet"
+      }
+    ]
+  };
+
+  // src/data.mjs
+  var workoutIdeas = () => running_default.ideas ?? [];
+
+  // src/memory.mjs
+  var ACTIVITIES = ["run", "long_run", "walk", "strength", "yoga", "ride", "elliptical", "swim", "stretch", "rest", "other"];
+  var INTENSITIES = ["easy", "steady", "hard"];
+  var ACTIVE = ["saved", "confirmed"];
+  var STOPPED = ["rejected", "stopped"];
+  var FROM_HEALTH = {
+    Running: "run",
+    Walking: "walk",
+    Cycling: "ride",
+    Elliptical: "elliptical",
+    Yoga: "yoga",
+    Swimming: "swim",
+    FunctionalStrengthTraining: "strength",
+    TraditionalStrengthTraining: "strength",
+    CoreTraining: "strength",
+    Pilates: "stretch",
+    Flexibility: "stretch",
+    Cooldown: "stretch",
+    MindAndBody: "stretch"
+  };
+  var own = (o, k) => typeof k === "string" && Object.prototype.hasOwnProperty.call(o, k) ? o[k] : null;
+  var LABELS = { HighIntensityIntervalTraining: "HIIT", Hiking: "hike", Rowing: "rowing", CrossTraining: "cross-training" };
+  var norm = (v) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  var activityOf = (healthType) => typeof healthType === "string" && healthType ? own(FROM_HEALTH, healthType) ?? "other" : null;
+  var labelOf = (healthType) => own(LABELS, healthType) ?? String(healthType).replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  var baseActivity = (activity) => activity === "long_run" ? "run" : activity;
+  var isRun = (activity) => baseActivity(activity) === "run";
+  function readMemory(memory) {
+    if (memory === void 0 || memory === null) return { given: false, rows: [], keys: [], stoppedKeys: [], slots: [], stoppedSlots: [], first: () => null };
+    if (typeof memory !== "object" || !Array.isArray(memory.rows)) throw new InputError("bad_memory");
+    const valid = memory.rows.filter((r) => r && typeof r === "object" && typeof r.key === "string" && r.key);
+    const rows = valid.filter((r) => r.state === void 0 || r.state === null || ACTIVE.includes(r.state));
+    const stoppedKeys = [...new Set(valid.filter((r) => STOPPED.includes(r.state)).map((r) => r.key))];
+    const keys = [...new Set(rows.map((r) => r.key))].filter((k) => !stoppedKeys.includes(k));
+    const slots = [];
+    const stoppedSlots = [];
+    for (const r of valid) {
+      const d = r.kind === "usual_slot" && r.data && typeof r.data === "object" ? r.data : null;
+      const stopped = stoppedKeys.includes(r.key);
+      if (!d || !stopped && !(rows.includes(r) && keys.includes(r.key)) || !ACTIVITIES.includes(d.activity) || !Number.isInteger(d.weekday) || d.weekday < 0 || d.weekday > 6) continue;
+      if (!Number.isInteger(d.hour) || d.hour < 0 || d.hour > 23) continue;
+      (stopped ? stoppedSlots : slots).push({
+        key: r.key,
+        weekday: d.weekday,
+        activity: baseActivity(d.activity),
+        hour: d.hour,
+        minutes: Number.isFinite(d.minutes) && d.minutes > 0 ? d.minutes : null,
+        label: d.activity === "other" && typeof d.label === "string" && d.label.trim() ? d.label.trim() : null,
+        weeksSeen: d.weeksSeen ?? null,
+        weeksTotal: d.weeksTotal ?? null,
+        statement: typeof r.statement === "string" ? r.statement : ""
+      });
+    }
+    const first = (kind) => rows.find((r) => r.kind === kind && keys.includes(r.key) && r.data && typeof r.data === "object") ?? null;
+    return { given: true, rows: rows.filter((r) => keys.includes(r.key)), keys, stoppedKeys, slots, stoppedSlots, first };
+  }
+  function slotMatches(slot, healthType) {
+    const activity = activityOf(healthType);
+    if (activity === null || slot.activity !== activity) return false;
+    return activity !== "other" || slot.label === null || [norm(healthType), norm(labelOf(healthType))].includes(norm(slot.label));
+  }
+  function slotFor(mem, weekday, healthType) {
+    let hit = null;
+    for (const s of mem.slots) if (s.weekday === weekday && slotMatches(s, healthType)) hit = s;
+    return hit;
+  }
+  function readStopped(list, mem) {
+    if (list !== void 0 && list !== null && !Array.isArray(list)) throw new InputError("bad_stopped");
+    const out = [];
+    const add = (x) => {
+      if (!out.some((y) => y.activity === x.activity && y.weekday === x.weekday && y.hour === x.hour)) out.push(x);
+    };
+    for (const x of mem.stoppedSlots) add({ key: x.key, activity: x.activity, weekday: x.weekday, hour: x.hour, label: x.label });
+    for (const x of list ?? []) {
+      if (!x || typeof x !== "object" || !ACTIVITIES.includes(x.activity) || !Number.isInteger(x.weekday) || x.weekday < 0 || x.weekday > 6) continue;
+      if (!Number.isInteger(x.hour) || x.hour < 0 || x.hour > 23) continue;
+      add({ key: typeof x.key === "string" && x.key ? x.key : null, activity: baseActivity(x.activity), weekday: x.weekday, hour: x.hour, label: x.activity === "other" && typeof x.label === "string" && x.label.trim() ? x.label.trim() : null });
+    }
+    return out;
+  }
+  var isStopped = (stopped, activity, weekday, hour) => stopped.some((x) => x.activity === baseActivity(activity) && x.weekday === weekday && x.hour === hour);
+
+  // src/history.mjs
+  var KEEP = ["id", "activityType", "start", "end", "avgHeartRate", "effort", "distanceKm", "indoor"];
+  function readHistory(history, now) {
+    if (!history || typeof history !== "object") throw new InputError("missing_history");
+    return [historyWorkouts(history, now), historyDaily(history, now)];
+  }
+  function historyWorkouts(doc, now) {
+    const out = [];
+    for (const raw of doc.workouts ?? []) {
+      const w = {};
+      for (const k of KEEP) w[k] = raw[k] ?? null;
+      const start = parseDT(raw.start);
+      const end = parseDT(raw.end);
+      if (end.mic <= now.mic) {
+        const minutes = Number.isFinite(raw.durationMin) && raw.durationMin > 0 ? raw.durationMin : (end.mic - start.mic) / 1e6 / 60;
+        out.push({ ...w, start, end, durationMin: minutes });
+      }
+    }
+    return out.map((w, i) => [w, i]).sort((a, b) => a[0].start.mic - b[0].start.mic || a[1] - b[1]).map(([w]) => w);
+  }
+  function historyDaily(doc, now) {
+    const out = [];
+    (doc.daily ?? []).forEach((d, i) => {
+      const day = parseDay(d.date);
+      if (day < dayOf(now)) out.push([{ sleepMin: d.sleepMin ?? null, restingHeartRate: d.restingHeartRate ?? null, date: day }, i]);
+    });
+    return out.sort((a, b) => a[0].date - b[0].date || a[1] - b[1]).map(([d]) => d);
+  }
+
+  // src/condition.mjs
+  var KM_PER_MILE = 1.609344;
+  var DEFAULT_LIFE_KM = 650;
+  var WORN_AT = 0.6;
+  var REPLACE_AT = 0.85;
+  var runs = (workouts) => workouts.filter((w) => w.activityType === "Running" && (w.durationMin ?? 0) >= 10);
+  function condition(workouts, shoes, now, lifeKm = DEFAULT_LIFE_KM) {
+    const counted = runs(workouts).filter((w) => dayOf(w.start) >= shoes.boughtOn && w.end.mic <= now.mic);
+    const dist = counted.map((w) => w.distanceKm || 0);
+    const runKm = pySum(dist);
+    const km = shoes.startMiles * KM_PER_MILE + runKm;
+    const share = km / lifeKm;
+    const kmText = dist.some((d) => d) ? pyFloat(pyRound(runKm, 1)) : "0";
+    return {
+      km: pyRound(km, 1),
+      miles: pyRound(km / KM_PER_MILE),
+      lifeKm,
+      percentLife: pyRound(share * 100),
+      status: share >= REPLACE_AT ? "replace" : share >= WORN_AT ? "worn" : "fresh",
+      runsCounted: counted.length,
+      why: `${pyRound(shoes.startMiles)} mi on the pair before tracking plus ${kmText} km from ${counted.length} logged runs since ${dayISO(shoes.boughtOn)}: ${pyRound(share * 100)}% of a ${lifeKm} km life.`
+    };
+  }
+
+  // src/workouts.mjs
+  var DAYS = 7;
+  var TODAY_LEAD_MIN = 60;
+  var TODAY_END_HOUR = 22;
+  var LOAD_GROWTH = 1.1;
+  var ACWR_MAX = 1.3;
+  var SLEEP_DROP_MIN = 30;
+  var RHR_RISE = 3;
+  var TAPER_DAYS = 10;
+  var WORN_RUN_MAX_MIN = 45;
+  var BREAK_IN_MIN = 30;
+  var MIN_SESSION = 20;
+  var LONG_RUN_MIN = 60;
+  var HARD_EFFORT = 6;
+  var EASY_EFFORT = 4;
+  var NOUN = {
+    Running: "run",
+    Cycling: "bike ride",
+    Elliptical: "elliptical session",
+    Walking: "walk",
+    Yoga: "yoga",
+    FunctionalStrengthTraining: "strength session",
+    TraditionalStrengthTraining: "strength session"
+  };
+  var COUNT = [null, "One", "Two", "Three", "Four", "Five", "Six", "Seven"];
+  var plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  var nounOf = (activity) => NOUN[activity] ?? String(activity).toLowerCase();
+  var wordOf = (s) => NOUN[s.usualActivity ?? s.activityType] ?? s.label ?? labelOf(s.usualActivity ?? s.activityType);
+  function effort(w) {
+    if (w.effort) return Number(w.effort);
+    const hr = w.avgHeartRate;
+    return hr ? Math.max(1, Math.min(10, 1 + (hr - 90) / 10)) : 5;
+  }
+  var intensityOf = (e) => e >= HARD_EFFORT ? "hard" : e <= EASY_EFFORT ? "easy" : "steady";
+  function signals(ws, days, now) {
+    const load = (rows) => pySum(rows.map((w) => effort(w) * w.durationMin));
+    const load7 = load(ws.filter((w) => w.start.mic >= now.mic - 7 * US_DAY));
+    const avg28 = load(ws.filter((w) => w.start.mic >= now.mic - 28 * US_DAY)) / 4;
+    const cap = Math.min(LOAD_GROWTH * Math.max(load7, avg28), ACWR_MAX * avg28);
+    const avg = (rows, key) => {
+      const vals = rows.filter((r) => r[key]).map((r) => r[key]);
+      return vals.length ? pyRound(pyMean(vals), 1) : null;
+    };
+    const today = dayOf(now);
+    const d7 = days.filter((d) => d.date >= today - 7);
+    const d28 = days.filter((d) => d.date >= today - 28);
+    const sig = {
+      load7: pyRound(load7),
+      loadWeeklyAvg28: pyRound(avg28),
+      loadRatio: avg28 ? pyRound(load7 / avg28, 2) : null,
+      loadCap: pyRound(cap),
+      sleep7Min: avg(d7, "sleepMin"),
+      sleep28Min: avg(d28, "sleepMin"),
+      rhr7: avg(d7, "restingHeartRate"),
+      rhr28: avg(d28, "restingHeartRate")
+    };
+    const tired = [];
+    if (sig.sleep7Min && sig.sleep28Min && sig.sleep7Min < sig.sleep28Min - SLEEP_DROP_MIN) {
+      tired.push(`sleep down ${pyRound(sig.sleep28Min - sig.sleep7Min)} min/night`);
+    }
+    if (sig.rhr7 && sig.rhr28 && sig.rhr7 > sig.rhr28 + RHR_RISE) tired.push(`resting HR up ${pyFloat(pyRound(sig.rhr7 - sig.rhr28, 1))} bpm`);
+    sig.readiness = tired.length ? `ease off: ${tired.join(", ")}` : "normal";
+    return sig;
+  }
+  var tiredSignals = (sig) => [
+    ...sig.readiness.includes("sleep down") ? ["sleep"] : [],
+    ...sig.readiness.includes("resting HR up") ? ["resting_hr"] : []
+  ];
+  function usualWeek(ws, now) {
+    const byDay = /* @__PURE__ */ new Map();
+    for (const w of ws) {
+      if (w.start.mic < now.mic - 28 * US_DAY) continue;
+      const wd = weekdayOf(dayOf(w.start));
+      if (!byDay.has(wd)) byDay.set(wd, []);
+      byDay.get(wd).push(w);
+    }
+    const week = /* @__PURE__ */ new Map();
+    for (const [wd, rows] of byDay) {
+      if (new Set(rows.map((r) => dayOf(r.start))).size < 2) continue;
+      const counts = /* @__PURE__ */ new Map();
+      for (const r of rows) counts.set(r.activityType, (counts.get(r.activityType) ?? 0) + 1);
+      let act = null;
+      for (const [a, n] of counts) if (act === null || n > counts.get(act)) act = a;
+      const same = rows.filter((r) => r.activityType === act);
+      week.set(wd, {
+        activityType: act,
+        minutes: pyRound(pyMedian(same.map((r) => r.durationMin))),
+        hour: pyRound(pyMedian(same.map((r) => hourOf(r.start)))),
+        effort: pyMean(same.map(effort)),
+        label: same[same.length - 1].label ?? ""
+      });
+    }
+    return week;
+  }
+  var NEW_HISTORY_DAYS = 14;
+  var NEW_MAX_SESSIONS = 3;
+  var finite = (v) => Number.isFinite(v) ? v : null;
+  function sessionLimit(ws, week, now, mem) {
+    const perWeek = finite(mem?.first("weekly_volume")?.data?.workoutsPerWeek);
+    if (perWeek !== null && perWeek >= 0) return Math.min(DAYS, Math.ceil(perWeek) + 1);
+    if (mem?.slots.length) return Math.min(DAYS, Math.max(new Set(mem.slots.map((x) => x.weekday)).size, week.size) + 1);
+    const first = ws.reduce((min, w) => Math.min(min, w.start.mic), Infinity);
+    return ws.length && (now.mic - first) / US_DAY >= NEW_HISTORY_DAYS ? Math.min(DAYS, week.size + 1) : NEW_MAX_SESSIONS;
+  }
+  var HIGH_LOAD_RATIO = 1.1;
+  function minutesBudget(ws, now, mem, week = /* @__PURE__ */ new Map()) {
+    const load = mem?.first("load")?.data;
+    const last7 = finite(load?.minutes7d);
+    let usual = finite(mem?.first("weekly_volume")?.data?.minutesPerWeek);
+    if (!(usual > 0)) usual = last7 !== null && load?.ratioToUsual > 0 ? last7 / load.ratioToUsual : null;
+    let ratio = usual !== null ? finite(load?.ratioToUsual) ?? (last7 !== null ? last7 / usual : null) : null;
+    if (usual === null && ws.length) {
+      const minutes = (days) => pySum(ws.filter((w) => w.start.mic >= now.mic - days * US_DAY).map((w) => w.durationMin));
+      usual = minutes(28) / 4;
+      ratio = usual > 0 ? minutes(7) / usual : null;
+    }
+    if (usual === null) return { usual: null, ratio: null, limit: null };
+    const high = ratio !== null && ratio > HIGH_LOAD_RATIO;
+    const sum = (rows) => rows.reduce((total, x) => total + (x.minutes ?? 0), 0);
+    const usualWeekMinutes = Math.max(sum(mem?.slots ?? []), sum([...week.values()]));
+    const limit = high ? pyRound(usual) : Math.max(pyRound(usual * LOAD_GROWTH), usualWeekMinutes);
+    return { usual: pyRound(usual), ratio: ratio === null ? null : pyRound(ratio, 2), limit: Math.max(MIN_SESSION, limit) };
+  }
+  function longDay(week) {
+    let best = null;
+    for (const [wd, s] of week) if (s.activityType === "Running" && (best === null || s.minutes > week.get(best).minutes)) best = wd;
+    return best;
+  }
+  function parseRequest(a) {
+    if (!a || typeof a !== "object") throw new InputError("bad_request");
+    const now = parseDT(a.now);
+    const day = (v) => v === void 0 || v === null ? null : parseDay(String(v).slice(0, 10));
+    const shoes = a.shoes ? { boughtOn: day(a.shoes.boughtOn), startMiles: Number(a.shoes.startMiles ?? 0) } : null;
+    if (shoes && (shoes.boughtOn === null || !Number.isFinite(shoes.startMiles))) throw new InputError("bad_shoes");
+    const busy = (a.busy ?? a.calendar ?? []).map((b) => ({ start: parseDT(b.start), end: parseDT(b.end), title: typeof b.title === "string" ? b.title : null }));
+    return { now, shoes, newPairArrives: day(a.newPairArrives), raceDate: day(a.raceDate), busy, memory: a.memory ?? null, history: a.history ?? null, stopped: a.stopped ?? null };
+  }
+  function build(req, firstDay = 0) {
+    const { now } = req;
+    const [ws, days] = readHistory(req.history, now);
+    const historySource = "phone";
+    const sig = signals(ws, days, now);
+    const mem = readMemory(req.memory);
+    const stopped = readStopped(req.stopped, mem);
+    const week = usualWeek(ws, now);
+    const cond = req.shoes ? condition(ws, req.shoes, now) : null;
+    const worn = Boolean(cond && cond.status === "replace");
+    const long = longDay(week);
+    const hasBike = ws.some((w) => w.activityType === "Cycling");
+    const tired = tiredSignals(sig);
+    let eased = false;
+    let brokenIn = 0;
+    const sessions = [];
+    for (let i = firstDay; i < firstDay + DAYS; i += 1) {
+      const day = dayOf(now) + i;
+      const wd = weekdayOf(day);
+      if (req.raceDate !== null && day === req.raceDate) {
+        sessions.push({ date: day, activityType: "Running", usualActivity: "Running", minutes: 0, hour: 8, tags: [{ code: "race_day" }], race: true });
+        continue;
+      }
+      if (req.raceDate !== null && day === req.raceDate - 1) continue;
+      const usual = week.get(wd);
+      if (!usual) continue;
+      const slot = slotFor(mem, wd, usual.activityType);
+      if (i === 0 && atDay(day, now.off, slot ? slot.hour : usual.hour).mic < now.mic + TODAY_LEAD_MIN * US_MIN) continue;
+      if (isStopped(stopped, activityOf(usual.activityType), wd, slot ? slot.hour : usual.hour)) continue;
+      const s = {
+        date: day,
+        activityType: usual.activityType,
+        usualActivity: usual.activityType,
+        minutes: usual.minutes,
+        effort: usual.effort,
+        hour: slot ? slot.hour : usual.hour,
+        tags: [],
+        usual: usual.label,
+        label: slot ? slot.label : null
+      };
+      if (slot) {
+        s.basedOn = [slot.key];
+        s.tags.push({ code: "memory_slot", hour: s.hour });
+      }
+      if (wd === long) s.tags.push({ code: "long_run" });
+      const daysToRace = req.raceDate !== null ? req.raceDate - day : null;
+      if (daysToRace !== null && daysToRace > 0 && daysToRace <= TAPER_DAYS && s.activityType === "Running") {
+        s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes * (wd === long ? 0.6 : 0.8)));
+        s.tags.push({ code: "taper", daysToRace });
+      }
+      if (sig.readiness !== "normal" && (!eased || firstDay === 0 && i <= 1) && s.effort >= HARD_EFFORT) {
+        s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes * 0.8));
+        s.effort = Math.min(s.effort, EASY_EFFORT);
+        s.tags.push({ code: "ease_off", signals: tired });
+        eased = true;
+      }
+      if (s.activityType === "Running") {
+        const arrived = req.newPairArrives !== null && day > req.newPairArrives;
+        if (worn && !arrived && s.minutes > WORN_RUN_MAX_MIN) {
+          s.activityType = hasBike ? "Cycling" : "Elliptical";
+          s.tags.push({ code: "worn_shoes_swap", percentLife: cond.percentLife, to: s.activityType });
+        } else if (arrived && brokenIn < 2) {
+          s.minutes = Math.min(s.minutes, BREAK_IN_MIN);
+          s.effort = Math.min(s.effort, EASY_EFFORT);
+          s.tags.push({ code: "break_in" });
+          brokenIn += 1;
+        }
+      }
+      sessions.push(s);
+    }
+    if (firstDay === 0) {
+      const limit = sessionLimit(ws, week, now, mem);
+      let kept = 0;
+      for (let i = 0; i < sessions.length; i += 1) {
+        if (sessions[i].race) continue;
+        kept += 1;
+        if (kept > limit) {
+          sessions.splice(i, 1);
+          i -= 1;
+        }
+      }
+    }
+    const load = (rows) => pySum(rows.filter((s) => !s.race).map((s) => s.effort * s.minutes));
+    const planned = load(sessions);
+    if (planned > sig.loadCap && sig.loadCap > 0) {
+      const flex = sessions.filter((s) => !s.race && !s.tags.some((t) => t.code === "long_run"));
+      const excess = planned - sig.loadCap;
+      const flexLoad = load(flex) || 1;
+      for (const s of flex) {
+        const cut = s.minutes * Math.min(0.5, excess / flexLoad);
+        if (cut >= 1) {
+          s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes - cut));
+          s.tags.push({ code: "load_trim" });
+        }
+      }
+    }
+    if (sig.loadCap > 0) {
+      for (; ; ) {
+        if (load(sessions) <= sig.loadCap) break;
+        const open = sessions.filter((s) => !s.race && s.minutes > MIN_SESSION);
+        const flex = open.filter((s) => !s.tags.some((t) => t.code === "long_run"));
+        const pool = flex.length ? flex : open;
+        if (!pool.length) break;
+        let longest = pool[0];
+        for (const s of pool) if (s.minutes > longest.minutes) longest = s;
+        longest.minutes -= 1;
+        if (!longest.tags.some((t) => t.code === "load_trim")) longest.tags.push({ code: "load_trim" });
+      }
+    }
+    if (firstDay === 0) {
+      const { limit } = minutesBudget(ws, now, mem, week);
+      const total = () => sessions.reduce((sum, s) => sum + (s.race ? 0 : s.minutes), 0);
+      while (limit !== null && total() > limit) {
+        const open = sessions.filter((s) => !s.race && s.minutes > MIN_SESSION);
+        const flex = open.filter((s) => !s.tags.some((t) => t.code === "long_run"));
+        const pool = flex.length ? flex : open;
+        if (pool.length) {
+          let longest = pool[0];
+          for (const s of pool) if (s.minutes > longest.minutes) longest = s;
+          longest.minutes -= 1;
+          if (!longest.tags.some((t) => t.code === "load_trim")) longest.tags.push({ code: "load_trim" });
+        } else {
+          const booked = sessions.filter((s) => !s.race);
+          if (booked.length <= 1) break;
+          const last = sessions.lastIndexOf(booked[booked.length - 1]);
+          sessions.splice(last, 1);
+        }
+      }
+    }
+    sig.plannedLoad = pyRound(load(sessions));
+    for (const s of sessions) {
+      const length = Math.max(s.minutes, 1) * US_MIN;
+      let start = atDay(s.date, now.off, s.hour);
+      let end = addUs(start, length);
+      for (const b of req.busy) {
+        if (b.start.mic < end.mic && start.mic < b.end.mic) {
+          start = { mic: b.end.mic, off: now.off };
+          end = addUs(start, length);
+          s.tags.push({ code: "calendar_moved", to: clock(hourOf(start), minuteOf(start)) });
+        }
+      }
+      if (hourOf(end) >= 21 && !s.race) s.tags.push({ code: "no_free_slot" });
+      s.start = start;
+      s.end = end;
+    }
+    const before = sessions.length;
+    for (let i = sessions.length - 1; i >= 0; i -= 1) {
+      const s = sessions[i];
+      if (!s.race && isStopped(stopped, activityOf(s.activityType), weekdayOf(s.date), hourOf(s.start))) sessions.splice(i, 1);
+    }
+    if (sessions.length !== before) sig.plannedLoad = pyRound(load(sessions));
+    const tooLate = sessions.findIndex((s) => !s.race && s.date === dayOf(now) && s.end.mic > atDay(s.date, now.off, TODAY_END_HOUR).mic);
+    if (tooLate >= 0) {
+      sessions.splice(tooLate, 1);
+      sig.plannedLoad = pyRound(load(sessions));
+    }
+    return { sessions, signals: sig, condition: cond, memory: mem, memorySource: mem.given ? "phone" : null, historySource, week, long };
+  }
+  var TIRED_WORDS = { sleep: "you have been sleeping less than usual", resting_hr: "your resting heart rate is higher than usual" };
+  var tiredWords = (list) => list.map((k) => TIRED_WORDS[k]).filter(Boolean).join(" and ") || "your body needs a lighter day";
+  function wording(tag, s) {
+    const weekday = WEEKDAY_NAMES[weekdayOf(s.date)];
+    const noun = wordOf(s);
+    const machine = tag.to === "Cycling" ? "bike" : "elliptical";
+    switch (tag.code) {
+      case "usual":
+        return { whole: `Your usual ${weekday} ${noun}.` };
+      case "memory_slot":
+        return { whole: `Your usual ${weekday} ${clock(tag.hour)} ${noun}.` };
+      case "long_run":
+        return { part: "the longest of your week", whole: "It is your longest run of the week." };
+      case "taper":
+        return { part: `kept shorter because your race is ${plural(tag.daysToRace, "day")} away` };
+      case "ease_off":
+        return { part: `kept short and easy because ${tiredWords(tag.signals ?? [])}` };
+      case "worn_shoes_swap":
+        return { part: `moved to the ${machine} because your running shoes are nearly worn out`, whole: `Your running shoes are nearly worn out, so this one moves to the ${machine}.` };
+      case "break_in":
+        return { whole: "A short, easy run to break in your new shoes." };
+      case "load_trim":
+        return { part: "kept short so this week stays close to your normal" };
+      case "calendar_moved":
+        return { part: `moved to ${tag.to} because your calendar is busy before that` };
+      case "no_free_slot":
+        return { whole: "It ends late because the rest of that day is full, so skip it if that is too late." };
+      case "race_day":
+        return { whole: "Race day. Rest and fuel." };
+      default:
+        return { whole: "" };
+    }
+  }
+  function sessionReasons(s) {
+    const tags = s.tags.length ? s.tags : [{ code: "usual" }];
+    const weekday = WEEKDAY_NAMES[weekdayOf(s.date)];
+    const noun = wordOf(s);
+    return tags.map((t, i) => {
+      const w = wording(t, s);
+      const text = i === 0 && w.part ? `Your usual ${weekday} ${noun}, ${w.part}.` : w.whole ?? `${w.part.slice(0, 1).toUpperCase()}${w.part.slice(1)}.`;
+      return { code: t.code, text };
+    });
+  }
+  var sentence = (reasons) => [...new Set(reasons.map((r) => r.text))].join(" ");
+  var SAFE_KINDS = ["strides", "shakeout", "mobility", "drills", "walk"];
+  var DEFAULT_MIN = { strides: 6, shakeout: 15, mobility: 10, drills: 10, walk: 15 };
+  var ADDON_EFFORT = 3;
+  var MAX_SUGGESTIONS = 2;
+  function phases(req, plan, firstDay) {
+    const ph = /* @__PURE__ */ new Set(["any"]);
+    const first = dayOf(req.now) + firstDay;
+    if (req.raceDate !== null && req.raceDate - first > 0 && req.raceDate - first <= TAPER_DAYS) {
+      ph.add("taper");
+      ph.add("race week");
+    }
+    if (plan.condition && plan.condition.status === "replace") ph.add("worn shoes");
+    if (req.newPairArrives !== null) ph.add("new shoes");
+    return ph;
+  }
+  function why(idea, req) {
+    const out = req.raceDate !== null ? req.raceDate - dayOf(req.now) : null;
+    const lead = {
+      taper: out !== null ? `Your race is ${out} days out` : "You're tapering",
+      "race week": out !== null ? `Race week: your race is ${out} days out` : "Race week",
+      "new shoes": req.newPairArrives !== null ? `Your new pair arrives ${WEEKDAYS[weekdayOf(req.newPairArrives)]}` : "New shoes",
+      "worn shoes": "Your shoes are worn out",
+      any: "An easy add-on"
+    }[idea.phase];
+    const when = idea.when.slice(0, 1).toLowerCase() + idea.when.slice(1).replace(/\.+$/, "");
+    return `${lead}; ${idea.source} suggests it ${when}. Optional, and it fits in your week.`;
+  }
+  function suggestions(req, plan, ids, firstDay = 0) {
+    const sig = plan.signals;
+    let headroom = sig.loadCap - sig.plannedLoad;
+    const ph = phases(req, plan, firstDay);
+    const worn = Boolean(plan.condition && plan.condition.status === "replace");
+    const runs2 = plan.sessions.map((s, i) => [ids[i], s]).filter(([, s]) => s.activityType === "Running" && !s.race);
+    const rank = (x) => (x.phase === "any" ? 2 : 0) + (x.kind === "mobility" ? 1 : 0);
+    const ideas = workoutIdeas().map((x, i) => [x, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([x]) => x);
+    const out = [];
+    const used = /* @__PURE__ */ new Set();
+    for (const idea of ideas) {
+      if (out.length >= MAX_SUGGESTIONS) break;
+      const { kind } = idea;
+      if (!SAFE_KINDS.includes(kind) || idea.intensity === "hard" || !ph.has(idea.phase) || used.has(kind)) continue;
+      const minutes = Math.trunc(idea.minutes || DEFAULT_MIN[kind]);
+      if (minutes > 30 || ADDON_EFFORT * minutes > headroom) continue;
+      let attach = null;
+      if (["strides", "shakeout", "drills"].includes(kind)) {
+        let ok = runs2.filter(([, s]) => !(worn && req.newPairArrives !== null && s.date <= req.newPairArrives) && !(worn && req.newPairArrives === null));
+        if (kind === "shakeout" && req.raceDate !== null) ok = ok.filter(([, s]) => s.date === req.raceDate - 2);
+        if (!ok.length) continue;
+        attach = kind === "strides" ? ok[ok.length - 1] : ok[0];
+      }
+      out.push({
+        id: idea.id,
+        title: idea.title,
+        kind,
+        activityType: idea.activityType,
+        minutes,
+        when: attach ? `after your ${WEEKDAYS[weekdayOf(attach[1].date)]} run` : idea.when,
+        attachTo: attach ? attach[0] : null,
+        why: why(idea, req),
+        source: { title: idea.sourceTitle, name: idea.source },
+        quote: idea.quote,
+        optional: true
+      });
+      used.add(kind);
+      headroom -= ADDON_EFFORT * minutes;
+    }
+    return out;
+  }
+  function citations(s) {
+    const codes = s.tags.map((t) => t.code);
+    const want = [...codes.includes("taper") ? ["taper"] : [], ...codes.includes("worn_shoes_swap") ? ["worn shoes"] : [], ...codes.includes("break_in") ? ["new shoes"] : []];
+    const out = [];
+    for (const phase of want) {
+      const hit = workoutIdeas().find((i) => i.phase === phase || phase === "worn shoes" && i.kind === "cross-training");
+      if (hit) out.push({ source: `${hit.sourceTitle} (${hit.source})`, passage: hit.quote });
+    }
+    return out;
+  }
+  function summaryReasons(plan) {
+    const sig = plan.signals;
+    const out = [];
+    if (!plan.sessions.length) out.push({ code: "no_history", text: "Nothing is planned yet because there is not enough recent history to see your usual week." });
+    else if (sig.loadRatio === null) out.push({ code: "load_unknown", text: "This week follows your usual pattern." });
+    else if (sig.loadRatio < 0.9) {
+      const trimmed = plan.sessions.some((s) => s.tags.some((t) => t.code === "load_trim"));
+      out.push({ code: "load_light", text: trimmed ? "Last week was lighter than usual, so this week builds back up gently." : "A lighter week than usual, so there is room to build." });
+    } else if (sig.loadRatio > 1.1) out.push({ code: "load_heavy", text: "A heavier week than usual, so this week stays close to your normal." });
+    else out.push({ code: "load_normal", text: "Last week was close to your normal, so this week keeps your usual pattern." });
+    const tired = tiredSignals(sig);
+    if (tired.length) out.push({ code: "readiness_ease", text: `Take it easier for now, because ${tiredWords(tired)}.` });
+    const swaps = plan.sessions.filter((s) => s.tags.some((t) => t.code === "worn_shoes_swap")).length;
+    if (swaps) out.push({ code: "worn_shoes", text: `${swaps === 1 ? "One long run moves" : `${COUNT[swaps] ?? "Several"} long runs move`} off the road while your shoes are worn out.` });
+    return out;
+  }
+  var actionId = (s) => `wk-${dayISO(s.date)}-${s.activityType.toLowerCase()}`;
+  var p22 = (n) => String(n).padStart(2, "0");
+  function toSession(s, reasons) {
+    const base = activityOf(s.activityType);
+    if (s.race || base === null) return null;
+    const activity = base === "run" && s.minutes >= LONG_RUN_MIN && s.tags.some((t) => t.code === "long_run") ? "long_run" : base;
+    return {
+      id: `ses-${dayISO(s.date)}-${activity}-${p22(hourOf(s.start))}${p22(minuteOf(s.start))}`,
+      day: dayISO(s.date),
+      start: isoDT({ mic: Math.floor(s.start.mic / 1e6) * 1e6, off: s.start.off }),
+      // whole seconds, as the shared session shape asks
+      minutes: s.minutes,
+      activity,
+      intensity: intensityOf(s.effort),
+      reason: sentence(reasons),
+      basedOn: s.basedOn ?? []
+    };
+  }
+  function recommendWeek(args, firstDay = 0) {
+    const req = parseRequest(args);
+    const plan = build(req, firstDay);
+    const ids = plan.sessions.map(actionId);
+    const createdAt = isoDT(req.now);
+    const sessions = [];
+    const reasonsById = {};
+    const notes = [];
+    const actions = plan.sessions.map((s, i) => {
+      const reasons = sessionReasons(s);
+      const session = toSession(s, reasons);
+      if (session) {
+        sessions.push(session);
+        reasonsById[session.id] = reasons;
+      }
+      if (s.race) notes.push({ day: dayISO(s.date), code: "race_day", text: reasons[0].text });
+      return {
+        id: ids[i],
+        kind: s.race ? "note" : "addWorkout",
+        sessionId: session ? session.id : null,
+        title: s.race ? "Race day" : `Planned a ${s.minutes}-minute ${nounOf(s.activityType)}`,
+        planItemId: ids[i],
+        after: s.race ? null : { start: isoDT(s.start), end: isoDT(s.end), activityType: s.activityType },
+        reason: sentence(reasons),
+        reasons,
+        points: s.race ? null : 10,
+        createdAt,
+        rules: s.tags.map((t) => t.code),
+        basedOn: s.basedOn ?? [],
+        intensity: s.race ? null : intensityOf(s.effort),
+        evidence: citations(s)
+      };
+    });
+    const summary = summaryReasons(plan);
+    return {
+      sessions,
+      reasons: reasonsById,
+      notes,
+      summary: sentence(summary),
+      summaryReasons: summary,
+      signals: plan.signals,
+      actions,
+      suggestions: suggestions(req, plan, ids, firstDay),
+      memoryUsed: [...new Set(sessions.flatMap((x) => x.basedOn))],
+      memorySource: plan.memorySource,
+      historySource: plan.historySource,
+      live: false,
+      source: "rules",
+      condition: plan.condition
+    };
+  }
+
+  // src/plan.mjs
+  var MIN_MINUTES = 10;
+  var MAX_MINUTES = 180;
+  var LOAD_SLACK = 1.1;
+  var DAY_START_HOUR = 6;
+  var DAY_END_HOUR = 21;
+  var TAPER_RUN_MAX_MIN = 45;
+  var EFFORT_OF = { easy: 3, steady: 5, hard: 7 };
+  var NOUN2 = { run: "run", long_run: "long run", walk: "walk", strength: "strength session", yoga: "yoga", ride: "ride", elliptical: "elliptical session", swim: "swim", stretch: "stretch", rest: "rest", other: "session" };
+  var TIRED_WORDS2 = { sleep: "you have been sleeping less than usual", resting_hr: "your resting heart rate is higher than usual" };
+  var RACE_GOAL = /race|marathon|\b\d+ ?k\b|triathlon/i;
+  var finite2 = (v) => Number.isFinite(v) ? v : null;
+  function longestStreak(weekdays) {
+    const on = new Set(weekdays);
+    if (on.size >= 7) return 7;
+    let best = 0;
+    for (let start = 0; start < 7; start += 1) {
+      let n = 0;
+      while (n < 7 && on.has((start + n) % 7)) n += 1;
+      best = Math.max(best, n);
+    }
+    return best;
+  }
+  function situation(ctx) {
+    if (!ctx || typeof ctx !== "object") throw new InputError("bad_context");
+    let now = parseDT(ctx.now);
+    const tz = typeof ctx.tz === "string" && /^[+-]\d\d:?\d\d$/.test(ctx.tz) ? parseDT(`2000-01-01T00:00:00${ctx.tz}`).off : null;
+    if (tz !== null) now = { mic: now.mic, off: tz };
+    const today = dayOf(now);
+    const day = (v) => v === void 0 || v === null ? null : parseDay(String(v).slice(0, 10));
+    const mem = readMemory(ctx.memory);
+    const calendar = (ctx.calendar ?? ctx.busy ?? []).map((b) => ({ start: parseDT(b.start), end: parseDT(b.end), title: typeof b.title === "string" ? b.title : null }));
+    const stopped = readStopped(ctx.stopped, mem);
+    const stoppedKeys = [.../* @__PURE__ */ new Set([...mem.stoppedKeys, ...stopped.map((x) => x.key).filter(Boolean), ...Array.isArray(ctx.stoppedKeys) ? ctx.stoppedKeys.filter((k) => typeof k === "string") : []])];
+    const s = { now, today, mem, calendar, stopped, stoppedKeys, memoryKeys: mem.keys.filter((k) => !stoppedKeys.includes(k)), ws: null, week: /* @__PURE__ */ new Map(), long: null };
+    const slots = mem.slots.filter((x) => !stoppedKeys.includes(x.key));
+    if (ctx.history) {
+      const [ws, days] = readHistory(ctx.history, now);
+      const sig = signals(ws, days, now);
+      const week = usualWeek(ws, now);
+      s.ws = ws;
+      s.long = longDay(week);
+      for (const [wd, u] of week) {
+        const act = activityOf(u.activityType);
+        const slot = [...slots].reverse().find((x) => x.weekday === wd && slotMatches(x, u.activityType));
+        s.week.set(wd, { activity: act, minutes: u.minutes, hour: slot ? slot.hour : u.hour, effort: u.effort, key: slot ? slot.key : null, label: act === "other" ? slot && slot.label || labelOf(u.activityType) : null });
+      }
+      Object.assign(s, { unit: "effort-minutes", load7: sig.load7, loadUsual: sig.loadWeeklyAvg28, loadCap: sig.loadCap > 0 ? sig.loadCap : null, tired: tiredSignals(sig) });
+      s.usualDays = s.week.size;
+      s.streak = s.week.size ? Math.max(3, longestStreak([...s.week.keys()])) : 6;
+      s.maxSessions = sessionLimit(ws, week, now, mem);
+      s.minutes = minutesBudget(ws, now, mem, week);
+    } else {
+      for (const x of slots) s.week.set(x.weekday, { activity: x.activity, minutes: x.minutes, hour: x.hour, effort: null, key: x.key, label: x.label });
+      const runs2 = [...s.week].filter(([, u]) => u.activity === "run" && u.minutes !== null);
+      for (const [wd, u] of runs2) if (s.long === null || u.minutes > s.week.get(s.long).minutes) s.long = wd;
+      const load = mem.first("load")?.data;
+      const volume = mem.first("weekly_volume")?.data;
+      const sleep = mem.first("sleep")?.data;
+      const rhr = mem.first("resting_hr")?.data;
+      const load7 = finite2(load?.minutes7d);
+      const usual = load7 !== null && load?.ratioToUsual > 0 ? load7 / load.ratioToUsual : finite2(volume?.minutesPerWeek);
+      s.tired = [];
+      if (finite2(sleep?.hours7d) !== null && finite2(sleep?.hours28d) !== null && sleep.hours7d * 60 < sleep.hours28d * 60 - SLEEP_DROP_MIN) s.tired.push("sleep");
+      if (finite2(rhr?.bpm7d) !== null && finite2(rhr?.bpm28d) !== null && rhr.bpm7d > rhr.bpm28d + RHR_RISE) s.tired.push("resting_hr");
+      const cap = usual !== null && usual > 0 ? pyRound(Math.min(LOAD_GROWTH * Math.max(load7 ?? 0, usual), ACWR_MAX * usual)) : null;
+      Object.assign(s, { unit: "minutes", load7: load7 === null ? null : pyRound(load7), loadUsual: usual === null ? null : pyRound(usual), loadCap: cap });
+      const perWeek = finite2(volume?.workoutsPerWeek);
+      s.usualDays = perWeek !== null ? Math.ceil(perWeek) : s.week.size || null;
+      s.streak = perWeek !== null && perWeek > 6 ? 7 : 6;
+      s.maxSessions = sessionLimit([], s.week, now, mem);
+      s.minutes = minutesBudget([], now, mem, s.week);
+    }
+    s.shoe = null;
+    const gear = mem.rows.find((r) => r.kind === "gear" && r.data && /shoe/i.test(String(r.data.item ?? "")) && Number.isFinite(r.data.km));
+    let shoe = null;
+    if (ctx.shoes && typeof ctx.shoes === "object" && s.ws && ctx.shoes.boughtOn) {
+      const c = condition(s.ws, { boughtOn: day(ctx.shoes.boughtOn), startMiles: Number(ctx.shoes.startMiles ?? 0) }, now);
+      shoe = { status: c.status, percentLife: c.percentLife, miles: c.miles };
+    } else {
+      const miles = ctx.shoes && Number.isFinite(Number(ctx.shoes.miles ?? ctx.shoes.startMiles)) ? Number(ctx.shoes.miles ?? ctx.shoes.startMiles) : gear ? gear.data.km / KM_PER_MILE : null;
+      if (miles !== null) {
+        const share = miles * KM_PER_MILE / DEFAULT_LIFE_KM;
+        shoe = { status: share >= REPLACE_AT ? "replace" : share >= WORN_AT ? "worn" : "fresh", percentLife: pyRound(share * 100), miles: pyRound(miles) };
+      }
+    }
+    if (shoe) s.shoe = { ...shoe, longestRunMin: shoe.status === "replace" ? WORN_RUN_MAX_MIN : null };
+    s.newPairArrives = day(ctx.newPairArrives ?? ctx.shoes?.newPairArrives);
+    const goal = mem.rows.find((r) => r.kind === "goal" && r.data && RACE_GOAL.test(String(r.data.what ?? "")) && /^\d{4}-\d\d-\d\d/.test(String(r.data.date ?? "")));
+    s.raceDate = day(ctx.raceDate ?? (goal ? goal.data.date : null));
+    return s;
+  }
+  function freeOn(s, dayNum) {
+    const today = dayNum === s.today;
+    let from = Math.max(atDay(dayNum, s.now.off, DAY_START_HOUR).mic, today ? s.now.mic + TODAY_LEAD_MIN * US_MIN : 0);
+    const to = atDay(dayNum, s.now.off, today ? TODAY_END_HOUR : DAY_END_HOUR).mic;
+    const out = [];
+    const push = (a, b) => {
+      if (b - a >= MIN_SESSION * US_MIN) out.push({ day: dayISO(dayNum), start: isoDT({ mic: a, off: s.now.off }), end: isoDT({ mic: b, off: s.now.off }) });
+    };
+    for (const b of [...s.calendar].sort((x, y) => x.start.mic - y.start.mic)) {
+      if (b.end.mic <= from || b.start.mic >= to) continue;
+      push(from, Math.min(b.start.mic, to));
+      from = Math.max(from, b.end.mic);
+    }
+    if (from < to) push(from, to);
+    return out;
+  }
+  var readinessText = (tired) => tired.length ? `Take it easier for now, because ${tired.map((k) => TIRED_WORDS2[k]).join(" and ")}.` : "Sleep and resting heart rate look normal.";
+  function planContext(ctx) {
+    const s = situation(ctx);
+    const usual = [...s.week].filter(([, u]) => u.activity !== null).sort((a, b) => a[0] - b[0]).map(([wd, u]) => ({
+      weekday: wd,
+      weekdayName: WEEKDAYS[wd],
+      activity: u.activity === "run" && wd === s.long && u.minutes >= LONG_RUN_MIN ? "long_run" : u.activity,
+      minutes: u.minutes,
+      hour: u.hour,
+      intensity: u.effort === null ? u.activity === "other" ? "steady" : null : intensityOf(u.effort),
+      basedOn: u.key ? [u.key] : [],
+      ...u.activity === "other" ? { label: u.label ?? null } : {}
+    }));
+    const freeSlots = [];
+    for (let i = 0; i < DAYS; i += 1) freeSlots.push(...freeOn(s, s.today + i));
+    const daysAway = s.raceDate !== null ? s.raceDate - s.today : null;
+    return {
+      now: isoDT(s.now),
+      window: { from: dayISO(s.today), to: dayISO(s.today + DAYS - 1), earliestStart: isoDT({ mic: s.now.mic + TODAY_LEAD_MIN * US_MIN, off: s.now.off }) },
+      usualWeek: usual,
+      usualDaysPerWeek: s.usualDays,
+      maxSessions: s.maxSessions,
+      mostDaysInARow: s.streak,
+      usualMinutes: s.minutes.usual,
+      minutesRatio: s.minutes.ratio,
+      maxMinutes: s.minutes.limit,
+      loadUnit: s.unit,
+      loadThisWeek: s.load7,
+      loadUsual: s.loadUsual,
+      loadCap: s.loadCap,
+      readiness: { status: s.tired.length ? "ease_off" : "normal", signals: s.tired, text: readinessText(s.tired) },
+      freeSlots,
+      shoe: s.shoe ? { ...s.shoe, newPairArrives: s.newPairArrives !== null ? dayISO(s.newPairArrives) : null } : null,
+      race: s.raceDate !== null ? { date: dayISO(s.raceDate), daysAway, taper: daysAway > 0 && daysAway <= TAPER_DAYS + DAYS, restDay: dayISO(s.raceDate - 1) } : null,
+      newPairArrives: s.newPairArrives !== null ? dayISO(s.newPairArrives) : null,
+      stoppedKeys: s.stoppedKeys,
+      memoryKeys: s.memoryKeys,
+      stoppedSlots: s.stopped.map((x) => ({ weekday: x.weekday, weekdayName: WEEKDAYS[x.weekday], activity: x.activity, hour: x.hour, ...x.activity === "other" ? { label: x.label } : {} })),
+      usuallyHardDays: [...s.week].filter(([, u]) => u.effort !== null && u.effort >= HARD_EFFORT).map(([wd]) => wd).sort((a, b) => a - b),
+      activities: ACTIVITIES,
+      intensities: INTENSITIES,
+      limits: { minMinutes: MIN_MINUTES, maxMinutes: MAX_MINUTES, shortestSession: MIN_SESSION, wornShoeRunMin: WORN_RUN_MAX_MIN, breakInRunMin: BREAK_IN_MIN }
+    };
+  }
+  var ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+  var dayWords = (iso) => `${WEEKDAY_NAMES[weekdayOf(parseDay(iso))]} the ${ordinal(Number(iso.slice(8, 10)))}`;
+  var timeWords = (iso) => clock(Number(iso.slice(11, 13)), Number(iso.slice(14, 16)));
+  var PLURAL = { run: "runs", long_run: "long runs", walk: "walks", strength: "strength sessions", yoga: "yoga", ride: "rides", elliptical: "elliptical sessions", swim: "swims", stretch: "stretching", rest: "rest" };
+  var nameOf = (u) => u.activity === "other" ? u.label || "another activity" : NOUN2[u.activity];
+  function planBrief(args) {
+    const c = planContext(args?.context ?? args);
+    const lines = [];
+    const today = c.window.from;
+    lines.push(`Plan from today, ${dayWords(today)}, through ${dayWords(c.window.to)}; today nothing starts before ${timeWords(c.window.earliestStart)} or ends after ${clock(TODAY_END_HOUR)}.`);
+    lines.push("Use only activities the app knows, and give each session a day, a start time and a length.");
+    lines.push(`Every session lasts between ${MIN_MINUTES} and ${MAX_MINUTES} minutes, and no two sessions overlap.`);
+    const groups = /* @__PURE__ */ new Map();
+    for (const u of c.usualWeek) {
+      const id = `${nameOf(u)}|${u.hour}|${u.minutes}|${u.intensity}`;
+      if (!groups.has(id)) groups.set(id, { u, days: [] });
+      groups.get(id).days.push(u.weekdayName);
+    }
+    for (const { u, days } of groups.values()) {
+      lines.push(`Usual: ${nameOf(u)} ${days.join(", ")} at ${clock(u.hour)}${u.minutes ? `, ${u.minutes} minutes` : ""}${u.intensity ? `, ${u.intensity}` : ""}.`);
+    }
+    if (!groups.size) lines.push("No usual week is known yet, so keep this one light.");
+    lines.push(`${c.usualDaysPerWeek ? `Usually ${c.usualDaysPerWeek} training ${c.usualDaysPerWeek === 1 ? "day" : "days"} a week; at` : "At"} most ${c.mostDaysInARow} training days in a row before a rest day.`);
+    if (c.loadCap !== null) {
+      lines.push(c.loadUnit === "minutes" ? `The whole week can hold about ${c.loadCap} minutes of training.` : `The whole week can hold about ${Math.floor(c.loadCap / EFFORT_OF.steady)} minutes at a steady effort; hard minutes count for more, easy ones for less.`);
+    }
+    lines.push(`At most ${c.maxSessions} training ${c.maxSessions === 1 ? "session" : "sessions"} this week.`);
+    if (c.maxMinutes !== null) lines.push(`At most ${c.maxMinutes} minutes of training this week${c.minutesRatio !== null && c.minutesRatio > HIGH_LOAD_RATIO ? ", because the last 7 days were heavier than usual" : ""}.`);
+    const hard = c.usuallyHardDays.map((wd) => WEEKDAY_NAMES[wd]);
+    lines.push(`Hard days go back to back only on days that are both usually hard${hard.length ? ` (usually hard: ${hard.join(", ")})` : ""}.`);
+    const tired = c.readiness.signals;
+    if (tired.length) {
+      const cause = tired.length === 2 ? "Sleep has been short and resting heart rate is up" : tired[0] === "sleep" ? "Sleep has been short lately" : "Resting heart rate is up";
+      lines.push(`${cause}: nothing hard today or tomorrow.`);
+    } else lines.push("Sleep and resting heart rate look normal.");
+    if (c.race && c.race.daysAway >= 0) {
+      const last = parseDay(c.window.to);
+      const raceDay = parseDay(c.race.date);
+      if (raceDay - 1 <= last) lines.push(`Race ${dayWords(c.race.date)}: nothing else that day${c.race.daysAway >= 1 ? `, and rest on ${dayWords(c.race.restDay)}` : ""}.`);
+      if (c.race.daysAway > 1 && raceDay - parseDay(today) <= TAPER_DAYS + DAYS - 1) {
+        lines.push(`With the race ${c.race.daysAway} days away, runs in the ${TAPER_DAYS} days before it stay at about four fifths of their usual length, the longest run at three fifths.`);
+      }
+    }
+    const arrives = c.newPairArrives;
+    if (c.shoe && c.shoe.status === "replace") lines.push(`The running shoes are nearly worn out: no run longer than ${WORN_RUN_MAX_MIN} minutes${arrives ? ` until the new pair arrives on ${dayWords(arrives)}` : ""}.`);
+    if (arrives) lines.push(`The first two runs after the new pair arrives on ${dayWords(arrives)} are easy and at most ${BREAK_IN_MIN} minutes.`);
+    const byDay = /* @__PURE__ */ new Map();
+    for (const f of c.freeSlots) {
+      if (!byDay.has(f.day)) byDay.set(f.day, []);
+      byDay.get(f.day).push(`${timeWords(f.start)} to ${timeWords(f.end)}`);
+    }
+    for (let d = parseDay(today); d <= parseDay(c.window.to); d += 1) {
+      const free = byDay.get(dayISO(d));
+      lines.push(free ? `Free on ${dayWords(dayISO(d))}: ${free.join(", ")}.` : `Nothing is free on ${dayWords(dayISO(d))}.`);
+    }
+    lines.push("Say a session comes from a habit only when that habit is in the memory you were given.");
+    for (const x of c.stoppedSlots) lines.push(`Do not plan ${x.activity === "other" ? x.label || "sessions" : PLURAL[x.activity]} on ${WEEKDAY_NAMES[x.weekday]} at ${clock(x.hour)}.`);
+    if (c.stoppedKeys.length) lines.push("Do not bring back any habit that was stopped.");
+    return { lines };
+  }
+  function readSession(a, index, s) {
+    if (!a || typeof a !== "object") return { index, error: "invalid_session" };
+    try {
+      const basedOn = Array.isArray(a.basedOn) ? a.basedOn.filter((k) => typeof k === "string") : [];
+      let start;
+      let minutes;
+      let raw;
+      let activity;
+      if (a.after && typeof a.after === "object") {
+        start = parseDT(a.after.start);
+        minutes = (parseDT(a.after.end).mic - start.mic) / US_MIN;
+        raw = a.after.activityType;
+        activity = activityOf(raw);
+      } else {
+        raw = a.activity;
+        activity = ACTIVITIES.includes(raw) ? raw : null;
+        minutes = Number(a.minutes);
+        const t = typeof a.start === "string" ? /^(\d{1,2}):(\d\d)$/.exec(a.start.trim()) : null;
+        if (t) {
+          if (+t[1] > 23 || +t[2] > 59) return { index, error: "invalid_session" };
+          start = atDay(parseDay(a.day), s.now.off, +t[1], +t[2]);
+        } else start = parseDT(a.start);
+        if (!t && a.day !== void 0 && a.day !== null && parseDay(a.day) !== dayOf(start)) return { index, error: "invalid_session" };
+      }
+      if (!Number.isFinite(minutes) || minutes < 0) return { index, error: "invalid_session" };
+      start = { mic: start.mic, off: s.now.off };
+      const intensity = a.intensity === "moderate" ? "steady" : a.intensity ?? null;
+      if (intensity !== null && !INTENSITIES.includes(intensity)) return { index, error: "invalid_session" };
+      const day = dayOf(start);
+      const usual = s.week.get(weekdayOf(day));
+      const usualEffort = usual && usual.effort !== null ? usual.effort : null;
+      const effort2 = intensity === null ? activity === "other" ? EFFORT_OF.steady : usualEffort ?? EFFORT_OF.steady : usualEffort !== null && intensityOf(usualEffort) === intensity ? usualEffort : EFFORT_OF[intensity];
+      return { index, id: typeof a.id === "string" ? a.id : null, start, end: addUs(start, minutes * US_MIN), day, minutes, activity, raw, effort: effort2, basedOn };
+    } catch (e) {
+      if (e instanceof InputError) return { index, error: "invalid_session" };
+      throw e;
+    }
+  }
+  var dayName = (day) => WEEKDAY_NAMES[weekdayOf(day)];
+  var what = (x) => `${dayName(x.day)}'s ${NOUN2[x.activity] ?? "session"}`;
+  var listOf = (args) => args?.plan?.sessions ?? args?.plan?.actions ?? args?.sessions ?? args?.actions;
+  function checkPlan(args) {
+    const s = situation(args?.context);
+    const list = listOf(args);
+    if (!Array.isArray(list)) throw new InputError("bad_plan");
+    const found = [];
+    const add = (code, x, text, fix) => found.push({ code, text, fix, action: x ? x.index : null, sessionId: x && x.id ? x.id : null });
+    const items = [];
+    list.forEach((a, index) => {
+      if (a && a.kind === "note" && !a.after) return;
+      const x = readSession(a, index, s);
+      if (x.error) add(x.error, { index, id: typeof a?.id === "string" ? a.id : null }, "This session could not be read: it needs a day, a start time, an activity and minutes.", "send day (YYYY-MM-DD), start (ISO 8601 with offset), activity, minutes");
+      else if (x.activity === null) add("unknown_activity", x, `"${String(x.raw)}" is not an activity this app knows.`, `use one of: ${ACTIVITIES.join(", ")}`);
+      else if (x.activity !== "rest") items.push(x);
+    });
+    items.sort((a, b) => a.start.mic - b.start.mic || a.index - b.index);
+    const windowEnd = atDay(s.today + DAYS, s.now.off).mic;
+    const earliest = s.now.mic + TODAY_LEAD_MIN * US_MIN;
+    const todayEnd = atDay(s.today, s.now.off, TODAY_END_HOUR).mic;
+    for (const x of items) {
+      if (x.minutes < MIN_MINUTES) add("bad_duration", x, `${what(x)} is shorter than ${MIN_MINUTES} minutes.`, `lengthen to \u2265${MIN_MINUTES} min`);
+      else if (x.minutes > MAX_MINUTES) add("bad_duration", x, `${what(x)} is longer than ${MAX_MINUTES} minutes.`, `shorten to \u2264${MAX_MINUTES} min`);
+      if (x.start.mic < s.now.mic) add("outside_window", x, `${what(x)} is in the past.`, `move to ${hhmm({ mic: earliest, off: s.now.off })} or later`);
+      else if (x.start.mic >= windowEnd) add("outside_window", x, `${what(x)} is outside the ${DAYS} days that start today.`, `move to ${dayISO(s.today + DAYS - 1)} or earlier`);
+      else if (x.start.mic < earliest) add("outside_window", x, `${what(x)} starts too soon to get ready for.`, `move to ${hhmm({ mic: earliest, off: s.now.off })} or later`);
+      else if (x.day === s.today && x.end.mic > todayEnd) add("outside_window", x, `${what(x)} would end too late tonight.`, `end by ${TODAY_END_HOUR}:00 or move to tomorrow`);
+      const busy = s.calendar.find((b) => b.start.mic < x.end.mic && x.start.mic < b.end.mic);
+      if (busy) add("calendar_conflict", x, `${what(x)} overlaps ${busy.title ? `"${busy.title}"` : "something"} on your calendar.`, `move after ${hhmm({ mic: busy.end.mic, off: s.now.off })}`);
+      if (isStopped(s.stopped, x.activity, weekdayOf(x.day), hourOf(x.start))) {
+        const hit = s.stopped.find((y) => y.activity === (x.activity === "long_run" ? "run" : x.activity) && y.weekday === weekdayOf(x.day) && y.hour === hourOf(x.start));
+        add("stopped_slot", x, `You asked me not to plan ${dayName(x.day)} ${clock(hit.hour)} ${hit.activity === "other" ? hit.label || "sessions" : PLURAL[hit.activity]}.`, "move to another hour or remove this session");
+      }
+      for (const key of x.basedOn) {
+        if (s.stoppedKeys.includes(key)) add("stopped_memory_key", x, `${what(x)} leans on a habit you asked to stop.`, "remove this session");
+        else if (!s.memoryKeys.includes(key)) add("unknown_memory_key", x, `${what(x)} cites a memory that is not there.`, "remove that key from basedOn");
+      }
+    }
+    items.forEach((x, i) => {
+      const next = items[i + 1];
+      if (next && next.start.mic < x.end.mic) add("overlap", next, `${what(next)} starts before ${what(x)} ends.`, `move after ${hhmm(x.end)}`);
+    });
+    const loadOf = (x) => s.unit === "minutes" ? x.minutes : x.effort * x.minutes;
+    const planned = pySum(items.map(loadOf));
+    if (s.loadCap !== null && planned > s.loadCap * LOAD_SLACK && items.some((x) => x.minutes > MIN_SESSION)) {
+      const perMinute = s.unit === "minutes" ? 1 : planned / Math.max(1, pySum(items.map((x) => x.minutes)));
+      add("load_over_cap", null, "This week adds up to more than your body is used to.", `shorten the week by ${Math.ceil((planned - s.loadCap) / perMinute)} min in total`);
+    }
+    if (s.tired.length) {
+      for (const x of items) {
+        if (x.day <= s.today + 1 && x.effort >= HARD_EFFORT) add("hard_when_tired", x, `${what(x)} is a hard one, and ${s.tired.map((k) => TIRED_WORDS2[k]).join(" and ")}.`, "make it easy");
+      }
+    }
+    if (s.raceDate !== null) {
+      const runMinutes = [...s.week.values()].filter((u) => u.activity === "run" && u.minutes !== null).map((u) => u.minutes);
+      for (const x of items) {
+        const toRace = s.raceDate - x.day;
+        if (toRace === 0) add("race_day_session", x, "Race day is for the race alone.", "remove this session");
+        else if (toRace === 1) add("no_rest_before_race", x, "The day before your race is a rest day.", "remove this session");
+        else if (toRace > 0 && toRace <= TAPER_DAYS && isRun(x.activity)) {
+          const wd = weekdayOf(x.day);
+          const usual = s.week.get(wd);
+          const base = usual && usual.activity === "run" && usual.minutes !== null ? usual.minutes * (wd === s.long ? 0.6 : 0.8) : runMinutes.length ? pyMedian(runMinutes) * 0.8 : null;
+          const limit = base === null ? TAPER_RUN_MAX_MIN : Math.max(MIN_SESSION, pyRound(base));
+          if (x.minutes > limit) add("taper_too_long", x, `${what(x)} is too long this close to your race.`, `shorten to \u2264${limit} min`);
+        }
+      }
+    }
+    let brokenIn = 0;
+    for (const x of items) {
+      if (!isRun(x.activity)) continue;
+      const arrived = s.newPairArrives !== null && x.day > s.newPairArrives;
+      if (s.shoe && s.shoe.status === "replace" && !arrived && x.minutes > WORN_RUN_MAX_MIN) {
+        add("worn_shoes_long_run", x, `${what(x)} is too long for shoes this worn.`, `shorten to \u2264${WORN_RUN_MAX_MIN} min or switch to ride`);
+      } else if (arrived && brokenIn < 2) {
+        if (x.minutes > BREAK_IN_MIN) add("break_in_too_long", x, `${what(x)} is too long for a first run in new shoes.`, `shorten to \u2264${BREAK_IN_MIN} min`);
+        if (x.effort > EASY_EFFORT) add("break_in_not_easy", x, `${what(x)} should be easy while your new shoes break in.`, "make it easy");
+        brokenIn += 1;
+      }
+    }
+    if (items.length > s.maxSessions) {
+      const extra = items.length - s.maxSessions;
+      add("too_many_sessions", null, `This week has ${items.length} sessions, and ${s.maxSessions} is the most that fits you for now.`, `remove ${extra} ${extra === 1 ? "session" : "sessions"}`);
+    }
+    const totalMinutes = items.reduce((sum, x) => sum + x.minutes, 0);
+    if (s.minutes.limit !== null && totalMinutes > s.minutes.limit) {
+      add("too_many_minutes", null, `This week adds up to ${pyRound(totalMinutes)} minutes, and ${s.minutes.limit} is the most that fits you for now.`, `shorten the week by ${Math.ceil(totalMinutes - s.minutes.limit)} min in total`);
+    }
+    const days = [...new Set(items.map((x) => x.day))].sort((a, b) => a - b);
+    let run = 0;
+    days.forEach((d, i) => {
+      run = i && d === days[i - 1] + 1 ? run + 1 : 1;
+      if (run === s.streak + 1) add("too_many_days_in_a_row", items.find((it) => it.day === d), `${dayName(d)} would be day ${run} in a row without a rest.`, "remove this session or move it after a rest day");
+    });
+    const hardDays = /* @__PURE__ */ new Map();
+    for (const x of items) if (x.effort >= HARD_EFFORT && !hardDays.has(x.day)) hardDays.set(x.day, x);
+    const usuallyHard = (d) => {
+      const u = s.week.get(weekdayOf(d));
+      return Boolean(u && u.effort !== null && u.effort >= HARD_EFFORT);
+    };
+    for (const [d, x] of hardDays) {
+      if (hardDays.has(d - 1) && !(usuallyHard(d) && usuallyHard(d - 1))) add("back_to_back_hard", x, `${what(x)} is hard and so is the day before.`, "make it easy or move it a day later");
+    }
+    found.sort((a, b) => (a.action ?? 1e9) - (b.action ?? 1e9));
+    const where = (v) => ({ ...v.action === null ? {} : { action: v.action }, ...v.sessionId ? { sessionId: v.sessionId } : {} });
+    return {
+      pass: found.length === 0,
+      violations: found.map((v) => ({ code: v.code, text: v.text, ...v.sessionId ? { sessionId: v.sessionId } : {} })),
+      hints: found.map((v) => ({ code: v.code, ...where(v), fix: v.fix })),
+      load: { unit: s.unit, planned: pyRound(planned), cap: s.loadCap }
+    };
+  }
+  function explainAction(args) {
+    const action = args?.action ?? args?.session;
+    if (!action || typeof action !== "object") throw new InputError("bad_action");
+    const mem = readMemory(args.memory);
+    const basedOn = Array.isArray(action.basedOn) ? action.basedOn.filter((k) => typeof k === "string") : [];
+    const reasons = Array.isArray(action.reasons) ? action.reasons.map((r) => r?.text).filter((t) => typeof t === "string" && t) : [];
+    const parts2 = reasons.length ? [...new Set(reasons)] : [typeof action.reason === "string" && action.reason ? action.reason : "This session is part of your usual week."];
+    const memory = basedOn.map((key) => {
+      if (mem.stoppedKeys.includes(key)) return { key, found: false, text: "You asked to stop this habit, so it will not be suggested again." };
+      const slot = mem.slots.find((x) => x.key === key);
+      const row = mem.rows.find((r) => r.key === key);
+      if (slot) {
+        const seen = Number.isInteger(slot.weeksSeen) && Number.isInteger(slot.weeksTotal) ? `, seen in ${slot.weeksSeen} of the last ${slot.weeksTotal} weeks` : "";
+        const habit = slot.activity === "other" ? slot.label ?? "a session" : `a ${NOUN2[slot.activity]}`;
+        return { key, found: true, text: `It comes from a habit in your memory: ${habit} on ${WEEKDAY_NAMES[slot.weekday]}s around ${clock(slot.hour)}${seen}.` };
+      }
+      if (row) return { key, found: true, text: typeof row.statement === "string" && row.statement ? `It comes from your memory: ${row.statement}` : "It comes from your memory." };
+      return { key, found: false, text: "The habit it came from is no longer in your memory." };
+    });
+    return { text: [...parts2, ...memory.map((x) => x.text)].join(" "), basedOn, memory };
+  }
+  function checkWeek(args) {
+    const list = listOf(args);
+    if (!Array.isArray(list)) throw new InputError("bad_plan");
+    const first = list.find((a) => a && typeof (a.after?.start ?? a.start) === "string" && (a.after?.start ?? a.start).length > 5);
+    const now = parseDT(args.now ?? first?.after?.start ?? first?.start ?? "1970-01-01T00:00:00Z");
+    const s = { now, week: /* @__PURE__ */ new Map() };
+    const calendar = (args.calendar ?? args.busy ?? []).map((b) => ({ start: parseDT(b.start), end: parseDT(b.end), title: typeof b.title === "string" ? b.title : null }));
+    const items = [];
+    list.forEach((a, index) => {
+      if (a && a.kind === "note" && !a.after) return;
+      const x = readSession(a, index, s);
+      if (!x.error && x.activity !== "rest") items.push(x);
+    });
+    items.sort((a, b) => a.start.mic - b.start.mic || a.index - b.index);
+    const conflicts = [];
+    const at = (mic) => isoDT({ mic, off: now.off });
+    items.forEach((x, i) => {
+      for (const b of calendar) {
+        if (b.start.mic < x.end.mic && x.start.mic < b.end.mic) {
+          conflicts.push({
+            code: "calendar_conflict",
+            action: x.index,
+            id: x.id,
+            title: b.title,
+            start: at(b.start.mic),
+            end: at(b.end.mic),
+            text: `${what(x)} overlaps ${b.title ? `"${b.title}"` : "something"} on your calendar.`,
+            fix: `move after ${hhmm({ mic: b.end.mic, off: now.off })}`
+          });
+        }
+      }
+      const next = items[i + 1];
+      if (next && next.start.mic < x.end.mic) {
+        conflicts.push({
+          code: "overlap",
+          action: next.index,
+          id: next.id,
+          title: null,
+          start: at(x.start.mic),
+          end: at(x.end.mic),
+          text: `${what(next)} starts before ${what(x)} ends.`,
+          fix: `move after ${hhmm(x.end)}`
+        });
+      }
+    });
+    return { conflicts };
+  }
+
+  // src/phone/entry.mjs
+  var TEXT = {
+    bad_json: "The request could not be read.",
+    bad_request: "The request could not be read.",
+    bad_datetime: "A time in the request is not an ISO 8601 time with an offset.",
+    bad_date: "A day in the request is not written as YYYY-MM-DD.",
+    bad_shoes: "The shoes need the day they were bought and their miles.",
+    bad_memory: "Memory must be a table of rows.",
+    bad_stopped: "The stopped usual times must be a list.",
+    bad_context: "The context is missing.",
+    bad_plan: "The plan has no list of sessions.",
+    bad_action: "There is no session to explain.",
+    missing_history: "There is no workout history to plan from.",
+    internal: "Something went wrong while working this out."
+  };
+  var fail = (code) => JSON.stringify({ ok: false, error: { code, text: TEXT[code] ?? TEXT.internal } });
+  var tool = (fn) => (argsJson) => {
+    let args;
+    try {
+      args = JSON.parse(argsJson);
+    } catch {
+      return fail("bad_json");
+    }
+    try {
+      return JSON.stringify({ ok: true, ...fn(args) });
+    } catch (e) {
+      return fail(e && e.name === "InputError" && typeof e.code === "string" ? e.code : "internal");
+    }
+  };
+  globalThis.recommendWeek = tool(recommendWeek);
+  globalThis.planContext = tool(planContext);
+  globalThis.checkPlan = tool(checkPlan);
+  globalThis.explainAction = tool(explainAction);
+  globalThis.checkWeek = tool(checkWeek);
+  globalThis.planBrief = tool(planBrief);
+})();

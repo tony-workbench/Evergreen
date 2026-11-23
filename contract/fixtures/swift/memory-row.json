@@ -1,0 +1,167 @@
+[
+  {
+    "memoryId": "m-1",
+    "key": "mem:78adab0d",
+    "slot": "usual_slot/run/0/18",
+    "group": "routine",
+    "kind": "usual_slot",
+    "statement": "Running on Monday at 18:00 in 4 of the last 4 weeks.",
+    "data": {
+      "activity": "run",
+      "weekday": 0,
+      "hour": 18,
+      "minutes": 30,
+      "weeksSeen": 4,
+      "weeksTotal": 4
+    },
+    "state": "saved",
+    "confidence": 0.8,
+    "since": "2026-11-08",
+    "updated": "2026-11-08"
+  },
+  {
+    "memoryId": "m-1",
+    "key": "mem:5b29c614",
+    "slot": "usual_slot/strength/3/18",
+    "group": "routine",
+    "kind": "usual_slot",
+    "statement": "FunctionalStrengthTraining on Thursday at 18:00 in 4 of the last 4 weeks.",
+    "data": {
+      "activity": "strength",
+      "weekday": 3,
+      "hour": 18,
+      "minutes": 40,
+      "weeksSeen": 4,
+      "weeksTotal": 4
+    },
+    "state": "saved",
+    "confidence": 0.8,
+    "since": "2026-11-08",
+    "updated": "2026-11-08"
+  },
+  {
+    "memoryId": "m-gear",
+    "key": "mem:gear",
+    "slot": "gear",
+    "group": "gear",
+    "kind": "gear",
+    "statement": "The daily trainers have 512 km on them.",
+    "data": {
+      "item": "Daily trainers",
+      "km": 512,
+      "boughtOn": "2026-05-02"
+    },
+    "state": "saved",
+    "confidence": 0.8,
+    "since": "2026-11-08",
+    "updated": "2026-11-08"
+  },
+  {
+    "memoryId": "m-goal",
+    "key": "mem:goal",
+    "slot": "goal",
+    "group": "goal",
+    "kind": "goal",
+    "statement": "A half marathon on 6 December.",
+    "data": {
+      "what": "Half marathon",
+      "date": "2026-12-06"
+    },
+    "state": "saved",
+    "confidence": 0.8,
+    "since": "2026-11-08",
+    "updated": "2026-11-08"
+  },
+  {
+    "memoryId": "m-load",
+    "key": "mem:load",
+    "slot": "load",
+    "group": "load",
+    "kind": "load",
+    "statement": "This week had 215 active minutes, 1.1 times the usual.",
+    "data": {
+      "minutes7d": 215,
+      "ratioToUsual": 1.1
+    },
+    "state": "saved",
+    "confidence": 0.8,
+    "since": "2026-11-08",
+    "updated": "2026-11-08"
+  },
+  {
+    "memoryId": "m-mix",
+    "key": "mem:mix",
+    "slot": "mix",
+    "group": "routine",
+    "kind": "mix",
+    "statement": "The last four weeks were mostly runs.",
+    "data": {
+      "byActivity": {
+        "run": 7,
+        "long_run": 4,
+        "strength": 4
+      }
+    },
+    "state": "saved",
+    "confidence": 0.8,
+    "since": "2026-11-08",
+    "updated": "2026-11-08"
+  },
+  {
+    "memoryId": "m-other",
+    "key": "mem:other",
+    "slot": "usual_slot/other/2/19",
+    "group": "routine",
+    "kind": "usual_slot",
+    "statement": "Rowing on Wednesday at 19:00 in 3 of the last 4 weeks.",
+    "data": {
+      "activity": "other",
+      "label": "Rowing",
+      "weekday": 2,
+      "hour": 19,
+      "minutes": 40,
+      "weeksSeen": 3,
+      "weeksTotal": 4
+    },
+    "state": "saved",
+    "confidence": 0.8,
+    "since": "2026-11-08",
+    "updated": "2026-11-08"
+  },
+  {
+    "memoryId": "m-response",
+    "key": "mem:response",
+    "slot": "response",
+    "group": "response",
+    "kind": "response",
+    "statement": "Early sessions are often skipped.",
+    "data": {
+      "about": "early sessions",
+      "pattern": "skipped 3 of the last 4"
+    },
+    "state": "saved",
+    "confidence": 0.8,
+    "since": "2026-11-08",
+    "updated": "2026-11-08"
+  },
+  {
+    "memoryId": "m-1",
+    "key": "mem:9cbb98b9",
+    "slot": "usual_slot/walk/0/12",
+    "group": "routine",
+    "kind": "usual_slot",
+    "statement": "Walking on Monday at 12:00 in 4 of the last 4 weeks.",
+    "data": {
+      "activity": "walk",
+      "weekday": 0,
+      "hour": 12,
+      "minutes": 30,
+      "weeksSeen": 4,
+      "weeksTotal": 4
+    },
+    "state": "saved",
+    "confidence": 0.8,
+    "since": "2026-11-08",
+    "updated": "2026-11-08"
+  }
+]

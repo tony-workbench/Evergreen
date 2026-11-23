@@ -1,0 +1,20 @@
+{
+  "memoryId": "m-1",
+  "key": "mem:78adab0d",
+  "slot": "usual_slot/run/0/18",
+  "group": "routine",
+  "kind": "usual_slot",
+  "statement": "Running on Monday at 18:00 in 4 of the last 4 weeks.",
+  "data": {
+    "activity": "run",
+    "weekday": 0,
+    "hour": 18,
+    "minutes": 30,
+    "weeksSeen": 4,
+    "weeksTotal": 4
+  },
+  "state": "saved",
+  "confidence": 0.8,
+  "since": "2026-11-08",
+  "updated": "2026-11-08"
+}

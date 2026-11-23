@@ -1,0 +1,49 @@
+[
+  {
+    "kind": "add",
+    "activity": "run",
+    "minutes": 30,
+    "sessionId": "s-2026-11-09-run-1800",
+    "day": "2026-11-09",
+    "after": "18:30",
+    "exact": true
+  },
+  {
+    "kind": "add",
+    "activity": "run",
+    "minutes": 45,
+    "sessionId": "s-2026-11-09-run-1800",
+    "day": "2026-11-09",
+    "after": "19:00",
+    "exact": true
+  },
+  {
+    "kind": "add",
+    "activity": "other",
+    "title": "Rowing",
+    "minutes": 40,
+    "sessionId": "s-2026-11-11-other-1900",
+    "day": "2026-11-11",
+    "after": "19:00",
+    "exact": true
+  },
+  {
+    "kind": "race",
+    "raceDate": "2026-12-06"
+  },
+  {
+    "kind": "add",
+    "activity": "rest",
+    "sessionId": "s-2026-11-14-rest",
+    "day": "2026-11-14"
+  },
+  {
+    "kind": "add",
+    "activity": "walk",
+    "minutes": 30,
+    "sessionId": "s-2026-11-09-walk-1200",
+    "day": "2026-11-09",
+    "after": "13:00",
+    "exact": true
+  }
+]

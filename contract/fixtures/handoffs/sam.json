@@ -1,0 +1,416 @@
+{
+  "sessionToIntent": {
+    "session": {
+      "id": "s-2026-11-09-walk-1200",
+      "day": "2026-11-09",
+      "start": "2026-11-09T13:00:00-08:00",
+      "minutes": 30,
+      "activity": "walk",
+      "intensity": "easy",
+      "reason": "You usually do this on Monday at 12:00.",
+      "basedOn": [
+        "mem:9cbb98b9",
+        "mem:841dfc5d"
+      ]
+    },
+    "intent": {
+      "kind": "add",
+      "activity": "walk",
+      "minutes": 30,
+      "sessionId": "s-2026-11-09-walk-1200",
+      "day": "2026-11-09",
+      "after": "13:00",
+      "exact": true
+    }
+  },
+  "rowsToCalendarMemory": {
+    "rows": [
+      {
+        "memoryId": "m-1",
+        "key": "mem:9cbb98b9",
+        "slot": "usual_slot/walk/0/12",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Walking on Monday at 12:00 in 4 of the last 4 weeks.",
+        "data": {
+          "activity": "walk",
+          "weekday": 0,
+          "hour": 12,
+          "minutes": 30,
+          "weeksSeen": 4,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-2",
+        "key": "mem:7f0033ad",
+        "slot": "usual_slot/walk/2/18",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Walking on Wednesday at 18:00 in 3 of the last 4 weeks.",
+        "data": {
+          "activity": "walk",
+          "weekday": 2,
+          "hour": 18,
+          "minutes": 30,
+          "weeksSeen": 3,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-3",
+        "key": "mem:d22dbaf6",
+        "slot": "usual_slot/walk/4/17",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Walking on Friday at 17:00 in 3 of the last 4 weeks.",
+        "data": {
+          "activity": "walk",
+          "weekday": 4,
+          "hour": 17,
+          "minutes": 20,
+          "weeksSeen": 3,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-4",
+        "key": "mem:016fb23b",
+        "slot": "usual_slot/yoga/5/9",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Yoga on Saturday at 9:00 in 4 of the last 4 weeks.",
+        "data": {
+          "activity": "yoga",
+          "weekday": 5,
+          "hour": 9,
+          "minutes": 30,
+          "weeksSeen": 4,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-5",
+        "key": "mem:841dfc5d",
+        "slot": "weekly_volume",
+        "group": "routine",
+        "kind": "weekly_volume",
+        "statement": "3.5 workouts and 98 minutes a week over the last 4 weeks.",
+        "data": {
+          "workoutsPerWeek": 3.5,
+          "minutesPerWeek": 98
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-6",
+        "key": "mem:89eabb08",
+        "slot": "sleep",
+        "group": "body",
+        "kind": "sleep",
+        "statement": "Sleep averaged 6.56 hours over 7 days and 6.58 hours over 28 days.",
+        "data": {
+          "hours7d": 6.56,
+          "hours28d": 6.58
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-7",
+        "key": "mem:b8fd734c",
+        "slot": "resting_hr",
+        "group": "body",
+        "kind": "resting_hr",
+        "statement": "Resting heart rate averaged 71.9 bpm over 7 days and 72 bpm over 28 days.",
+        "data": {
+          "bpm7d": 71.9,
+          "bpm28d": 72
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      }
+    ],
+    "memory": {
+      "slots": [
+        {
+          "key": "mem:9cbb98b9",
+          "activity": "walk",
+          "weekday": 0,
+          "hour": 12,
+          "minutes": 30
+        },
+        {
+          "key": "mem:7f0033ad",
+          "activity": "walk",
+          "weekday": 2,
+          "hour": 18,
+          "minutes": 30
+        },
+        {
+          "key": "mem:d22dbaf6",
+          "activity": "walk",
+          "weekday": 4,
+          "hour": 17,
+          "minutes": 20
+        },
+        {
+          "key": "mem:016fb23b",
+          "activity": "yoga",
+          "weekday": 5,
+          "hour": 9,
+          "minutes": 30
+        }
+      ]
+    }
+  },
+  "keysToReject": {
+    "session": {
+      "id": "s-2026-11-11-walk-1800",
+      "day": "2026-11-11",
+      "start": "2026-11-11T18:00:00-08:00",
+      "minutes": 30,
+      "activity": "walk",
+      "intensity": "easy",
+      "reason": "You usually do this on Wednesday at 18:00.",
+      "basedOn": [
+        "mem:7f0033ad",
+        "mem:841dfc5d"
+      ]
+    },
+    "rows": [
+      {
+        "memoryId": "m-1",
+        "key": "mem:9cbb98b9",
+        "slot": "usual_slot/walk/0/12",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Walking on Monday at 12:00 in 4 of the last 4 weeks.",
+        "data": {
+          "activity": "walk",
+          "weekday": 0,
+          "hour": 12,
+          "minutes": 30,
+          "weeksSeen": 4,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-2",
+        "key": "mem:7f0033ad",
+        "slot": "usual_slot/walk/2/18",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Walking on Wednesday at 18:00 in 3 of the last 4 weeks.",
+        "data": {
+          "activity": "walk",
+          "weekday": 2,
+          "hour": 18,
+          "minutes": 30,
+          "weeksSeen": 3,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-3",
+        "key": "mem:d22dbaf6",
+        "slot": "usual_slot/walk/4/17",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Walking on Friday at 17:00 in 3 of the last 4 weeks.",
+        "data": {
+          "activity": "walk",
+          "weekday": 4,
+          "hour": 17,
+          "minutes": 20,
+          "weeksSeen": 3,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-4",
+        "key": "mem:016fb23b",
+        "slot": "usual_slot/yoga/5/9",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Yoga on Saturday at 9:00 in 4 of the last 4 weeks.",
+        "data": {
+          "activity": "yoga",
+          "weekday": 5,
+          "hour": 9,
+          "minutes": 30,
+          "weeksSeen": 4,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-5",
+        "key": "mem:841dfc5d",
+        "slot": "weekly_volume",
+        "group": "routine",
+        "kind": "weekly_volume",
+        "statement": "3.5 workouts and 98 minutes a week over the last 4 weeks.",
+        "data": {
+          "workoutsPerWeek": 3.5,
+          "minutesPerWeek": 98
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-6",
+        "key": "mem:89eabb08",
+        "slot": "sleep",
+        "group": "body",
+        "kind": "sleep",
+        "statement": "Sleep averaged 6.56 hours over 7 days and 6.58 hours over 28 days.",
+        "data": {
+          "hours7d": 6.56,
+          "hours28d": 6.58
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-7",
+        "key": "mem:b8fd734c",
+        "slot": "resting_hr",
+        "group": "body",
+        "kind": "resting_hr",
+        "statement": "Resting heart rate averaged 71.9 bpm over 7 days and 72 bpm over 28 days.",
+        "data": {
+          "bpm7d": 71.9,
+          "bpm28d": 72
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      }
+    ],
+    "keys": [
+      "mem:7f0033ad"
+    ]
+  },
+  "rowsToStopped": {
+    "rows": [
+      {
+        "memoryId": "m-2",
+        "key": "mem:7f0033ad",
+        "slot": "usual_slot/walk/2/18",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Walking on Wednesday at 18:00 in 3 of the last 4 weeks.",
+        "data": {
+          "activity": "walk",
+          "weekday": 2,
+          "hour": 18,
+          "minutes": 30,
+          "weeksSeen": 3,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      }
+    ],
+    "stopped": [
+      {
+        "key": "mem:7f0033ad",
+        "activity": "walk",
+        "weekday": 2,
+        "hour": 18
+      }
+    ]
+  },
+  "outcomesFor": {
+    "planRecords": [
+      {
+        "sessionId": "s-2026-11-09-walk-1200",
+        "day": "2026-11-09",
+        "activity": "walk",
+        "plannedStart": "2026-11-09T13:30:00-08:00"
+      },
+      {
+        "sessionId": "s-2026-11-13-walk-1700",
+        "day": "2026-11-13",
+        "activity": "walk",
+        "plannedStart": "2026-11-13T17:00:00-08:00"
+      }
+    ],
+    "healthWorkouts": [
+      {
+        "activityType": "Walking",
+        "start": "2026-11-09T13:35:00-08:00",
+        "end": "2026-11-09T14:07:00-08:00",
+        "durationMin": 31.6
+      }
+    ],
+    "days": [
+      "2026-11-09",
+      "2026-11-13"
+    ],
+    "outcomes": [
+      {
+        "sessionId": "s-2026-11-09-walk-1200",
+        "day": "2026-11-09",
+        "activity": "walk",
+        "plannedStart": "2026-11-09T13:30:00-08:00",
+        "done": true,
+        "actualStart": "2026-11-09T13:35:00-08:00",
+        "actualMinutes": 32
+      },
+      {
+        "sessionId": "s-2026-11-13-walk-1700",
+        "day": "2026-11-13",
+        "activity": "walk",
+        "plannedStart": "2026-11-13T17:00:00-08:00",
+        "done": false
+      }
+    ]
+  }
+}

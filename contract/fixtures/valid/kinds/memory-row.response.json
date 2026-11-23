@@ -1,0 +1,16 @@
+{
+  "memoryId": "m-response",
+  "key": "mem:response",
+  "slot": "response",
+  "group": "response",
+  "kind": "response",
+  "statement": "Early sessions are often skipped.",
+  "data": {
+    "about": "early sessions",
+    "pattern": "skipped 3 of the last 4"
+  },
+  "state": "saved",
+  "confidence": 0.8,
+  "since": "2026-11-08",
+  "updated": "2026-11-08"
+}

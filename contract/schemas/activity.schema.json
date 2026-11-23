@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "activity.schema.json",
+  "title": "Activity",
+  "description": "The one closed list of activities. `other` is anything not named. Display names are the app's job.",
+  "type": "string",
+  "enum": [
+    "run",
+    "long_run",
+    "walk",
+    "strength",
+    "yoga",
+    "ride",
+    "swim",
+    "elliptical",
+    "stretch",
+    "rest",
+    "other"
+  ]
+}

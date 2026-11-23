@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "stopped-slot.schema.json",
+  "title": "Stopped slot",
+  "description": "A usual time the person rejected: the data of a rejected usual_slot row. The app passes these to the recommendation agent, because rejected rows are not in the table.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "activity",
+    "weekday",
+    "hour"
+  ],
+  "properties": {
+    "key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "activity": {
+      "$ref": "activity.schema.json"
+    },
+    "weekday": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 6
+    },
+    "hour": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 23
+    }
+  }
+}

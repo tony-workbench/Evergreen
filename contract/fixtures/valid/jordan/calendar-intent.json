@@ -1,0 +1,9 @@
+{
+  "kind": "add",
+  "activity": "run",
+  "minutes": 45,
+  "sessionId": "s-2026-11-09-run-1800",
+  "day": "2026-11-09",
+  "after": "19:00",
+  "exact": true
+}

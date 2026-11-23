@@ -1,0 +1,32 @@
+import SwiftUI
+
+/// Onboarding: the tour, the three permissions on one page, what Evergreen
+/// noticed (worked out on the phone, the pay-off for the permissions), then
+/// "Connect your AI" (which can be put off), and straight into Today, where
+/// the first week is being planned.
+struct OnboardingView: View {
+    enum Step { case tour, permissions, noticed, connect }
+
+    @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var step = Step.tour
+
+    var body: some View {
+        Group {
+            switch step {
+            case .tour:
+                TourView(onDone: { step = .permissions })
+            case .permissions:
+                PermissionsView(onContinue: { step = .noticed })
+                    .transition(.move(edge: .trailing))
+            case .noticed:
+                NoticedView(onContinue: { if model.aiConnected { model.completeOnboarding() } else { step = .connect } })
+                    .transition(.move(edge: .trailing))
+            case .connect:
+                ConnectAIView(line: "Connect your key and I’ll plan your week. It stays on this phone.", leave: "Not now", onDone: model.completeOnboarding)
+                    .transition(.move(edge: .trailing))
+            }
+        }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: step)
+    }
+}

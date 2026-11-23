@@ -1,0 +1,23 @@
+Extend @Video1 forward by 11 seconds as the same shot, same camera, same lens, same height. Handmade stop-motion miniature, needle-felted wool and clay, shallow depth of field. Real-time motion; the picture never freezes. One continuous shot: no cuts, no dissolves, no fades. No text, no speech.
+
+STARTS ON the last frame of @Video1: wide view; she sits on the turned chair wearing both white running shoes, smiling; the tree stands beside her; the floor around the chair is empty. For the first half second keep exactly this framing and this pose while the characters keep breathing and moving slightly; then the new action begins.
+
+REFERENCES: @Video1: the film so far; continue it, do not replay it. @Image1: the tree puppet, one view, look only. @Image2: the woman puppet, one view, look only. @Image3: the woman, the tree and one running shoe side by side, sizes only. @Image4: walking to the door, the tree ahead. @Image5: her hand on the knob. @Image6: the last frame. @Image7: the tree seen from behind.
+
+SIZES, the same in every second: the woman is 120 cm tall. The tree is 32 cm: knee-high to her, its tip just below the seat of her chair, three coffee cups tall when it stands on the desk. Each running shoe is 18 cm, exactly her foot's length; the shoes never change size.
+
+FIXED: the short wooden desk under the sunset window, the stack of paper left of the laptop, one coffee cup with a white lid right of the laptop, one phone lying screen-up in front of the cup, the closed dark door in the right-hand wall. Nothing on the desk moves or turns unless a line below says so. Dim cold blue light.
+
+TIMELINE (one action, at most one slow camera move):
+0.5-3s: Camera dollies slowly forward and turns gently right, following her. She stands up in her running shoes and walks to the door. The tree runs ahead and waits at the door, looking back, as in @Image4. They never hold hands.
+3-4s: Camera keeps drifting forward to just behind her. She reaches out and closes her right hand around the round knob, as in @Image5.
+4-5s: Camera holds. She turns the knob, leaning slightly toward the door, and pauses half a beat.
+5-7s: Camera holds. She steps back with one foot, her arm straightens, and the door swings open toward her into the room. Warm orange sunset light pours in. The door keeps its size.
+7-9.5s: Camera holds. The tree darts out first and runs ahead down the street, glancing back and waving her on. She lets go of the knob and jogs out after it, two or three steps behind, as in @Image6.
+9.5-11s: Camera holds on the open doorway: the tree leading, she jogging behind, in the warm light. End.
+
+AUDIO: continue @Video1's sound without a break. 4.5s the knob turning. 5.5s the door creaking open, birdsong fading in. 8s two pairs of light running footsteps. The piano opens up from 5s and ends on one long note.
+
+ALWAYS: both shoes stay on her feet; the door moves only in her hand and keeps its size; the tree runs in front and she follows; the tree is knee-high to her.
+
+Keep the exact look of the woman from @Image2 and of the tree from @Image1 for the whole clip. Keep the same colour grade, the same dusk light and the same light direction as @Video1 from the first frame to the last.

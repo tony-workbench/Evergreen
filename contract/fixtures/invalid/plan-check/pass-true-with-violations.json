@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "pass": true,
+  "violations": [
+    {
+      "code": "UnknownMemory",
+      "text": "A session is based on a memory that is not in the table."
+    }
+  ]
+}

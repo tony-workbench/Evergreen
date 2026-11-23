@@ -1,0 +1,416 @@
+{
+  "sessionToIntent": {
+    "session": {
+      "id": "s-2026-11-09-run-1800",
+      "day": "2026-11-09",
+      "start": "2026-11-09T19:00:00-08:00",
+      "minutes": 45,
+      "activity": "run",
+      "intensity": "easy",
+      "reason": "You usually do this on Monday at 18:00.",
+      "basedOn": [
+        "mem:78adab0d",
+        "mem:841dfc5d"
+      ]
+    },
+    "intent": {
+      "kind": "add",
+      "activity": "run",
+      "minutes": 45,
+      "sessionId": "s-2026-11-09-run-1800",
+      "day": "2026-11-09",
+      "after": "19:00",
+      "exact": true
+    }
+  },
+  "rowsToCalendarMemory": {
+    "rows": [
+      {
+        "memoryId": "m-1",
+        "key": "mem:5b29c614",
+        "slot": "usual_slot/strength/3/18",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "FunctionalStrengthTraining on Thursday at 18:00 in 4 of the last 4 weeks.",
+        "data": {
+          "activity": "strength",
+          "weekday": 3,
+          "hour": 18,
+          "minutes": 40,
+          "weeksSeen": 4,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-2",
+        "key": "mem:78adab0d",
+        "slot": "usual_slot/run/0/18",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Running on Monday at 18:00 in 4 of the last 4 weeks.",
+        "data": {
+          "activity": "run",
+          "weekday": 0,
+          "hour": 18,
+          "minutes": 45,
+          "weeksSeen": 4,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-3",
+        "key": "mem:210b5eb9",
+        "slot": "usual_slot/run/1/6",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Running on Tuesday at 6:00 in 3 of the last 4 weeks.",
+        "data": {
+          "activity": "run",
+          "weekday": 1,
+          "hour": 6,
+          "minutes": 50,
+          "weeksSeen": 3,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-4",
+        "key": "mem:61066c28",
+        "slot": "usual_slot/long_run/6/7",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Running on Sunday at 7:00 in 4 of the last 4 weeks.",
+        "data": {
+          "activity": "long_run",
+          "weekday": 6,
+          "hour": 7,
+          "minutes": 100,
+          "weeksSeen": 4,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-5",
+        "key": "mem:841dfc5d",
+        "slot": "weekly_volume",
+        "group": "routine",
+        "kind": "weekly_volume",
+        "statement": "3.75 workouts and 223 minutes a week over the last 4 weeks.",
+        "data": {
+          "workoutsPerWeek": 3.75,
+          "minutesPerWeek": 223
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-6",
+        "key": "mem:89eabb08",
+        "slot": "sleep",
+        "group": "body",
+        "kind": "sleep",
+        "statement": "Sleep averaged 8.73 hours over 7 days and 8.74 hours over 28 days.",
+        "data": {
+          "hours7d": 8.73,
+          "hours28d": 8.74
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-7",
+        "key": "mem:b8fd734c",
+        "slot": "resting_hr",
+        "group": "body",
+        "kind": "resting_hr",
+        "statement": "Resting heart rate averaged 48.9 bpm over 7 days and 49 bpm over 28 days.",
+        "data": {
+          "bpm7d": 48.9,
+          "bpm28d": 49
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      }
+    ],
+    "memory": {
+      "slots": [
+        {
+          "key": "mem:5b29c614",
+          "activity": "strength",
+          "weekday": 3,
+          "hour": 18,
+          "minutes": 40
+        },
+        {
+          "key": "mem:78adab0d",
+          "activity": "run",
+          "weekday": 0,
+          "hour": 18,
+          "minutes": 45
+        },
+        {
+          "key": "mem:210b5eb9",
+          "activity": "run",
+          "weekday": 1,
+          "hour": 6,
+          "minutes": 50
+        },
+        {
+          "key": "mem:61066c28",
+          "activity": "long_run",
+          "weekday": 6,
+          "hour": 7,
+          "minutes": 100
+        }
+      ]
+    }
+  },
+  "keysToReject": {
+    "session": {
+      "id": "s-2026-11-10-run-0600",
+      "day": "2026-11-10",
+      "start": "2026-11-10T06:00:00-08:00",
+      "minutes": 50,
+      "activity": "run",
+      "intensity": "easy",
+      "reason": "You usually do this on Tuesday at 06:00.",
+      "basedOn": [
+        "mem:210b5eb9",
+        "mem:841dfc5d"
+      ]
+    },
+    "rows": [
+      {
+        "memoryId": "m-1",
+        "key": "mem:5b29c614",
+        "slot": "usual_slot/strength/3/18",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "FunctionalStrengthTraining on Thursday at 18:00 in 4 of the last 4 weeks.",
+        "data": {
+          "activity": "strength",
+          "weekday": 3,
+          "hour": 18,
+          "minutes": 40,
+          "weeksSeen": 4,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-2",
+        "key": "mem:78adab0d",
+        "slot": "usual_slot/run/0/18",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Running on Monday at 18:00 in 4 of the last 4 weeks.",
+        "data": {
+          "activity": "run",
+          "weekday": 0,
+          "hour": 18,
+          "minutes": 45,
+          "weeksSeen": 4,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-3",
+        "key": "mem:210b5eb9",
+        "slot": "usual_slot/run/1/6",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Running on Tuesday at 6:00 in 3 of the last 4 weeks.",
+        "data": {
+          "activity": "run",
+          "weekday": 1,
+          "hour": 6,
+          "minutes": 50,
+          "weeksSeen": 3,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-4",
+        "key": "mem:61066c28",
+        "slot": "usual_slot/long_run/6/7",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Running on Sunday at 7:00 in 4 of the last 4 weeks.",
+        "data": {
+          "activity": "long_run",
+          "weekday": 6,
+          "hour": 7,
+          "minutes": 100,
+          "weeksSeen": 4,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-5",
+        "key": "mem:841dfc5d",
+        "slot": "weekly_volume",
+        "group": "routine",
+        "kind": "weekly_volume",
+        "statement": "3.75 workouts and 223 minutes a week over the last 4 weeks.",
+        "data": {
+          "workoutsPerWeek": 3.75,
+          "minutesPerWeek": 223
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-6",
+        "key": "mem:89eabb08",
+        "slot": "sleep",
+        "group": "body",
+        "kind": "sleep",
+        "statement": "Sleep averaged 8.73 hours over 7 days and 8.74 hours over 28 days.",
+        "data": {
+          "hours7d": 8.73,
+          "hours28d": 8.74
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      },
+      {
+        "memoryId": "m-7",
+        "key": "mem:b8fd734c",
+        "slot": "resting_hr",
+        "group": "body",
+        "kind": "resting_hr",
+        "statement": "Resting heart rate averaged 48.9 bpm over 7 days and 49 bpm over 28 days.",
+        "data": {
+          "bpm7d": 48.9,
+          "bpm28d": 49
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      }
+    ],
+    "keys": [
+      "mem:210b5eb9"
+    ]
+  },
+  "rowsToStopped": {
+    "rows": [
+      {
+        "memoryId": "m-3",
+        "key": "mem:210b5eb9",
+        "slot": "usual_slot/run/1/6",
+        "group": "routine",
+        "kind": "usual_slot",
+        "statement": "Running on Tuesday at 6:00 in 3 of the last 4 weeks.",
+        "data": {
+          "activity": "run",
+          "weekday": 1,
+          "hour": 6,
+          "minutes": 50,
+          "weeksSeen": 3,
+          "weeksTotal": 4
+        },
+        "state": "saved",
+        "confidence": 0.8,
+        "since": "2026-11-08",
+        "updated": "2026-11-08"
+      }
+    ],
+    "stopped": [
+      {
+        "key": "mem:210b5eb9",
+        "activity": "run",
+        "weekday": 1,
+        "hour": 6
+      }
+    ]
+  },
+  "outcomesFor": {
+    "planRecords": [
+      {
+        "sessionId": "s-2026-11-09-run-1800",
+        "day": "2026-11-09",
+        "activity": "run",
+        "plannedStart": "2026-11-09T19:30:00-08:00"
+      },
+      {
+        "sessionId": "s-2026-11-12-strength-1800",
+        "day": "2026-11-12",
+        "activity": "strength",
+        "plannedStart": "2026-11-12T18:00:00-08:00"
+      }
+    ],
+    "healthWorkouts": [
+      {
+        "activityType": "Running",
+        "start": "2026-11-09T19:35:00-08:00",
+        "end": "2026-11-09T20:22:00-08:00",
+        "durationMin": 46.6
+      }
+    ],
+    "days": [
+      "2026-11-09",
+      "2026-11-12"
+    ],
+    "outcomes": [
+      {
+        "sessionId": "s-2026-11-09-run-1800",
+        "day": "2026-11-09",
+        "activity": "run",
+        "plannedStart": "2026-11-09T19:30:00-08:00",
+        "done": true,
+        "actualStart": "2026-11-09T19:35:00-08:00",
+        "actualMinutes": 47
+      },
+      {
+        "sessionId": "s-2026-11-12-strength-1800",
+        "day": "2026-11-12",
+        "activity": "strength",
+        "plannedStart": "2026-11-12T18:00:00-08:00",
+        "done": false
+      }
+    ]
+  }
+}

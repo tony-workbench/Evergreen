@@ -1,0 +1,3 @@
+// Base configuration of the Evergreen app target (Debug and Release).
+// Merged with the generated Info.plist.
+INFOPLIST_FILE = Evergreen-Info.plist
