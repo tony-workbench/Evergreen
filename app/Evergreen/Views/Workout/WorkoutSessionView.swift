@@ -18,6 +18,8 @@ struct WorkoutSessionView: View {
     @State private var feeling: WorkoutFeeling?
     @State private var swapping = false
     @State private var saving = false
+    /// Goes up with each set done, for a light tap of feedback.
+    @State private var setsLogged = 0
 
     var body: some View {
         NavigationStack {
@@ -45,6 +47,8 @@ struct WorkoutSessionView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
         }
+        .sensoryFeedback(.success, trigger: setsLogged)
+        .sensoryFeedback(.success, trigger: finishing) { _, now in now }
         .task {
             progress = await model.workoutToday()
             loading = false
@@ -169,6 +173,7 @@ struct WorkoutSessionView: View {
     private func doneWithSet() {
         guard let item else { return }
         edit { $0.results[$0.index].sets.append(count) }
+        setsLogged += 1
         if setsDone >= item.sets { advance() } else { restUntil = Date().addingTimeInterval(TimeInterval(item.rest)); resetCount() }
     }
 

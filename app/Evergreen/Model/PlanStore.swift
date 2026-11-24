@@ -145,10 +145,11 @@ final class PlanStore {
     }
 
     /// Puts the plan on the calendar. Without access the plan stays in the app.
-    func syncCalendar(_ plan: [PlanItem], calendar: Calendar) {
+    /// `notes` adds a day's movement list to that day's strength event, so the system calendar shows what to do too.
+    func syncCalendar(_ plan: [PlanItem], calendar: Calendar, notes: [String: String] = [:]) {
         calendarAccess = calendarSync.access
         guard calendarAccess == .on else { return }
-        let entries = CalendarEntry.entries(for: plan, storyDay: run.storyDay, calendar: calendar)
+        let entries = CalendarEntry.entries(for: plan, storyDay: run.storyDay, calendar: calendar, notes: notes)
         calendarSync.sync(entries, from: run.storyDay)
     }
 }

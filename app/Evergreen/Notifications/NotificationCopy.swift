@@ -16,4 +16,7 @@ enum NotificationCopy {
         return ("\(meeting?.title ?? "A meeting") landed on your \(noun)",
                 "\(what) overlaps your \(before.start.clock) \(noun), so I moved it to \(after.start.clock). Still on track!")
     }
+
+    /// Sunday evening, for the person who plans by their rules.
+    static let weekAhead = (title: "Your week ahead", body: "Open Evergreen to see which days are at home and what each one holds.")
 }

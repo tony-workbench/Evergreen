@@ -12,6 +12,7 @@ struct TodayView: View {
     @State private var showMemory = false
     @State private var showConnect = false
     @State private var showSettings = false
+    @State private var showWeek = false
 
     var body: some View {
         ScrollView {
@@ -21,6 +22,13 @@ struct TodayView: View {
                         .font(.footnote)
                         .foregroundStyle(Theme.textMuted)
                     Spacer()
+                    if model.userRules.isOn {
+                        Button("This week") { showWeek = true }
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Theme.accent)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .accessibilityHint("Each day of the week: at home, out or rest, and what it holds")
+                    }
                     Button { showSettings = true } label: {
                         Image(systemName: "gearshape")
                             .font(.body)
@@ -140,6 +148,7 @@ struct TodayView: View {
             if model.aiConnected { AskBar() }
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showWeek) { WeekTableView() }
         .sheet(isPresented: $showConnect) {
             ConnectAIView { showConnect = false }
         }

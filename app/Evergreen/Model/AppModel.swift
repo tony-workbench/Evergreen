@@ -65,6 +65,12 @@ final class AppModel {
     var userRules = UserRules()
     /// Each of the next seven days as home, out or rest, worked out on the phone (AppModel+Rules.swift).
     var dayKinds: [String: DayKind] = [:]
+    /// The week the rules make: each day's kind, focus, time and fallbacks (Model/HomeWeek.swift).
+    var homeWeek: HomeWeek?
+    /// What each day at home of that week holds, by day; filled after the week is worked out.
+    var homeWeekContent: [String: WorkoutContent] = [:]
+    /// Said at the top of the week table when the week can't reach its aim ("This week has 4 sets of…").
+    var homeWeekNote: String?
     /// What the person did on the workout page (Model/WorkoutLog.swift).
     var workoutLog = WorkoutLog()
     /// Every movement's words, read from the engine once (AppModel+Workout.swift).
@@ -117,6 +123,7 @@ final class AppModel {
         guard onDevice else { return }
         userRules = UserRules.load(from: settings)
         workoutLog = WorkoutLog.load(from: settings)
+        homeWeek = HomeWeek.load(from: settings)
         self.calendarSync.onChange = { [weak self] in self?.calendarChanged() }
         notifier.onOpen = { [weak self] in Task { await self?.tick() } }
         notifier.onUndo = { [weak self] id in self?.undoMove(id) }
@@ -316,6 +323,7 @@ final class AppModel {
         // A day out has no reminders: the person said they're out, or the phone was far from home when the app opened.
         let upcoming = plan.filter { completion(for: $0) == nil && !isDayOut($0.slot.start) }
         await notifier.scheduleReminders(for: upcoming)
+        await notifier.scheduleWeekAhead(userRules.isOn)
     }
 
     /// Starts clean: a reinstall keeps calendar events, so clear the plan's old
@@ -387,6 +395,6 @@ final class AppModel {
     /// Puts the plan on the calendar, from the device and only while it is unlocked.
     private func syncCalendar() {
         guard onDevice, deviceUnlocked else { return }
-        store.syncCalendar(plan, calendar: calendar)
+        store.syncCalendar(plan, calendar: calendar, notes: calendarNotes)
     }
 }

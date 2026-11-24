@@ -41,6 +41,8 @@ extension AppModel {
         if !foreground { await tick() }
         // With the app open: a phone far from home makes today a day out (needs a home set in My rules).
         if foreground { await checkFarFromHome() }
+        // The week the rules make: looked at again the first time each day, and for the week ahead on Sunday evening.
+        await checkHomeWeek()
         // Each check runs only while its switch in Settings is on.
         if Automatic.rain.isOn(settings) { await triggers.checkRain(now: now, mayAsk: foreground) }
         if Automatic.shoes.isOn(settings) { await triggers.checkShoes(now: now) }

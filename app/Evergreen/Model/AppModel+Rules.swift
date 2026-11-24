@@ -95,16 +95,24 @@ extension AppModel {
         (settings.dictionary(forKey: Self.homeFocusKey) as? [String: String]) ?? [:]
     }
 
-    /// Reads the week the rules make and keeps each day's focus. Called after the week is planned.
+    /// Reads the week the rules make and keeps it: each day's focus (for a missed day), its times and fallbacks
+    /// (for the week table and the reminders), and which days were planned (for the lighter fifth week).
+    /// Called after the week is planned, and by the week's own checks (AppModel+HomeWeek.swift).
     func rememberHomeWeek() async {
         guard userRules.isOn, let rules = planRules,
-              let days = await rules.planContext(rows: memoryRows, now: now)["homeWeek"]?["days"]?.array else { return }
+              let week = HomeWeek.from(engine: await rules.planContext(rows: memoryRows, now: now)["homeWeek"], madeOn: todayISO)
+        else { return }
+        homeWeek = week
+        week.save(to: settings)
         var kept = homeFocus.filter { $0.key >= dayISO(offset: -7) }
-        for day in days {
-            guard let date = day["day"]?.string else { continue }
-            if let focus = day["focus"]?.string { kept[date] = focus } else { kept.removeValue(forKey: date) }
+        for day in week.days {
+            if let focus = day.focus { kept[day.day] = focus } else { kept.removeValue(forKey: day.day) }
         }
         settings.set(kept, forKey: Self.homeFocusKey)
+        var planned = PlannedDays.load(from: settings)
+        planned.update(with: week, today: todayISO)
+        planned.save(to: settings)
+        await fillHomeWeek()
     }
 
     /// The focus of each day at home in the last three days that had a session planned and no strength workout done,
@@ -126,7 +134,7 @@ extension AppModel {
         }
     }
 
-    private func dayISO(offset: Int) -> String {
+    func dayISO(offset: Int) -> String {
         LocalTime(calendar.date(byAdding: .day, value: offset, to: now) ?? now, in: calendar.timeZone).day
     }
 }

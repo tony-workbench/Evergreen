@@ -12,12 +12,14 @@ import SwiftData
 ///   -uiTest runner   four weeks of morning runs, shoes at 212 km
 ///   -uiTest rain     the same, with rain due on tomorrow's run, a dry afternoon and three gyms nearby
 ///   -uiTest shoes    the same, with 492 km on the shoes
+///   -uiTest home     training at home by the rules: nothing to train with, the usual rest weekdays, the next
+///                    training day out, and rain through the afternoon on the day at home after it
 ///
 /// Release builds don't contain this file's code, and the argument does nothing there.
 @MainActor
 enum UITestSeed {
     enum Name: String, CaseIterable {
-        case empty, thin, runner, rain, shoes
+        case empty, thin, runner, rain, shoes, home
     }
 
     static let argument = "-uiTest"
@@ -48,13 +50,17 @@ enum UITestSeed {
                                   secret: "ui-test-only-0123456789abcdef")
         let model = AppModel(context: container.mainContext, memory: memory, onDevice: false, health: history)
 
+        let home = name == .home ? homeDays(today: today, calendar: calendar) : nil
+        if let home { seedRules(model, out: home.out, calendar: calendar) }
+
         let store = MemoryTriggerStore()
         if name == .runner || name == .rain || name == .shoes {
             store.save(ShoeLog(name: nil, startedOn: calendar.date(byAdding: .day, value: -120, to: today) ?? today), for: ShoeLog.storeKey)
         }
         model.triggers.setUp(TriggerCenter.Parts(
             store: store,
-            forecast: FixedForecast(wetDay: name == .rain ? calendar.date(byAdding: .day, value: 1, to: today) : nil, calendar: calendar),
+            forecast: FixedForecast(wetDay: name == .rain ? calendar.date(byAdding: .day, value: 1, to: today) : home?.rain,
+                                    wetHours: name == .home ? 12..<20 : 6..<12, calendar: calendar),
             location: FixedLocation(), places: FixedPlaces(),
             distance: FixedDistance(km: name == .shoes ? 492 : 212),
             notify: { _, _ in }, busy: { [] }, plan: { [weak model] in model?.plan ?? [] }, calendar: calendar
@@ -69,15 +75,40 @@ enum UITestSeed {
                                           minutes: 40, status: "new", reason: "Your usual morning run.")])
         }
         Task {
+            if home != nil { await model.saveRules(model.userRules, quiet: true) }
             await model.tick()
             await model.triggers.checkAll(now: Date(), mayAsk: true)
         }
         return (container, model)
     }
 
+    /// The first training day after today goes out; the training day after that has rain. Both within the coming week.
+    static func homeDays(today: Date, calendar: Calendar) -> (out: Date, rain: Date)? {
+        let rest = UserRules().restWeekdays
+        let training = (1...13).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+            .filter { !rest.contains(UserRules.weekdayIndex($0, calendar: calendar)) }
+        guard training.count >= 2 else { return nil }
+        return (training[0], training[1])
+    }
+
+    /// Rules on, with nothing to train with, kept in a settings store of their own so the device's rules are untouched.
+    static func seedRules(_ model: AppModel, out: Date, calendar: Calendar) {
+        let suite = "ui-test-home"
+        let settings = UserDefaults(suiteName: suite) ?? .standard
+        settings.removePersistentDomain(forName: suite)
+        model.settings = settings
+        var rules = UserRules()
+        rules.isOn = true
+        rules.equipment = []
+        model.userRules = rules
+        model.workoutLog = WorkoutLog()
+        model.homeWeek = nil
+        settings.set([LocalTime(out, in: calendar.timeZone).day], forKey: AppModel.goingOutKey)
+    }
+
     /// A 40-minute, 7 km run at 7:00 every morning before today: 28 days, or 9 for `thin` (which Today counts as ten days of history: the first run's day through today).
     static func workouts(_ name: Name, today: Date, calendar: Calendar) -> [Workout] {
-        let days = name == .empty ? 0 : name == .thin ? 9 : 28
+        let days = name == .empty || name == .home ? 0 : name == .thin ? 9 : 28
         guard days > 0 else { return [] }
         return (1...days).compactMap { back in
             guard let day = calendar.date(byAdding: .day, value: -back, to: today),
@@ -88,9 +119,10 @@ enum UITestSeed {
     }
 }
 
-/// Dry everywhere, except 6 AM to noon on one day.
+/// Dry everywhere, except some hours of one day (6 AM to noon unless said otherwise).
 struct FixedForecast: ForecastProviding {
     var wetDay: Date?
+    var wetHours: Range<Int> = 6..<12
     var calendar: Calendar
 
     func forecast(at place: Coordinate, now: Date) async throws -> Forecast {
@@ -98,7 +130,7 @@ struct FixedForecast: ForecastProviding {
         let hours = (0..<72).map { index -> Forecast.Hour in
             let start = from.addingTimeInterval(Double(index) * 3600)
             let hour = calendar.component(.hour, from: start)
-            let wet = wetDay.map { calendar.isDate(start, inSameDayAs: $0) && (6..<12).contains(hour) } ?? false
+            let wet = wetDay.map { calendar.isDate(start, inSameDayAs: $0) && wetHours.contains(hour) } ?? false
             return Forecast.Hour(start: start, probability: wet ? 85 : 5, millimeters: wet ? 2.4 : 0)
         }
         return Forecast(hours: hours, fetchedAt: now, place: place.rounded)

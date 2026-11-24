@@ -7,7 +7,8 @@
   "scripts": {
     "test": "node --test",
     "build": "node scripts/build-phone.mjs",
-    "sample": "node scripts/sample.mjs"
+    "sample": "node scripts/sample.mjs",
+    "eval:home": "node scripts/eval-home-weeks.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

@@ -67,6 +67,17 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    /// Every Sunday at 20:00, "Your week ahead is ready", while the person plans by their rules. The week is worked out
+    /// again when the app opens (and in the background when the system allows), so the words promise nothing more.
+    func scheduleWeekAhead(_ on: Bool) async {
+        center.removePendingNotificationRequests(withIdentifiers: [Self.weekAheadId])
+        guard on, access == .on else { return }
+        let copy = NotificationCopy.weekAhead
+        await add(Self.weekAheadId, copy, trigger: UNCalendarNotificationTrigger(dateMatching: DateComponents(hour: 20, minute: 0, weekday: 1), repeats: true))
+    }
+
+    static let weekAheadId = "week-ahead"
+
     /// Takes off what is left of a day's workout reminders, once the day's session is done.
     func cancelReminders(on day: Date, calendar: Calendar = .current) async {
         let pending = await center.pendingNotificationRequests()

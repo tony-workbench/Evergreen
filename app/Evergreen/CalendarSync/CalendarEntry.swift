@@ -25,7 +25,8 @@ struct CalendarEntry: Equatable, Sendable {
 
     /// One entry per plan item, keyed by the story day and the item's id. The
     /// story day is in the key because pinned plan ids repeat from day to day.
-    static func entries(for plan: [PlanItem], storyDay: Date, calendar: Calendar) -> [CalendarEntry] {
+    /// `notes` are extra lines for a day's strength workout, by day (YYYY-MM-DD): the movements of a home session.
+    static func entries(for plan: [PlanItem], storyDay: Date, calendar: Calendar, notes: [String: String] = [:]) -> [CalendarEntry] {
         let day = Date.ISO8601FormatStyle(timeZone: calendar.timeZone).year().month().day().format(storyDay)
         return plan.compactMap { item in
             // A rest day is never written to the calendar.
@@ -33,10 +34,15 @@ struct CalendarEntry: Equatable, Sendable {
             return CalendarEntry(
                 key: key,
                 title: Activity.title(item.slot),
-                notes: "Planned by Evergreen.",
+                notes: ["Planned by Evergreen.", homeNotes(item, notes: notes, calendar: calendar)].compactMap { $0 }.joined(separator: "\n"),
                 start: item.slot.start,
                 end: item.slot.end
             )
         }
+    }
+
+    private static func homeNotes(_ item: PlanItem, notes: [String: String], calendar: Calendar) -> String? {
+        guard Activity.kind(item.slot.activityType) == .strength else { return nil }
+        return notes[LocalTime(item.slot.start, in: calendar.timeZone).day]
     }
 }

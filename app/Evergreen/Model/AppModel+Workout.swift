@@ -38,7 +38,7 @@ extension AppModel {
         if let saved = WorkoutProgress.load(from: settings, day: todayISO) { return saved }
         guard let focus = homeFocusToday,
               let content = await contentEngine.session(id: "home-\(todayISO)", focus: focus, minutes: homeMinutesToday,
-                                                        rules: userRules, log: workoutLog, turn: workoutLog.turn)
+                                                        rules: userRules, log: workoutLog, turn: workoutLog.turn, lighter: isLighterWeek)
         else { return nil }
         let progress = WorkoutProgress(day: todayISO, content: content,
                                        results: content.items.map { WorkoutResult(movementId: $0.movementId, load: $0.load) },
