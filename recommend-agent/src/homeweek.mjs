@@ -2,7 +2,7 @@
 // the hours the rules allow, with one or two later times the same day to fall back to, and what each day works.
 // Code decides all of it; the model may only reorder what goes into a session (content.mjs), never which days train.
 import { atDay, dayOf, dayISO, isoDT, parseDay, weekdayOf, InputError, US_MIN, WEEKDAY_NAMES } from './pytime.mjs';
-import { kindOf, SLOT_MIN } from './rules.mjs';
+import { kindOf, SLOT_MIN, MINUTES_PER_HOUR, LAST_MINUTE, SUNDAY, WEEK_DAYS } from './rules.mjs';
 
 export const LEAD_MIN = 60;            // a session today starts at least this long after now (as the usual week)
 export const TODAY_END_HOUR = 22;      // and today nothing runs past this hour
@@ -10,6 +10,8 @@ export const FALLBACK_GAP_MIN = 90;    // a fallback start is at least this long
 export const MAX_FALLBACKS = 2;
 export const ROUND_MIN = 5;            // starts fall on whole five minutes
 export const SPLIT_DAYS = 4;           // from this many days at home, lower and upper body take turns
+const TURNS = 2;                       // lower and upper body take turns: every second day
+const LEAN_DAYS = 3;                   // on this many days at home, two days in a row lean legs, then upper body
 export const FOCUS = ['full', 'lower', 'upper', 'full_lower', 'full_upper'];
 export const FOCUS_WORDS = { full: 'full-body', lower: 'lower-body', upper: 'upper-body', full_lower: 'full-body, more legs', full_upper: 'full-body, more upper body' };
 
@@ -26,8 +28,8 @@ export function readDayOffsets(raw) {
   if (typeof raw !== 'object' || Array.isArray(raw)) throw new InputError('bad_day_offsets');
   for (const [iso, text] of Object.entries(raw)) {
     const m = typeof text === 'string' ? OFFSET.exec(text) : null;
-    const minutes = m ? (m[1] === '-' ? -1 : 1) * (+m[2] * 60 + +m[3]) : NaN;
-    if (!m || +m[3] > 59 || Math.abs(minutes) > MAX_OFFSET_MIN) throw new InputError('bad_day_offsets');
+    const minutes = m ? (m[1] === '-' ? -1 : 1) * (+m[2] * MINUTES_PER_HOUR + +m[3]) : NaN;
+    if (!m || +m[3] > LAST_MINUTE || Math.abs(minutes) > MAX_OFFSET_MIN) throw new InputError('bad_day_offsets');
     try { out.set(parseDay(iso), minutes); } catch { throw new InputError('bad_day_offsets'); }
   }
   return out;
@@ -37,7 +39,7 @@ export function readDayOffsets(raw) {
 export const offOf = (h, day) => h.offsets.get(day) ?? h.off;
 
 /** How many days the week runs from `today`: through this Sunday, or through next Sunday when today is Sunday. */
-export const weekLength = (today) => (weekdayOf(today) === 6 ? 8 : 7 - weekdayOf(today));
+export const weekLength = (today) => (weekdayOf(today) === SUNDAY ? WEEK_DAYS + 1 : WEEK_DAYS - weekdayOf(today));
 
 /**
  * What the week is built from: { now, calendar: [{ start, end }], rules, dayKinds: Map, carry: [focus], queue: Map, doneToday, offsets: Map }.
@@ -50,15 +52,28 @@ export function homeContext({ now, calendar, rules, dayKinds, carry = [], queue 
     queue: new Map([...queue].filter(([, f]) => FOCUS.includes(f))), doneToday: doneToday === true, offsets };
 }
 
+/**
+ * The home week's context from what the phone sent (`carry`, `queue`, `doneToday`, `dayOffsets`) beside `now`, the calendar,
+ * the rules and the day kinds. planContext and recommendWeek both read the phone's fields here, so the rules engine and the
+ * model's context plan the same split: neither recomputes it while the other follows the queue.
+ */
+export function homeContextOf(raw, { now, calendar, rules, dayKinds }) {
+  const carry = Array.isArray(raw.carry) ? raw.carry.filter((f) => FOCUS.includes(f)) : [];
+  return homeContext({ now, calendar, rules, dayKinds, carry, queue: readQueue(raw.queue), doneToday: raw.doneToday === true, offsets: readDayOffsets(raw.dayOffsets) });
+}
+
 /** Reads `queue` ({ "YYYY-MM-DD": focus }); a day or focus it can't read is left out, since the week works without it. */
 export function readQueue(raw) {
   const out = new Map();
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
   for (const [iso, focus] of Object.entries(raw)) {
-    try { if (FOCUS.includes(focus)) out.set(parseDay(iso), focus); } catch { /* not a day */ }
+    const day = FOCUS.includes(focus) ? dayOrNull(iso) : null;
+    if (day !== null) out.set(day, focus);
   }
   return out;
 }
+
+const dayOrNull = (iso) => { try { return parseDay(iso); } catch { return null; } };
 
 /** The free stretches of a day at home within the rules' hours, at least 30 minutes long, as { a, b } in microseconds. */
 export function stretchesOn(h, day) {
@@ -82,8 +97,10 @@ export function stretchesOn(h, day) {
 
 const roundUp = (mic) => Math.ceil(mic / (ROUND_MIN * US_MIN)) * ROUND_MIN * US_MIN;
 
-// The earliest start at or after `after` where a whole session fits and that is no later than the latest start.
-function nextStart(h, day, stretches, after) {
+// The earliest start at or after `after` where a whole session fits and that is no later than the latest start. `open` is
+// { day, stretches }: the day and its free stretches.
+function nextStart(h, open, after) {
+  const { day, stretches } = open;
   const length = h.rules.session.max * US_MIN;
   const latest = atDay(day, offOf(h, day), 0, h.rules.window.to).mic;
   let best = null;
@@ -96,13 +113,13 @@ function nextStart(h, day, stretches, after) {
 
 /** The first time a day at home can train and up to two later times, each at least 90 minutes after the one before. */
 export function startsOn(h, day) {
-  const stretches = stretchesOn(h, day);
-  const first = nextStart(h, day, stretches, -Infinity);
+  const open = { day, stretches: stretchesOn(h, day) };
+  const first = nextStart(h, open, -Infinity);
   if (first === null) return { first: null, fallbacks: [] };
   const fallbacks = [];
   let previous = first;
   while (fallbacks.length < MAX_FALLBACKS) {
-    const t = nextStart(h, day, stretches, previous + FALLBACK_GAP_MIN * US_MIN);
+    const t = nextStart(h, open, previous + FALLBACK_GAP_MIN * US_MIN);
     if (t === null) break;
     fallbacks.push(t);
     previous = t;
@@ -112,9 +129,9 @@ export function startsOn(h, day) {
 
 // Full body on fewer than four days; on three, two days in a row lean legs first and then upper body first.
 function splitOf(days) {
-  if (days.length >= SPLIT_DAYS) return days.map((_, i) => (i % 2 === 0 ? 'lower' : 'upper'));
+  if (days.length >= SPLIT_DAYS) return days.map((_, i) => (i % TURNS === 0 ? 'lower' : 'upper'));
   const focus = days.map(() => 'full');
-  if (days.length !== 3) return focus;
+  if (days.length !== LEAN_DAYS) return focus;
   for (let i = 0; i + 1 < days.length; i += 1) {
     if (days[i + 1] === days[i] + 1 && focus[i] === 'full' && focus[i + 1] === 'full') {
       focus[i] = 'full_lower';
@@ -129,9 +146,9 @@ function splitOf(days) {
 function withCarry(days, focus, carry) {
   const missed = carry.filter((f) => FOCUS.includes(f));
   if (!missed.length) return focus;
-  if (['lower', 'upper'].includes(missed[0]) && days.length >= 2) {
+  if (['lower', 'upper'].includes(missed[0]) && days.length >= TURNS) {
     const other = missed[0] === 'lower' ? 'upper' : 'lower';
-    return days.map((_, i) => (i % 2 === 0 ? missed[0] : other));
+    return days.map((_, i) => (i % TURNS === 0 ? missed[0] : other));
   }
   return [...missed, ...focus].slice(0, days.length);
 }
@@ -155,9 +172,11 @@ function thisWeekFocus(h, rows, sunday) {
 
 // The days of next week seen from here take their place in that whole week's split, so the split doesn't change as more
 // of the week comes into view: a day past the last one in view is taken as at home unless the rules rest it or the phone said out.
-function nextWeekFocus(h, rows, monday, last) {
+// `span` is { monday, last }: next week's Monday and the last day in view.
+function nextWeekFocus(h, rows, span) {
+  const { monday, last } = span;
   if (!rows.length) return;
-  const days = Array.from({ length: 7 }, (_, i) => monday + i)
+  const days = Array.from({ length: WEEK_DAYS }, (_, i) => monday + i)
     .filter((d) => (d <= last ? rows.some((r) => r.day === d) : kindOf(h.rules, h.given, d) === 'home'));
   const focus = splitOf(days);
   for (const r of rows) r.focus = focus[days.indexOf(r.day)];
@@ -175,11 +194,11 @@ export function homeWeek(h, days = weekLength(h.today)) {
     const kind = kindOf(h.rules, h.given, day);
     rows.push({ day, kind, focus: null, ...(kind === 'home' ? startsOn(h, day) : { first: null, fallbacks: [] }) });
   }
-  const sunday = h.today + 6 - weekdayOf(h.today);
+  const sunday = h.today + SUNDAY - weekdayOf(h.today);
   const training = rows.filter((r) => r.first !== null);
   const thisWeek = training.filter((r) => r.day <= sunday);
   thisWeekFocus(h, thisWeek, sunday);
-  nextWeekFocus(h, training.filter((r) => r.day > sunday), sunday + 1, h.today + days - 1);
+  nextWeekFocus(h, training.filter((r) => r.day > sunday), { monday: sunday + 1, last: h.today + days - 1 });
   const homeDays = rows.filter((r) => r.kind === 'home').length;
   let note = null;
   if (training.length === 0) note = 'There is no day at home with time to train this week, so nothing is planned.';

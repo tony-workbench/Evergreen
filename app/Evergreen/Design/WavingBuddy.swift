@@ -9,7 +9,10 @@ struct WavingBuddy: View {
     /// Wave again after each rest; otherwise wave once, then walk.
     var loops = false
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
     @State private var start = Date()
 
     /// Arm up, swinging, arm down.

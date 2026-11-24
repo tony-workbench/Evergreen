@@ -3,6 +3,11 @@
 // same answer. It is no model and names none; the app's real call goes to the person's own model.
 import { statementFor } from './statements.mjs';
 
+const KIND_PREFIX = 4;   // 'gear' and 'goal': an evidence id's kind before its dot
+const MISSED_TO_ASK = 2;  // sessions not done before the stand-in asks the person
+const SLEEP_MOVED_H = 0.2; // a 28-day sleep average that moved this much, or a resting heart rate this much, is news
+const RHR_MOVED_BPM = 2;
+
 // One candidate memory per evidence item the rules know: { slot, kind, statement, moved(old) -> boolean }.
 function candidate(e) {
   const n = e.numbers;
@@ -10,12 +15,12 @@ function candidate(e) {
   if (e.id.startsWith('regularity.slot.')) return { ...base, kind: 'usual_slot' };
   if (e.id === 'volume.per_week') return { ...base, kind: 'weekly_volume' };
   if (e.id === 'load.ratio') return { ...base, kind: 'load' };
-  if (e.id === 'body.sleep') return { ...base, kind: 'sleep', moved: (old) => Math.abs(Number(/and (\d+(?:\.\d+)?) h over 28/.exec(old)?.[1] ?? n.average28) - n.average28) >= 0.2 };
-  if (e.id === 'body.resting_hr') return { ...base, kind: 'resting_hr', moved: (old) => Math.abs(Number(/and (\d+) bpm over 28/.exec(old)?.[1] ?? n.average28) - n.average28) >= 2 };
+  if (e.id === 'body.sleep') return { ...base, kind: 'sleep', moved: (old) => Math.abs(Number(/and (\d+(?:\.\d+)?) h over 28/.exec(old)?.[1] ?? n.average28) - n.average28) >= SLEEP_MOVED_H };
+  if (e.id === 'body.resting_hr') return { ...base, kind: 'resting_hr', moved: (old) => Math.abs(Number(/and (\d+) bpm over 28/.exec(old)?.[1] ?? n.average28) - n.average28) >= RHR_MOVED_BPM };
   if (e.id === 'mix.count') return { ...base, kind: 'mix' };
   if (e.id === 'place.home') return { ...base, kind: 'training_place' };
-  if (e.id.startsWith('gear.') || e.id.startsWith('goal.')) return { ...base, kind: e.id.slice(0, 4), moved: () => true };
-  if (e.id.startsWith('outcomes.') && n.notDone >= 2) return { ...base, kind: 'response', ask: true };
+  if (e.id.startsWith('gear.') || e.id.startsWith('goal.')) return { ...base, kind: e.id.slice(0, KIND_PREFIX), moved: () => true };
+  if (e.id.startsWith('outcomes.') && n.notDone >= MISSED_TO_ASK) return { ...base, kind: 'response', ask: true };
   return null;
 }
 

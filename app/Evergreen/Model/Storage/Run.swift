@@ -1,4 +1,5 @@
 import Foundation
+import os
 import SwiftData
 
 // What the phone saves. The contract structs stay the shapes the rules read;
@@ -43,7 +44,16 @@ final class Run {
     var personaKey: PersonaKey { PersonaKey(rawValue: persona) ?? .me }
 
     var suggestionAnswers: [String: SuggestionAnswer] {
-        get { suggestionAnswersData.flatMap { try? JSONDecoder.contract.decode([String: SuggestionAnswer].self, from: $0) } ?? [:] }
-        set { suggestionAnswersData = newValue.isEmpty ? nil : try? JSONEncoder.contract.encode(newValue) }
+        get {
+            suggestionAnswersData.flatMap { data in
+                Logger.model.attempt("The suggestion answers couldn't be read") {
+                    try JSONDecoder.contract.decode([String: SuggestionAnswer].self, from: data)
+                }
+            } ?? [:]
+        }
+        set {
+            suggestionAnswersData = newValue.isEmpty ? nil
+                : Logger.model.attempt("The suggestion answers couldn't be kept") { try JSONEncoder.contract.encode(newValue) }
+        }
     }
 }

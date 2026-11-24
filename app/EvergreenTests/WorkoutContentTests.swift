@@ -22,7 +22,7 @@ struct WorkoutContentTests {
         rules.isOn = true
         rules.equipment = []
         let library = await engine.library()
-        let content = try #require(await engine.session(id: "home-1", focus: "full", minutes: 25, rules: rules, log: WorkoutLog(), turn: 0))
+        let content = try #require(await engine.session(.init(id: "home-1", focus: "full", minutes: 25), basis: .init(rules: rules, log: WorkoutLog()), turn: 0))
         #expect(content.sessionId == "home-1")
         #expect(content.minutes <= 25)
         #expect(content.items.count >= 3)
@@ -37,9 +37,9 @@ struct WorkoutContentTests {
         var rules = UserRules()
         rules.isOn = true
         var log = WorkoutLog()
-        let usual = try #require(await engine.session(id: nil, focus: "full", minutes: 40, rules: rules, log: log, turn: 0))
+        let usual = try #require(await engine.session(.init(id: nil, focus: "full", minutes: 40), basis: .init(rules: rules, log: log), turn: 0))
         log.lastPain = 4
-        let eased = try #require(await engine.session(id: nil, focus: "full", minutes: 40, rules: rules, log: log, turn: 0))
+        let eased = try #require(await engine.session(.init(id: nil, focus: "full", minutes: 40), basis: .init(rules: rules, log: log), turn: 0))
         #expect(eased.items.map(\.sets) == usual.items.map { max(1, $0.sets - 1) })
     }
 
@@ -89,8 +89,27 @@ struct WorkoutContentTests {
         log.settleLoads([hard, WorkoutResult(movementId: "backpack_row", sets: [12, 12], load: 3)], feeling: .right)
         #expect(log.loads["backpack_squat"] == 3)      // the page already took the kilogram off: not two
         #expect(log.loads["backpack_row"] == nil)      // used once, so the usual step up applies again
-        log.settleLoads([WorkoutResult(movementId: "backpack_press", sets: [10], load: 11)], feeling: .easy)
+        let finding = WorkoutResult(movementId: "backpack_press", sets: [10], load: 11, calibrating: true)
+        log.settleLoads([finding], feeling: .easy)
         #expect(log.loads["backpack_press"] == 12)     // no more than a backpack holds
+    }
+
+    @Test func tooEasyAtTheEndRaisesTheBackpackOnlyWhileItsWeightIsBeingFound() {
+        var log = WorkoutLog()
+        let finding = WorkoutResult(movementId: "backpack_squat", sets: [10], load: 3, calibrating: true)
+        let known = WorkoutResult(movementId: "backpack_row", sets: [12], load: 3, calibrating: false)
+        log.settleLoads([finding, known], feeling: .easy)
+        #expect(log.loads["backpack_squat"] == 5, "the first time with the backpack: two kilograms more")
+        #expect(log.loads["backpack_row"] == nil, "after that only the usual kilogram a session, from the engine")
+    }
+
+    @Test func aBackpackWeightIsKeptFromTheLogOnceASessionLoggedIt() {
+        var log = WorkoutLog()
+        #expect(log.savedLoad("backpack_squat") == nil)
+        log.record(day: "2026-11-18", results: [WorkoutResult(movementId: "backpack_squat", sets: [10], load: 4)], pain: nil)
+        #expect(log.savedLoad("backpack_squat") == 4)
+        log.loads["backpack_squat"] = 3
+        #expect(log.savedLoad("backpack_squat") == 3, "the weight set for next time comes first")
     }
 
     @Test func tooEasyOnOneBackpackMovementRaisesOnlyThatOne() {

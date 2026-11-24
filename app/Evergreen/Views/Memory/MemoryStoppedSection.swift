@@ -12,24 +12,29 @@ struct MemoryStoppedSection: View {
                     .foregroundStyle(Theme.textMuted)
                     .accessibilityAddTraits(.isHeader)
                     .padding(.bottom, Theme.sm)
-                Rectangle().fill(Theme.rule).frame(height: 1)
-                ForEach(model.stoppedEntries, id: \.key) { entry in
-                    HStack(spacing: Theme.md) {
-                        Text(entry.label)
-                            .font(.body)
-                            .foregroundStyle(Theme.textMuted)
-                            .strikethrough(color: Theme.textMuted)
-                        Spacer(minLength: Theme.sm)
-                        Button("Restore") { Task { await model.restore(key: entry.key) } }
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(Theme.text)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .accessibilityLabel("Restore \(entry.label)")
-                    }
-                    .frame(minHeight: 44)
-                    Rectangle().fill(Theme.rule).frame(height: 1)
-                }
+                rule
+                ForEach(model.stoppedEntries, id: \.key) { entry in row(key: entry.key, label: entry.label) }
             }
         }
+    }
+
+    private var rule: some View { Rectangle().fill(Theme.rule).frame(height: Theme.borderWidth) }
+
+    @ViewBuilder private func row(key: String, label: String) -> some View {
+        HStack(spacing: Theme.md) {
+            Text(label)
+                .font(.body)
+                .foregroundStyle(Theme.textMuted)
+                .strikethrough(color: Theme.textMuted)
+            Spacer(minLength: Theme.sm)
+            Button("Restore") { Task { await model.restore(key: key) } }
+                .font(.body.weight(.medium))
+                .foregroundStyle(Theme.text)
+                .frame(minWidth: TapTargetButtonStyle.minSide, minHeight: TapTargetButtonStyle.minSide)
+                .accessibilityLabel("Restore \(label)")
+                .accessibilityIdentifier("memory.restore.\(key)")
+        }
+        .frame(minHeight: TapTargetButtonStyle.minSide)
+        rule
     }
 }

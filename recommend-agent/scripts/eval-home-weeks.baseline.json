@@ -1,21 +1,261 @@
 {
-  "total": 30,
-  "checks": {
-    "plan": 30,
-    "days": 30,
-    "movements": 30,
-    "equipment": 30,
-    "length": 30,
-    "new": 30,
-    "sets": 30,
-    "rain": 30,
-    "progress": 30
+  "source": {
+    "commit": "c247786",
+    "path": "recommend-agent/src",
+    "levers": "scripts/eval-home-weeks.levers/<lever>.patch"
   },
-  "knownBad": [
-    "rest_day_rule",
-    "too_many_sessions",
-    "session_on_rest_day",
-    "avoided_movement",
-    "session_too_long"
-  ]
+  "before": {
+    "total": 30,
+    "guards": {
+      "plan": 30,
+      "days": 30,
+      "movements": 30,
+      "equipment": 30,
+      "new": 30,
+      "floor": 30,
+      "rain": 30,
+      "progress": 30,
+      "picks": 29
+    },
+    "outcomes": {
+      "earning": {
+        "unearned": 52,
+        "earned": 26,
+        "probes": {
+          "once": 26,
+          "tooHard": 26,
+          "twice": 26
+        }
+      },
+      "items": {
+        "underFour": 25,
+        "overFive": 0,
+        "sessions": 67
+      },
+      "weekSets": {
+        "aboveTen": 17,
+        "belowEight": 58
+      },
+      "timing": {
+        "overTime": 41,
+        "sessions": 67
+      },
+      "queue": {
+        "disagree": 31,
+        "probes": 30
+      }
+    }
+  },
+  "levers": {
+    "earning": {
+      "total": 30,
+      "guards": {
+        "plan": 30,
+        "days": 30,
+        "movements": 30,
+        "equipment": 30,
+        "new": 30,
+        "floor": 30,
+        "rain": 30,
+        "progress": 30,
+        "picks": 29
+      },
+      "outcomes": {
+        "earning": {
+          "unearned": 0,
+          "earned": 26,
+          "probes": {
+            "once": 26,
+            "tooHard": 26,
+            "twice": 26
+          }
+        },
+        "items": {
+          "underFour": 25,
+          "overFive": 0,
+          "sessions": 67
+        },
+        "weekSets": {
+          "aboveTen": 17,
+          "belowEight": 60
+        },
+        "timing": {
+          "overTime": 41,
+          "sessions": 67
+        },
+        "queue": {
+          "disagree": 31,
+          "probes": 30
+        }
+      }
+    },
+    "items": {
+      "total": 30,
+      "guards": {
+        "plan": 30,
+        "days": 30,
+        "movements": 30,
+        "equipment": 30,
+        "new": 30,
+        "floor": 30,
+        "rain": 30,
+        "progress": 30,
+        "picks": 30
+      },
+      "outcomes": {
+        "earning": {
+          "unearned": 52,
+          "earned": 26,
+          "probes": {
+            "once": 26,
+            "tooHard": 26,
+            "twice": 26
+          }
+        },
+        "items": {
+          "underFour": 0,
+          "overFive": 0,
+          "sessions": 67
+        },
+        "weekSets": {
+          "aboveTen": 16,
+          "belowEight": 56
+        },
+        "timing": {
+          "overTime": 36,
+          "sessions": 67
+        },
+        "queue": {
+          "disagree": 31,
+          "probes": 30
+        }
+      }
+    },
+    "weekSets": {
+      "total": 30,
+      "guards": {
+        "plan": 30,
+        "days": 30,
+        "movements": 30,
+        "equipment": 30,
+        "new": 30,
+        "floor": 30,
+        "rain": 30,
+        "progress": 30,
+        "picks": 29
+      },
+      "outcomes": {
+        "earning": {
+          "unearned": 52,
+          "earned": 26,
+          "probes": {
+            "once": 26,
+            "tooHard": 26,
+            "twice": 26
+          }
+        },
+        "items": {
+          "underFour": 35,
+          "overFive": 0,
+          "sessions": 67
+        },
+        "weekSets": {
+          "aboveTen": 0,
+          "belowEight": 42
+        },
+        "timing": {
+          "overTime": 45,
+          "sessions": 67
+        },
+        "queue": {
+          "disagree": 31,
+          "probes": 30
+        }
+      }
+    },
+    "timing": {
+      "total": 30,
+      "guards": {
+        "plan": 30,
+        "days": 30,
+        "movements": 30,
+        "equipment": 30,
+        "new": 30,
+        "floor": 30,
+        "rain": 30,
+        "progress": 30,
+        "picks": 30
+      },
+      "outcomes": {
+        "earning": {
+          "unearned": 52,
+          "earned": 26,
+          "probes": {
+            "once": 26,
+            "tooHard": 26,
+            "twice": 26
+          }
+        },
+        "items": {
+          "underFour": 31,
+          "overFive": 0,
+          "sessions": 67
+        },
+        "weekSets": {
+          "aboveTen": 14,
+          "belowEight": 64
+        },
+        "timing": {
+          "overTime": 0,
+          "sessions": 67
+        },
+        "queue": {
+          "disagree": 31,
+          "probes": 30
+        }
+      }
+    },
+    "queue": {
+      "total": 30,
+      "guards": {
+        "plan": 30,
+        "days": 30,
+        "movements": 30,
+        "equipment": 30,
+        "new": 30,
+        "floor": 30,
+        "rain": 30,
+        "progress": 30,
+        "picks": 29
+      },
+      "outcomes": {
+        "earning": {
+          "unearned": 52,
+          "earned": 26,
+          "probes": {
+            "once": 26,
+            "tooHard": 26,
+            "twice": 26
+          }
+        },
+        "items": {
+          "underFour": 25,
+          "overFive": 0,
+          "sessions": 67
+        },
+        "weekSets": {
+          "aboveTen": 17,
+          "belowEight": 58
+        },
+        "timing": {
+          "overTime": 41,
+          "sessions": 67
+        },
+        "queue": {
+          "disagree": 0,
+          "probes": 30
+        }
+      }
+    }
+  }
 }

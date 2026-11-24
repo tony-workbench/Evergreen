@@ -64,7 +64,7 @@ struct MemoryForgetControls: View {
                 textButton("Forget") { ask(.day(pickedDay)) }
                     .accessibilityLabel("Forget \(Self.dayTitle(pickedDay))")
             }
-            .frame(minHeight: 44)
+            .frame(minHeight: TapTargetButtonStyle.minSide)
             rule
         }
     }
@@ -85,7 +85,7 @@ struct MemoryForgetControls: View {
                 textButton(button, action: action)
                     .accessibilityLabel("\(button): \(title)")
             }
-            .frame(minHeight: 44)
+            .frame(minHeight: TapTargetButtonStyle.minSide)
             rule
         }
     }
@@ -94,7 +94,7 @@ struct MemoryForgetControls: View {
         Button(title, action: action)
             .font(.body.weight(.medium))
             .foregroundStyle(Theme.text)
-            .frame(minWidth: 44, minHeight: 44)
+            .frame(minWidth: TapTargetButtonStyle.minSide, minHeight: TapTargetButtonStyle.minSide)
             .contentShape(.rect)
     }
 

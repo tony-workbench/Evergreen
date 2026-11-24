@@ -9,7 +9,7 @@ npm install
 npm test
 npm run build     # writes dist/recommend-phone.js
 npm run sample    # prints a sample week, brief and check
-npm run eval:home # grades 30 home weeks
+npm run eval:home # 30 home weeks, one lever per comparison (docs/HOME.md)
 ```
 
 Needs Node.js 20+. The app runs `dist/recommend-phone.js` in JavaScriptCore; [docs/PHONE.md](docs/PHONE.md) and [docs/HOME.md](docs/HOME.md) list its globals.

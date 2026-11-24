@@ -41,7 +41,8 @@ final class RecordingCalendar: PlanCalendar {
 
     func sync(_ entries: [CalendarEntry], from storyDay: Date) {
         guard access == .on else { return }
-        let changes = CalendarChanges(desired: entries, existing: events.indices.map { (id: $0, entry: events[$0]) })
+        // As the device's calendar: only events from the story day on are read back; earlier ones stay as history.
+        let changes = CalendarChanges(desired: entries, existing: events.indices.filter { events[$0].end > storyDay }.map { (id: $0, entry: events[$0]) })
         var next = events
         for update in changes.update { next[update.event] = update.entry }
         updated += changes.update.map(\.entry)
@@ -161,43 +162,69 @@ struct AppRig {
         return HealthHistory(workouts: workouts, days: [], readAt: now)
     }
 
-    /// - Parameters:
-    ///   - connected: whether an AI key is connected. When it is, the model is a script that can't be reached,
-    ///     so memory and the week come from the engines' own rules unless the test gives another script.
-    ///   - persona: `.me` is the person's own (empty) plan; `.tour` starts from the fixed three-workout week.
-    init(now: Date = Clocks.morning, history: HealthHistory? = nil, persona: PersonaKey = .me, connected: Bool = true,
-         calendarAccess: CalendarAccess = .on, healthRead: HealthHistory? = nil) throws {
+    /// What a test asks of the rig; every answer has the usual default, so a test names only what it changes.
+    struct Setup {
+        var now: Date = Clocks.morning
+        /// Apple Health's history; a month of the `jordan` fixture ending the day before `now` when nil.
+        var history: HealthHistory? = nil
+        /// `.me` is the person's own (empty) plan; `.tour` starts from the fixed three-workout week.
+        var persona: PersonaKey = .me
+        /// Whether an AI key is connected. When it is, the model is a script that can't be reached,
+        /// so memory and the week come from the engines' own rules unless the test gives another script.
+        var connected = true
+        var calendarAccess: CalendarAccess = .on
+        var healthRead: HealthHistory? = nil
+    }
+
+    /// The usual rig at another time of day.
+    init(now: Date) throws {
+        try self.init(Setup(now: now))
+    }
+
+    init(_ setup: Setup = Setup()) throws {
+        container = try Self.container(setup)
+        let clock = TestClock(setup.now)
+        self.clock = clock
+        calendar = RecordingCalendar(access: setup.calendarAccess)
+        health = ScriptedHealth(setup.healthRead)
+        settings = Self.freshSettings()
+        model = AppModel(context: container.mainContext, setup: AppModel.Setup(
+            memory: try MemoryEngineTests.engine(),
+            // An account nothing was ever saved under: no key is found on this machine.
+            aiKey: AIKey(account: "rig-no-key-\(UUID().uuidString)"),
+            health: setup.history ?? AppRig.month(endingBefore: setup.now),
+            calendar: Fixture.calendar, clock: { clock.now }, calendarSync: calendar, healthReader: health))
+        Self.prepare(model, settings: settings, connected: setup.connected)
+    }
+
+    /// An in-memory store holding the run the model starts from.
+    private static func container(_ setup: Setup) throws -> ModelContainer {
         let schema = Schema([Run.self, ActionRecord.self, LoggedWorkout.self])
-        container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
+        let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
         // Kept for the whole run: a model's ticks go on after its test ends.
         SuggestionTests.containers.append(container)
-        let run = Run(persona: persona, storyDay: Fixture.calendar.startOfDay(for: now))
+        let run = Run(persona: setup.persona, storyDay: Fixture.calendar.startOfDay(for: setup.now))
         run.onboarded = true
         container.mainContext.insert(run)
+        return container
+    }
 
-        let clock = TestClock(now)
-        self.clock = clock
-        calendar = RecordingCalendar(access: calendarAccess)
-        health = ScriptedHealth(healthRead)
+    /// A settings store of the test's own, empty.
+    private static func freshSettings() -> UserDefaults {
         let suite = "rig-\(UUID().uuidString)"
-        settings = UserDefaults(suiteName: suite)!
+        let settings = UserDefaults(suiteName: suite)!
         settings.removePersistentDomain(forName: suite)
+        return settings
+    }
 
-        model = AppModel(context: container.mainContext, memory: try MemoryEngineTests.engine(),
-                         // An account nothing was ever saved under: no key is found on this machine.
-                         aiKey: AIKey(account: "rig-no-key-\(UUID().uuidString)"),
-                         health: history ?? AppRig.month(endingBefore: now),
-                         calendar: Fixture.calendar, clock: { clock.now }, calendarSync: calendar, healthReader: health)
+    /// The model unlocked, on the test's settings, with memory worked out without a model and the AI key as asked.
+    private static func prepare(_ model: AppModel, settings: UserDefaults, connected: Bool) {
         model.settings = settings
         model.unlocked = { true }
         model.sessionKey = nil
         model.memoryWithoutModel = true
-        if connected {
-            model.scriptedModel = ScriptedModel([])
-            model.aiKeyTail = "test"
-        } else {
-            model.aiKeyTail = nil
-        }
+        if connected { model.scriptedModel = ScriptedModel([]) }
+        model.aiKeyTail = connected ? "test" : nil
     }
 
     /// Connects a key that is only ever sent to a scripted network: the model is the app's own client, answered from `answers` in order.

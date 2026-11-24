@@ -14,6 +14,7 @@ struct PlanRow: View {
             Button(action: pick) { row(showsChevron: true) }
                 .buttonStyle(RowPressStyle())
                 .accessibilityHint("Picks another time")
+                .accessibilityIdentifier("plan.row.\(item.id)")
                 .pickAnotherTime(for: item, isPresented: $picking)
         } else {
             row(showsChevron: false)
@@ -31,29 +32,9 @@ struct PlanRow: View {
 
     private func row(showsChevron: Bool) -> some View {
         HStack(alignment: .top, spacing: Theme.md) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: Theme.sm) {
-                    Text(item.slot.start.formatted(.dateTime.weekday(.wide)))
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(isMissed ? Theme.textMuted : Theme.text)
-                        .strikethrough(isMissed, color: Theme.textMuted)
-                    if model.movedAction(for: item) != nil {
-                        Badge(text: "Moved")
-                    }
-                }
-                Text(detail)
-                    .font(.footnote)
-                    .foregroundStyle(Theme.textMuted)
-                if let reason = model.reason(for: item), !isMissed, model.completion(for: item) == nil {
-                    Text(reason)
-                        .font(.footnote)
-                        .foregroundStyle(Theme.text)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 2)
-                }
-            }
+            what
             Spacer(minLength: Theme.sm)
-            VStack(alignment: .trailing, spacing: 2) {
+            VStack(alignment: .trailing, spacing: Theme.xxs) {
                 Text(item.slot.start.clock)
                     .font(.body.monospacedDigit())
                     .foregroundStyle(isMissed ? Theme.textMuted : Theme.text)
@@ -67,9 +48,32 @@ struct PlanRow: View {
             }
         }
         .padding(.vertical, Theme.md)
-        .frame(minHeight: 44)
+        .frame(minHeight: TapTargetButtonStyle.minSide)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
+    }
+
+    /// The day (with "Moved" when the agent moved it), what and how long, and why.
+    private var what: some View {
+        VStack(alignment: .leading, spacing: Theme.xxs) {
+            HStack(spacing: Theme.sm) {
+                Text(item.slot.start.formatted(.dateTime.weekday(.wide)))
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(isMissed ? Theme.textMuted : Theme.text)
+                    .strikethrough(isMissed, color: Theme.textMuted)
+                if model.movedAction(for: item) != nil { Badge(text: "Moved") }
+            }
+            Text(detail)
+                .font(.footnote)
+                .foregroundStyle(Theme.textMuted)
+            if let reason = model.reason(for: item), !isMissed, model.completion(for: item) == nil {
+                Text(reason)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, Theme.xxs)
+            }
+        }
     }
 
     /// "Strength, 30 minutes."

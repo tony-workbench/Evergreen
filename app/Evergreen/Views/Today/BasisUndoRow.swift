@@ -16,7 +16,7 @@ struct BasisUndoRow: View {
             Button("Undo") { Task { await model.undoRejectBasis() } }
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(Theme.text)
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: TapTargetButtonStyle.minSide, minHeight: TapTargetButtonStyle.minSide)
                 .accessibilityHint("Uses it again")
         }
     }

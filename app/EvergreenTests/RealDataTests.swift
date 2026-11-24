@@ -12,7 +12,7 @@ struct RealDataTests {
         let schema = Schema([Run.self, ActionRecord.self, LoggedWorkout.self])
         let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
         SuggestionTests.containers.append(container)
-        return AppModel(context: container.mainContext, memory: nil, onDevice: false, health: HealthHistory())
+        return AppModel(context: container.mainContext, setup: AppModel.Setup(memory: nil, onDevice: false, health: HealthHistory()))
     }
 
     // MARK: Nothing in Health, nothing on the calendar
@@ -53,13 +53,13 @@ struct RealDataTests {
         let old = Run(persona: .me, storyDay: Calendar.current.startOfDay(for: Date()))
         old.persona = "jordan"
         container.mainContext.insert(old)
-        let model = AppModel(context: container.mainContext, memory: nil, onDevice: false, health: HealthHistory())
+        let model = AppModel(context: container.mainContext, setup: AppModel.Setup(memory: nil, onDevice: false, health: HealthHistory()))
         #expect(model.persona == .me)
     }
 
     @Test func aFixedClockIsNeverReadOnTheDevice() async throws {
         // A model on the device, as the app makes it; under test it wires no triggers.
-        let model = AppModel(context: try SuggestionTests.container().mainContext, memory: nil, health: HealthHistory())
+        let model = AppModel(context: try SuggestionTests.container().mainContext, setup: AppModel.Setup(memory: nil, health: HealthHistory()))
         model.run.clockMinutes = 16 * 60
         model.save()
         await model.tick()

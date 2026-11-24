@@ -65,18 +65,22 @@ struct BasesSheet: View {
                 .font(.footnote)
                 .foregroundStyle(Theme.textMuted)
                 .fixedSize(horizontal: false, vertical: true)
-            if let key = basis.key {
-                Button("Not true for me") {
-                    dismiss()
-                    Task { await model.rejectBasis(key) }
-                }
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(Theme.text)
-                .frame(minHeight: 44)
-                .accessibilityHint("Stops using this and plans your week again")
-            }
+            if let key = basis.key { notTrue(key) }
         }
         .padding(.top, Theme.md)
         .padding(.bottom, basis.key == nil ? Theme.md : 0)
+    }
+
+    /// "Not true for me": the sheet goes, that row stops being used and the week is planned again.
+    private func notTrue(_ key: String) -> some View {
+        Button("Not true for me") {
+            dismiss()
+            Task { await model.rejectBasis(key) }
+        }
+        .font(.footnote.weight(.medium))
+        .foregroundStyle(Theme.text)
+        .frame(minHeight: TapTargetButtonStyle.minSide)
+        .accessibilityHint("Stops using this and plans your week again")
+        .accessibilityIdentifier("why.notTrue.\(key)")
     }
 }

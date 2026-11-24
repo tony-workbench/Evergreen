@@ -14,6 +14,8 @@ final class CalendarSync {
     private static let log = Logger(subsystem: "com.evergreentraining.app", category: "calendar")
 
     private var store = EKEventStore()
+    /// Reads the other calendars off the main thread, with an event store of its own.
+    private let reader = EventReader()
     /// A store made before access was granted doesn't see any calendars, so
     /// it's replaced the first time a sync runs with access.
     private var storeHasAccess = EKEventStore.authorizationStatus(for: .event) == .fullAccess
@@ -68,26 +70,32 @@ final class CalendarSync {
                 existing: events.indices.map { (id: $0, entry: CalendarEntry(events[$0])) }
             )
             guard !changes.isEmpty else { return }
-            for entry in changes.create {
-                let event = EKEvent(eventStore: store)
-                event.calendar = calendar
-                event.apply(entry)
-                try store.save(event, span: .thisEvent, commit: false)
-            }
-            for update in changes.update {
-                events[update.event].apply(update.entry)
-                try store.save(events[update.event], span: .thisEvent, commit: false)
-            }
-            for index in changes.delete {
-                try store.remove(events[index], span: .thisEvent, commit: false)
-            }
-            try store.commit()
+            try write(changes, over: events, in: calendar)
             Self.log.info("Synced: \(changes.create.count) created, \(changes.update.count) moved, \(changes.delete.count) removed")
         } catch {
             // The plan stays in the app either way; the next sync tries again.
             store.reset()
             Self.log.error("Calendar sync failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Creates, moves and removes the app's events as `changes` says, `events` being the ones read back, and commits them
+    /// together.
+    private func write(_ changes: CalendarChanges<Int>, over events: [EKEvent], in calendar: EKCalendar) throws {
+        for entry in changes.create {
+            let event = EKEvent(eventStore: store)
+            event.calendar = calendar
+            event.apply(entry)
+            try store.save(event, span: .thisEvent, commit: false)
+        }
+        for update in changes.update {
+            events[update.event].apply(update.entry)
+            try store.save(events[update.event], span: .thisEvent, commit: false)
+        }
+        for index in changes.delete {
+            try store.remove(events[index], span: .thisEvent, commit: false)
+        }
+        try store.commit()
     }
 
     /// Removes every event the app made in the month around the story day, and
@@ -112,21 +120,17 @@ final class CalendarSync {
 
     // MARK: Slot defense
 
-    /// The person's busy times on their other calendars for the synced window,
-    /// for slot defense. The fetch runs off the main thread.
+    /// The person's busy times on their other calendars for the synced window, for slot defense. Read on `reader`,
+    /// off the main thread.
     func busyTimes(from storyDay: Date) async -> [Busy] {
         guard prepareStore() else { return [] }
-        let reader = BusyReader(store: store)
-        let days = Self.window, title = Self.calendarTitle
-        return await Task.detached { reader.busy(from: storyDay, days: days, except: title) }.value
+        return await reader.busy(from: storyDay, days: Self.window, except: Self.calendarTitle)
     }
 
-    /// All-day and free events that have a place, for telling days out from days at home. The fetch runs off the main thread.
+    /// All-day and free events that have a place, for telling days out from days at home. Read on `reader`.
     func placedEvents(from storyDay: Date) async -> [Busy] {
         guard prepareStore() else { return [] }
-        let reader = BusyReader(store: store)
-        let days = Self.window, title = Self.calendarTitle
-        return await Task.detached { reader.placed(from: storyDay, days: days, except: title) }.value
+        return await reader.placed(from: storyDay, days: Self.window, except: Self.calendarTitle)
     }
 
     static let testMeetingScheme = "evergreen-demo"

@@ -89,11 +89,11 @@
   {
     "sessionId": null,
     "focus": "full",
-    "minutes": 15,
+    "minutes": 16,
     "items": [
       {
         "movementId": "sit_to_stand",
-        "sets": 3,
+        "sets": 2,
         "reps": [
           8,
           12
@@ -103,7 +103,7 @@
       },
       {
         "movementId": "wall_push_up",
-        "sets": 3,
+        "sets": 2,
         "reps": [
           10,
           15
@@ -111,6 +111,16 @@
         "rest": 60,
         "isNew": false,
         "slow": true
+      },
+      {
+        "movementId": "prone_arm_raise",
+        "sets": 2,
+        "reps": [
+          10,
+          15
+        ],
+        "rest": 45,
+        "isNew": false
       },
       {
         "movementId": "dead_bug",

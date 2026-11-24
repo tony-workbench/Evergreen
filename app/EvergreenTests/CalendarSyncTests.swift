@@ -11,7 +11,7 @@ struct CalendarSyncTests {
     )
 
     private func entries(_ plan: [PlanItem]) -> [CalendarEntry] {
-        CalendarEntry.entries(for: plan, storyDay: Fixture.storyDay, calendar: Fixture.calendar)
+        CalendarEntry.entries(.init(plan: plan, storyDay: Fixture.storyDay, calendar: Fixture.calendar))
     }
 
     // MARK: Entries
@@ -89,11 +89,11 @@ struct CalendarSyncTests {
     }
 
     @Test func anotherStoryDaysEventIsReplaced() {
-        let yesterday = CalendarEntry.entries(
-            for: [Fixture.lunchWalk],
+        let yesterday = CalendarEntry.entries(.init(
+            plan: [Fixture.lunchWalk],
             storyDay: Fixture.calendar.date(byAdding: .day, value: -1, to: Fixture.storyDay)!,
             calendar: Fixture.calendar
-        )
+        ))
         let changes = CalendarChanges(desired: entries([Fixture.lunchWalk]), existing: [(id: 3, entry: yesterday[0])])
 
         #expect(changes.delete == [3])

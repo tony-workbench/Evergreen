@@ -27,6 +27,14 @@ enum NotificationBudget {
         (defaults.dictionary(forKey: sentKey) as? [String: Int])?[day] ?? 0
     }
 
+    /// Takes one of the day's six for a notification about to be sent, in one step: false when none is left. Checking
+    /// and counting together means two sent at the same moment can't both see the sixth as free.
+    static func claim(on day: String, in defaults: UserDefaults) -> Bool {
+        guard sent(on: day, in: defaults) < maxPerDay else { return false }
+        recordSent(on: day, in: defaults)
+        return true
+    }
+
     static func recordSent(on day: String, in defaults: UserDefaults) {
         var all = (defaults.dictionary(forKey: sentKey) as? [String: Int]) ?? [:]
         all[day, default: 0] += 1
@@ -54,15 +62,10 @@ enum NotificationBudget {
         rank(a.kind) != rank(b.kind) ? rank(a.kind) < rank(b.kind) : a.fires > b.fires
     }
 
+    /// The kinds from the lowest rank to the highest; kinds in one group share a rank.
+    private static let rankOrder: [[WorkoutReminder.Kind]] = [[.later], [.moved], [.soon], [.ask], [.now], [.evening, .outTomorrow], [.last]]
+
     private static func rank(_ kind: WorkoutReminder.Kind) -> Int {
-        switch kind {
-        case .later: 0
-        case .moved: 1
-        case .soon: 2
-        case .ask: 3
-        case .now: 4
-        case .evening, .outTomorrow: 5
-        case .last: 6
-        }
+        rankOrder.firstIndex { $0.contains(kind) } ?? rankOrder.count
     }
 }

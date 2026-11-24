@@ -8,7 +8,7 @@ import { rollDay } from '../src/memory/roll.mjs';
 import { lintWords } from '../src/facts/index.mjs';
 import {
   recordDay, dailyRequest, dailyApply, table, reviews, confirm, reject, restore, onForget, onRestore, slotsOfBriefKey, openAgentFile, AGENT_FILE,
-  SYSTEM, PROPOSALS_SCHEMA, USABLE, TABLE_MAX_ROWS, TABLE_MAX_WORDS, allowedNumbers, numbersNotIn, ACTIVITIES,
+  SYSTEM, PROPOSALS_SCHEMA, USABLE, TABLE_MAX_ROWS, TABLE_MAX_WORDS, allowedNumbers, numbersNotIn, ACTIVITIES, PLACE_KIND, PLACE_STATEMENT,
 } from '../src/agent/index.mjs';
 import { runAgentDemo } from '../scripts/demo.mjs';
 import { fakeModel } from '../scripts/fake-model.mjs';
@@ -30,23 +30,35 @@ function fresh(who = 'half_marathon') {
 }
 const missed = (day, hour = '06') => ({ sessionId: `s-${day}-run-${hour}00`, day, activity: 'run', plannedStart: `${day}T${hour}:00:00-08:00`, done: false });
 
+// Every day of a demo run applied cleanly, one asked about the early run, and some day had only the training place.
+function assertRunClean(run) {
+  for (const d of run.days) {
+    assert.equal(d.result.ok, true, JSON.stringify(d.result.error));
+    assert.deepEqual(d.result.rejected, [], `${d.day}: ${JSON.stringify(d.result.rejected)}`);
+  }
+  // A thin day has no fact to offer but where the person trains, which needs no length of history (plan 5.A.3).
+  assert.ok(run.days.some((d) => d.request.evidence.every((e) => e.id === 'place.home')) && run.days.some((d) => d.result.applied.length > 0));
+  assert.deepEqual(run.asked.map((q) => q.slot), ['response.run.early']);
+}
+
+// A table within budget whose rows are usable and lint-clean, the first one confirmed.
+function assertTableUsable(t) {
+  assert.ok(t.rows.length >= 5 && t.rows.length <= TABLE_MAX_ROWS && t.words <= TABLE_MAX_WORDS);
+  for (const row of t.rows) {
+    assert.ok(USABLE.includes(row.state));
+    if (row.kind !== PLACE_KIND) assert.deepEqual(lintWords(row.statement), [], row.statement);
+    else assert.equal(row.statement, PLACE_STATEMENT, 'the one fixed sentence, which the lint does not fit');
+  }
+  assert.deepEqual(t.rows[0].state, 'confirmed');
+}
+
 for (const who of ['sedentary', 'moderate', 'half_marathon']) {
   test(`${who}: 28 days with the stand-in model run clean, twice the same, and every table stays usable and within budget`, () => {
     const io = makeMemoryIO();
     const run = runAgentDemo(who, { io: io.io, user: USER });
-    for (const d of run.days) {
-      assert.equal(d.result.ok, true, JSON.stringify(d.result.error));
-      assert.deepEqual(d.result.rejected, [], `${d.day}: ${JSON.stringify(d.result.rejected)}`);
-    }
-    assert.ok(run.days.some((d) => d.request.evidence.length === 0) && run.days.some((d) => d.result.applied.length > 0));
-    assert.deepEqual(run.asked.map((q) => q.slot), ['response.run.early']);
+    assertRunClean(run);
     const t = run.table;
-    assert.ok(t.rows.length >= 5 && t.rows.length <= TABLE_MAX_ROWS && t.words <= TABLE_MAX_WORDS);
-    for (const row of t.rows) {
-      assert.ok(USABLE.includes(row.state));
-      assert.deepEqual(lintWords(row.statement), [], row.statement);
-    }
-    assert.deepEqual(t.rows[0].state, 'confirmed');
+    assertTableUsable(t);
     const again = makeMemoryIO();
     assert.deepEqual(runAgentDemo(who, { io: again.io, user: USER }).table, t);
     assert.deepEqual(again.dump('/mem'), io.dump('/mem'));
@@ -63,22 +75,26 @@ test('the half_marathon table is the one in README.md, and its rows fit the shar
   for (const a of Object.keys(t.rows.find((r) => r.kind === 'mix').data.byActivity)) assert.ok(ACTIVITIES.includes(a), a);
 });
 
-test('the request: one system prompt, the day\'s evidence with slots, the neighbors by exact slot, the schema; then alreadyDone', () => {
-  const p = fresh();
-  assert.deepEqual(p.roll(), { ok: true, day: DAY, items: 8 });
+// The first request of the day: its evidence with slots, no neighbors, and the same request when asked twice.
+function assertFirstRequest(p) {
+  assert.deepEqual(p.roll(), { ok: true, day: DAY, items: 9 });
   const r = dailyRequest(p.ctx, { now: NOW });
   assert.deepEqual([r.ok, r.day, r.alreadyDone, r.system, r.schema, r.neighbors], [true, DAY, false, SYSTEM, PROPOSALS_SCHEMA, []]);
   assert.deepEqual(r.evidence.map((e) => [e.id, e.slots]), [
     ['volume.per_week', ['routine.weekly_volume']], ['load.ratio', ['load.week']],
     ['regularity.slot.Running.Sun.08', ['routine.run.sun_08']], ['regularity.slot.Running.Tue.18', ['routine.run.tue_18']], ['regularity.slot.Running.Thu.06', ['routine.run.thu_06']],
-    ['mix.count', ['routine.mix']], ['body.sleep', ['body.sleep']], ['body.resting_hr', ['body.resting_hr']],
+    ['mix.count', ['routine.mix']], ['body.sleep', ['body.sleep']], ['body.resting_hr', ['body.resting_hr']], ['place.home', ['routine.training_place']],
   ]);
   for (const e of r.evidence) assert.deepEqual([typeof e.text, typeof e.numbers, typeof e.window, e.supportDays, Object.hasOwn(e.numbers, 'exact')], ['string', 'object', 'string', 1, false]);
   assert.ok(r.user.startsWith(`DAY: ${DAY}\n\nEVIDENCE:\n[`) && r.user.includes('"regularity.slot.Running.Sun.08"') && r.user.endsWith('EXISTING MEMORIES:\n[]'));
   assert.deepEqual(dailyRequest(p.ctx, { now: NOW }), r, 'the same request twice');
+  return r;
+}
 
+// After the day is applied: alreadyDone, the neighbors by exact slot, and an outcome as new evidence.
+function assertAfterApply(p, r) {
   const done = dailyApply(p.ctx, { now: NOW, day: DAY, proposals: fakeModel(r) });
-  assert.deepEqual([done.ok, done.alreadyDone, done.applied.map((a) => a.op), done.rejected], [true, false, Array(8).fill('ADD'), []]);
+  assert.deepEqual([done.ok, done.alreadyDone, done.applied.map((a) => a.op), done.rejected], [true, false, Array(9).fill('ADD'), []]);
   const second = dailyRequest(p.ctx, { now: NOW });
   assert.equal(second.alreadyDone, true);
   assert.deepEqual(second.neighbors.map((n) => [n.memoryId, n.slot, n.state, n.version, n.updated]).slice(0, 2), [['mem_0001', 'routine.weekly_volume', 'saved', 1, DAY], ['mem_0002', 'load.week', 'saved', 1, DAY]]);
@@ -86,6 +102,12 @@ test('the request: one system prompt, the day\'s evidence with slots, the neighb
   const more = dailyRequest(p.ctx, { now: NOW, outcomes: [missed(DAY)] });
   assert.equal(more.alreadyDone, false, 'an outcome is new evidence for the day');
   assert.deepEqual(more.evidence.slice(-2).map((e) => [e.id, e.numbers.done, e.slots]), [[`outcome.s-${DAY}-run-0600`, false, ['response.run.early']], ['outcomes.run.early', 0, ['response.run.early']]]);
+}
+
+test('the request: one system prompt, the day\'s evidence with slots, the neighbors by exact slot, the schema; then alreadyDone', () => {
+  const p = fresh();
+  const r = assertFirstRequest(p);
+  assertAfterApply(p, r);
 });
 
 test('every number of every statement the stand-in model writes is in the evidence it cites', () => {
@@ -110,7 +132,7 @@ test('errors are { ok: false, error: { code, text } }: no roll yet, bad outcomes
     contract.assertValid('error', r, code);
   }
   assert.equal(p.mem.exists(`/mem/${USER}/${AGENT_FILE}`), false, 'a failed call writes nothing');
-  assert.equal(dailyRequest(p.ctx, { now: NOW, snapshot: p.snapshot }).evidence.length, 8, 'with a snapshot the day needs no earlier roll');
+  assert.equal(dailyRequest(p.ctx, { now: NOW, snapshot: p.snapshot }).evidence.length, 9, 'with a snapshot the day needs no earlier roll');
 });
 
 test('reject by key ("Not now"), the question queue, confirm and restore through the daily calls', { skip: noContract }, () => {
@@ -137,20 +159,19 @@ test('reject by key ("Not now"), the question queue, confirm and restore through
   contract.assertValid('memory-table', t, 'memoryTable');
 });
 
-test('forgetting a day with the snapshot keeps the table: rows whose support survives stay, with numbers computed again without the day', () => {
-  const p = fresh();
-  p.roll();
-  p.round();
-  const before = table(p.ctx).rows;
-  assert.equal(forgetFactKey(p.store, 'daily', '2026-11-10'), true);
-  assert.equal(onForget(p.ctx, { what: 'day', day: '2026-11-10', snapshot: p.snapshot }), true);
-  const after = table(p.ctx).rows;
+const row = (rows, slot) => rows.find((r) => r.slot === slot);
+
+// The rows after forgetting 2026-11-10: the same slots, the usual slots unchanged, the numbers computed again.
+function assertRowsAfterForget(before, after) {
   assert.deepEqual(after.map((r) => r.slot).sort(), before.map((r) => r.slot).sort(), 'no row is lost: every slot still has support');
-  const row = (rows, slot) => rows.find((r) => r.slot === slot);
   for (const slot of ['routine.run.sun_08', 'routine.run.thu_06', 'routine.run.tue_18']) assert.deepEqual(row(after, slot), row(before, slot), `${slot}: 3 of the last 4 weeks still holds`);
   assert.deepEqual([row(before, 'routine.weekly_volume').data, row(after, 'routine.weekly_volume').data], [{ workoutsPerWeek: 6.5, minutesPerWeek: 323.13 }, { workoutsPerWeek: 6.25, minutesPerWeek: 309.75 }]);
   assert.equal(row(after, 'routine.weekly_volume').statement, 'Weekly average over 4 weeks: 6.3 workouts and 310 workout minutes.');
   assert.deepEqual(row(after, 'routine.mix').data, { byActivity: { run: 19, strength: 4, yoga: 2 } });
+}
+
+// Every statement's numbers are in the evidence it cites, and no number that contained the day remains.
+function assertFileNumbers(p) {
   const file = JSON.parse(p.mem.dump('/mem')[`${USER}/${AGENT_FILE}`]);
   const evidence = Object.fromEntries(file.evidence[DAY].map((e) => [e.id, e]));
   for (const m of file.memories) {
@@ -158,32 +179,46 @@ test('forgetting a day with the snapshot keeps the table: rows whose support sur
     assert.deepEqual(numbersNotIn(v.statement, allowedNumbers(v.evidence.flatMap((r) => r.ids.map((id) => evidence[id])))), [], v.statement);
   }
   assert.ok(!JSON.stringify(file).includes('323.13'), 'no number that contained the day remains');
+}
+
+test('forgetting a day with the snapshot keeps the table: rows whose support survives stay, with numbers computed again without the day', () => {
+  const p = fresh();
+  p.roll();
+  p.round();
+  const before = table(p.ctx).rows;
+  assert.equal(forgetFactKey(p.store, 'daily', '2026-11-10'), true);
+  assert.equal(onForget(p.ctx, { what: 'day', day: '2026-11-10', snapshot: p.snapshot }), true);
+  assertRowsAfterForget(before, table(p.ctx).rows);
+  assertFileNumbers(p);
   const again = p.round();
-  assert.deepEqual([again.request.alreadyDone, again.result.rejected, again.result.applied.length], [false, [], 8]);
+  assert.deepEqual([again.request.alreadyDone, again.result.rejected, again.result.applied.length], [false, [], 9]);
 
   assert.equal(forgetFactKey(p.store, 'daily', '2026-11-16'), true);
   assert.equal(onForget(p.ctx, { what: 'day', day: '2026-11-16', snapshot: p.snapshot }), true);
   const slots = table(p.ctx).rows.map((r) => r.slot);
-  assert.ok(!slots.includes('load.week') && slots.includes('routine.run.sun_08') && slots.length === 7, 'a row whose fact can no longer be computed goes; the others stay');
+  assert.ok(!slots.includes('load.week') && slots.includes('routine.run.sun_08') && slots.length === 8, 'a row whose fact can no longer be computed goes; the others stay');
 });
+
+// One persona forgets one day with the snapshot: only the `lost` rows go, within budget, with short lint-clean statements.
+function assertForgetKeeps(who, [day, lost]) {
+  const p = fresh(who);
+  p.roll();
+  p.round();
+  const before = table(p.ctx);
+  assert.equal(forgetFactKey(p.store, 'daily', day), true);
+  assert.equal(onForget(p.ctx, { what: 'day', day, snapshot: p.snapshot }), true);
+  const after = table(p.ctx);
+  assert.deepEqual(after.rows.map((r) => r.slot).sort(), before.rows.map((r) => r.slot).filter((s) => !lost.includes(s)).sort(), day);
+  assert.ok(after.words <= TABLE_MAX_WORDS && after.leftOut === 0 && after.words <= before.words + 5, `${day}: ${after.words} words`);
+  for (const r of after.rows) {
+    assert.ok(r.statement.length <= 160 && !/Counted|Fixed slot|4-week average:/.test(r.statement), r.statement);
+    if (r.kind !== PLACE_KIND) assert.deepEqual(lintWords(r.statement), [], r.statement);
+  }
+}
 
 for (const who of ['sedentary', 'moderate', 'half_marathon']) {
   test(`${who}: forgetting a day with the snapshot keeps the row count and the 200-word budget, with short statements`, () => {
-    for (const [day, lost] of [['2026-11-05', []], ['2026-11-14', ['load.week']]]) {
-      const p = fresh(who);
-      p.roll();
-      p.round();
-      const before = table(p.ctx);
-      assert.equal(forgetFactKey(p.store, 'daily', day), true);
-      assert.equal(onForget(p.ctx, { what: 'day', day, snapshot: p.snapshot }), true);
-      const after = table(p.ctx);
-      assert.deepEqual(after.rows.map((r) => r.slot).sort(), before.rows.map((r) => r.slot).filter((s) => !lost.includes(s)).sort(), day);
-      assert.ok(after.words <= TABLE_MAX_WORDS && after.leftOut === 0 && after.words <= before.words + 5, `${day}: ${after.words} words`);
-      for (const r of after.rows) {
-        assert.ok(r.statement.length <= 160 && !/Counted|Fixed slot|4-week average:/.test(r.statement), r.statement);
-        assert.deepEqual(lintWords(r.statement), [], r.statement);
-      }
-    }
+    for (const forget of [['2026-11-05', []], ['2026-11-14', ['load.week']]]) assertForgetKeeps(who, forget);
   });
 }
 
@@ -191,7 +226,7 @@ test('forgetting a day through the store also deletes it from the agent; rolling
   const p = fresh();
   p.roll();
   p.round();
-  assert.equal(table(p.ctx).rows.length, 8);
+  assert.equal(table(p.ctx).rows.length, 9);
   assert.equal(forgetFactKey(p.store, 'daily', '2026-11-10'), true);
   assert.equal(onForget(p.ctx, { what: 'day', date: '2026-11-10' }), true);
   assert.deepEqual([table(p.ctx).rows, reviews(p.ctx).rows], [[], []], 'every memory rested on aggregates that contained the day');

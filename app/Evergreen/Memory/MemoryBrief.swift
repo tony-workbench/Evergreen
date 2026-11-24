@@ -124,9 +124,25 @@ struct MemoryBrief: Equatable, Sendable {
     struct NoticedLine: Equatable, Identifiable, Sendable {
         var text: String
         var key: String? = nil
+        /// Who the line is in the list: its memory key, or else its words (with
+        /// how often they came before, when two lines read the same), so a
+        /// line keeps its identity when another line is removed.
+        var id: String
 
-        var id: String { text }
+        /// Lines without a key, each told apart by its words and, when the
+        /// words repeat, by how many times they came before.
+        static func plain(_ texts: [String]) -> [NoticedLine] {
+            zip(texts, TextIdentity.ids(texts)).map { NoticedLine(text: $0, id: $1) }
+        }
     }
+
+    /// The first screen's "What I noticed" shows this many lines at most.
+    static let noticedMost = 3
+    /// A line short enough for that screen has this many words or fewer.
+    static let shortLineWords = 8
+    /// Before this hour is a morning, before `eveningHour` an afternoon, then an evening.
+    private static let afternoonHour = 12
+    private static let eveningHour = 17
 
     /// At most three short lines (8 words or fewer) for the first screen: what
     /// Evergreen already knows. With under 14 days of data, a friendly version that says so.
@@ -135,7 +151,7 @@ struct MemoryBrief: Equatable, Sendable {
         let found = shortLines
         return found.isEmpty
             ? ["I don't have your history yet.", "A few workouts and I'll learn your routine.", "Until then, a gentle week to start."]
-            : Array(found.prefix(3))
+            : Array(found.prefix(Self.noticedMost))
     }
 
     /// The same first screen with the memory table's rows: where the person
@@ -143,10 +159,11 @@ struct MemoryBrief: Equatable, Sendable {
     /// equipment."), takes the third place and can be answered "Not true for
     /// me" by its key. A row kind this code doesn't know changes nothing.
     func noticedLines(rows: [MemoryRow]) -> [NoticedLine] {
-        let plain = noticed.map { NoticedLine(text: $0) }
-        guard thinDays == nil, let home = rows.first(where: { $0.kind == "training_place" && $0.isUsable }) else { return plain }
-        let place = NoticedLine(text: RowWords.sentence(home), key: home.key)
-        return Array(shortLines.prefix(2)).map { NoticedLine(text: $0) } + [place]
+        let brief = NoticedLine.plain(noticed)
+        guard thinDays == nil, let home = rows.first(where: { $0.kind == "training_place" && $0.isUsable }) else { return brief }
+        let place = NoticedLine(text: RowWords.sentence(home), key: home.key, id: home.key)
+        // The place takes the last of the screen's lines.
+        return NoticedLine.plain(Array(shortLines.prefix(Self.noticedMost - 1))) + [place]
     }
 
     private static func thinLines(_ days: Int) -> [String] {
@@ -161,11 +178,16 @@ struct MemoryBrief: Equatable, Sendable {
     private var shortLines: [String] {
         func line(_ id: String) -> Line? { lines.first { $0.id == id } }
         let usual = line("usual_time")?.usualTime.map {
-            "You usually \($0.verb) \($0.weekdayName) \($0.hour < 12 ? "mornings" : $0.hour < 17 ? "afternoons" : "evenings")."
+            "You usually \($0.verb) \($0.weekdayName) \(Self.partOfDay($0.hour))."
         }
         // The first clause of the sleep sentence is short enough on its own.
         let sleep = line("sleep").map(\.sentence).flatMap { $0.contains(",") ? String($0.prefix { $0 != "," }) + "." : nil }
         return [usual, line("load")?.sentence, sleep, line("workouts_per_week")?.sentence].compactMap(\.self)
-            .filter { $0.split(separator: " ").count <= 8 }
+            .filter { $0.split(separator: " ").count <= Self.shortLineWords }
+    }
+
+    /// "mornings", "afternoons" or "evenings" for an hour of the day.
+    private static func partOfDay(_ hour: Int) -> String {
+        hour < afternoonHour ? "mornings" : hour < eveningHour ? "afternoons" : "evenings"
     }
 }

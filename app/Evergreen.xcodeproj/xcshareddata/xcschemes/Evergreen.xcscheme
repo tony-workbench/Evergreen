@@ -38,6 +38,17 @@
                ReferencedContainer = "container:Evergreen.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "7A3000000000000000000006"
+               BuildableName = "EvergreenUITests.xctest"
+               BlueprintName = "EvergreenUITests"
+               ReferencedContainer = "container:Evergreen.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

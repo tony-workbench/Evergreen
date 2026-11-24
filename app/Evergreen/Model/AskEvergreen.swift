@@ -8,6 +8,8 @@ import Observation
 @Observable
 @MainActor
 final class AskEvergreen {
+    /// "What do you remember about me?" is answered with this many remembered lines at most.
+    static let rememberedLines = 3
     /// The app model this is part of: the clock, the plan, the engines and the other parts are read from it.
     @ObservationIgnored unowned let app: AppModel
     /// The last four characters of the connected AI key ("…a1b2"); nil when none is connected.
@@ -114,7 +116,7 @@ final class AskEvergreen {
             return
         }
         ask = .idle
-        if app.weekPlan != nil { _ = try? await app.loadWeekPlan() }
+        if app.weekPlan != nil { await app.planIfPossible() }
     }
 
     /// Sorts the sentence and lets the right agent answer.
@@ -191,12 +193,12 @@ final class AskEvergreen {
         case .week:
             await answerWithAFreshWeek()
         case .plan:
-            if app.plannedSessions.isEmpty { _ = try? await app.loadWeekPlan() }
+            if app.plannedSessions.isEmpty { await app.planIfPossible() }
             ask = .answer(agent: .plan, text: app.topSuggestion.map { "\(SuggestionWords.headline($0)). \(PlainWords.reason($0.reason))" }
                 ?? "Nothing new to suggest this week.")
         case .memory:
             await app.refreshMemory()
-            let lines = app.remembered.prefix(3).map(\.text)
+            let lines = app.remembered.prefix(Self.rememberedLines).map(\.text)
             ask = .answer(agent: .memory, text: lines.isEmpty ? "Nothing yet. I learn your routine from your workouts." : lines.joined(separator: " "))
         case .none:
             ask = .answer(agent: .none, text: "That’s not something I do. I plan your training, keep it on your calendar and remember your routine.")
@@ -220,7 +222,7 @@ final class AskEvergreen {
 
     /// Recommend, then place: the week is planned again, and each session the person accepts goes through the calendar.
     private func answerWithAFreshWeek() async {
-        guard let week = try? await app.loadWeekPlan(fresh: true) else {
+        guard let week = await app.planIfPossible(fresh: true) else {
             ask = .problem("I couldn’t plan your week just now. Try again in a moment.")
             return
         }
@@ -233,7 +235,7 @@ final class AskEvergreen {
     /// tools, and its own sentence from the data for when the model's answer can't be shown.
     private func answerInWords(_ sentence: String, as kind: AgentKind, with model: any LanguageModel) async throws(ModelFailure) {
         let aboutMemory = kind == .memory
-        if !aboutMemory, app.plannedSessions.isEmpty { _ = try? await app.loadWeekPlan() }
+        if !aboutMemory, app.plannedSessions.isEmpty { await app.planIfPossible() }
         let loop = AgentLoop(model: model, modelId: AIModels.model(), system: aboutMemory ? MemoryAgent.system : PlanTalk.system,
                              tools: aboutMemory ? MemoryAgent.tools(app) : PlanTalk.tools(app))
         let result = try await loop.run(sentence)

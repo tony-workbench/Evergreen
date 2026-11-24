@@ -17,6 +17,12 @@ export const DEFAULT_EQUIPMENT = ['backpack', 'chair', 'table', 'sofa', 'book', 
 export const DAY_KINDS = ['home', 'out', 'rest'];
 export const MOVEMENT_STATES = ['untried', 'can', 'cannot'];
 const MIN_LENGTH = 10;
+export const MINUTES_PER_HOUR = 60;
+export const LAST_HOUR = 23;              // an HH:MM time is at most 23:59
+export const LAST_MINUTE = 59;
+export const SUNDAY = 6;                  // weekdays count from Monday, 0
+export const WEEK_DAYS = 7;
+const CLOCK_DIGITS = 2;                   // HH and MM are two digits each
 const MAX_LENGTH = 90;
 const ID = /^[a-z0-9_]{1,48}$/;
 
@@ -26,15 +32,15 @@ const whole = (v, fallback) => (v === undefined || v === null ? fallback : v);
 /** Minutes after midnight of an `HH:MM` text, or null. */
 export function minutesOf(text) {
   const m = typeof text === 'string' ? /^(\d\d):(\d\d)$/.exec(text) : null;
-  if (!m || +m[1] > 23 || +m[2] > 59) return null;
-  return +m[1] * 60 + +m[2];
+  if (!m || +m[1] > LAST_HOUR || +m[2] > LAST_MINUTE) return null;
+  return +m[1] * MINUTES_PER_HOUR + +m[2];
 }
 
-const clockText = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+const clockText = (minutes) => `${String(Math.floor(minutes / MINUTES_PER_HOUR)).padStart(CLOCK_DIGITS, '0')}:${String(minutes % MINUTES_PER_HOUR).padStart(CLOCK_DIGITS, '0')}`;
 
 function readWeekdays(list) {
   const days = whole(list, REST_WEEKDAYS);
-  if (!Array.isArray(days) || !days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) throw bad();
+  if (!Array.isArray(days) || !days.every((d) => Number.isInteger(d) && d >= 0 && d <= SUNDAY)) throw bad();
   return [...new Set(days)].sort((a, b) => a - b);
 }
 
@@ -118,4 +124,5 @@ export function kindOf(rules, given, day) {
   return given.get(day) ?? 'home';
 }
 
-export const dayKindsView = (rules, given, firstDay, days) => Array.from({ length: days }, (_, i) => ({ day: dayISO(firstDay + i), kind: kindOf(rules, given, firstDay + i) }));
+/** Each day's kind from `span.firstDay` for `span.days` days, as plain values. */
+export const dayKindsView = (rules, given, { firstDay, days }) => Array.from({ length: days }, (_, i) => ({ day: dayISO(firstDay + i), kind: kindOf(rules, given, firstDay + i) }));

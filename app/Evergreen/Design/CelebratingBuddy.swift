@@ -6,7 +6,10 @@ import SwiftUI
 struct CelebratingBuddy: View {
     var filled: Int? = nil
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
     @State private var start = Date()
 
     static let hops = 3

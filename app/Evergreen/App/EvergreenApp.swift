@@ -25,6 +25,7 @@ struct EvergreenApp: App {
         WindowGroup {
             RootView()
                 .environment(model)
+                .environment(\.networkStatus, NetworkStatus.shared)
         }
         .modelContainer(container)
         .backgroundTask(.appRefresh(Refresh.taskId)) { [model] in await Refresh.run(model) }

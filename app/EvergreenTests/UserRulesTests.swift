@@ -61,11 +61,38 @@ struct UserRulesTests {
     @Test func aChangedRuleChangesTheWeeksKey() {
         var rules = UserRules()
         rules.isOn = true
-        let before = WeekCache.key(day: "2026-11-30", rows: [], busy: [], rules: rules.cacheText)
+        let before = WeekCache.key(.init(day: "2026-11-30", rows: [], busy: [], rules: rules.cacheText))
         rules.restWeekdays = [5, 6]
-        let after = WeekCache.key(day: "2026-11-30", rows: [], busy: [], rules: rules.cacheText)
+        let after = WeekCache.key(.init(day: "2026-11-30", rows: [], busy: [], rules: rules.cacheText))
         #expect(before != after)
-        #expect(WeekCache.key(day: "2026-11-30", rows: [], busy: []) == WeekCache.key(day: "2026-11-30", rows: [], busy: [], rules: ""))
+        #expect(WeekCache.key(.init(day: "2026-11-30", rows: [], busy: [])) == WeekCache.key(.init(day: "2026-11-30", rows: [], busy: [], rules: "")))
+    }
+
+    @Test func crossedHoursAreSaidAsTheirOwnProblem() {
+        var rules = UserRules()
+        rules.windowFrom = "12:00"
+        rules.windowTo = "09:00"
+        #expect(rules.problems == [.window])
+        #expect(!rules.isValid)
+    }
+
+    @Test func everyProblemMakesTheRulesInvalidAndNoneMeansValid() {
+        #expect(UserRules().problems.isEmpty && UserRules().isValid)
+        var rules = UserRules()
+        rules.sessionMin = 30
+        rules.sessionMax = 20
+        rules.windowFrom = "25:00"
+        rules.restWeekdays = [7]
+        #expect(rules.problems == [.restDays, .lengths, .clock], "in the order the screen shows the answers")
+        #expect(!rules.isValid)
+    }
+
+    @Test func notTriedYetIsKeptAsNothingSaid() {
+        var rules = UserRules()
+        rules.setState(.cannot, of: "push_up")
+        #expect(rules.state(of: "push_up") == .cannot)
+        rules.setState(.untried, of: "push_up")
+        #expect(rules.movements["push_up"] == nil && rules.state(of: "push_up") == .untried)
     }
 
     @Test func weekdaysAreCountedFromMonday() {

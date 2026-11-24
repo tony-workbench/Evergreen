@@ -3319,58 +3319,72 @@
 
   // src/agent/place.mjs
   var PLACE_WEEKS = 8;
+  var DATE_LENGTH = 10;
   var PLACE_DAYS = PLACE_WEEKS * 7;
   var PLACE_SLOT = "routine.training_place";
   var PLACE_KIND = "training_place";
   var PLACE_STATEMENT = "You train at home, without gym equipment.";
-  var GYM_ACTIVITY_TYPES = ["Elliptical", "StairClimbing"];
-  function placeEvidence(snapshot, day, nowMs, forgottenDays = []) {
-    const forgot = new Set(forgottenDays);
+  var GYM_TYPES = Object.freeze({ Elliptical: "always", StairClimbing: "always", Rowing: "unless_outdoors", Cycling: "if_indoors", Climbing: "if_indoors" });
+  var GYM_ACTIVITY_TYPES = Object.keys(GYM_TYPES);
+  function isGymWorkout(type, indoor) {
+    const rule = GYM_TYPES[type];
+    if (rule === "always") return true;
+    if (rule === "unless_outdoors") return indoor !== false;
+    return rule === "if_indoors" && indoor === true;
+  }
+  function placeEvidence(snapshot, when) {
+    const { day, nowMs } = when;
+    const forgot = new Set(when.forgottenDays ?? []);
+    const from = addDays3(day, -(PLACE_DAYS - 1));
+    const workouts = endedWorkouts(snapshot, { day, nowMs, forgot }).filter((w) => w.day >= from);
+    const logged = [...(snapshot.dailySummaries ?? []).map((x) => x.date), ...workouts.map((w) => w.day)].filter((d) => d >= from && d <= day && !forgot.has(d));
+    const counted = workouts.filter((w) => Number.isFinite(w.minutes) && w.minutes >= MIN_WORKOUT_MINUTES);
+    if (counted.some((w) => isGymWorkout(w.type, w.indoor))) return { items: [], gym: true };
+    if (logged.length === 0) return { items: [], gym: false };
+    return { gym: false, items: [homeItem(from, day, counted.length)] };
+  }
+  function endedWorkouts(snapshot, when) {
+    const { day, nowMs, forgot } = when;
     const records = [];
     for (const w of snapshot.workouts ?? []) {
       const s = parseTimestamp(w.start);
       const e = parseTimestamp(w.end);
       if (s === null || e === null) continue;
-      records.push({ type: w.activityType, ms: s.ms, day: w.start.slice(0, 10), ended: e.ms <= nowMs && s.ms <= nowMs, minutes: w.durationMin });
+      records.push({ type: w.activityType, indoor: w.indoor, ms: s.ms, day: w.start.slice(0, DATE_LENGTH), ended: e.ms <= nowMs && s.ms <= nowMs, minutes: w.durationMin });
     }
     const gone = new Set(records.filter((r3) => forgot.has(r3.day)).map((r3) => `${r3.type}|${r3.ms}`));
     const seen = /* @__PURE__ */ new Set();
-    const workouts = records.filter((r3) => {
+    return records.filter((r3) => {
       const id = `${r3.type}|${r3.ms}`;
       if (!r3.ended || r3.day > day || gone.has(id) || seen.has(id)) return false;
       seen.add(id);
       return true;
     });
-    const logged = [...(snapshot.dailySummaries ?? []).map((x) => x.date), ...workouts.map((w) => w.day)].filter((d) => d <= day && !forgot.has(d)).sort();
-    if (logged.length === 0 || dayNum3(day) - dayNum3(logged[0]) + 1 < PLACE_DAYS) return { items: [], gym: false };
-    const from = addDays3(day, -(PLACE_DAYS - 1));
-    const counted = workouts.filter((w) => w.day >= from && Number.isFinite(w.minutes) && w.minutes >= MIN_WORKOUT_MINUTES);
-    const gymWorkouts = counted.filter((w) => GYM_ACTIVITY_TYPES.includes(w.type)).length;
-    if (gymWorkouts > 0) return { items: [], gym: true };
-    if (counted.length === 0) return { items: [], gym: false };
+  }
+  function homeItem(from, day, workouts) {
     return {
-      gym: false,
-      items: [{
-        id: "place.home",
-        window: `${PLACE_DAYS}d`,
-        numbers: { from, to: day, workouts: counted.length, gymWorkouts: 0, weeks: PLACE_WEEKS },
-        text: `Counted workouts in the last ${PLACE_DAYS} days (${from} to ${day}; workouts of ${MIN_WORKOUT_MINUTES} minutes or more): ${counted.length}, of which 0 of a gym-equipment type (elliptical, stair climbing).`,
-        slots: [{ slot: PLACE_SLOT, kind: PLACE_KIND, data: { place: "home", gymWorkouts: 0, weeks: PLACE_WEEKS } }]
-      }]
+      id: "place.home",
+      window: `${PLACE_DAYS}d`,
+      numbers: { from, to: day, workouts, gymWorkouts: 0, weeks: PLACE_WEEKS },
+      text: `Counted workouts in the last ${PLACE_DAYS} days (${from} to ${day}; workouts of ${MIN_WORKOUT_MINUTES} minutes or more): ${workouts}, of which 0 of a gym-equipment type (elliptical, stair climbing, rowing machine, indoor cycling, indoor climbing).`,
+      slots: [{ slot: PLACE_SLOT, kind: PLACE_KIND, data: { place: "home", gymWorkouts: 0, weeks: PLACE_WEEKS } }]
     };
   }
 
   // src/agent/statements.mjs
   var cap2 = (s) => s[0].toUpperCase() + s.slice(1);
   var r = (v, places) => rounded(String(v), places);
+  var RATIO_PLACES = 2;
+  var WHOLE_PLACES = 0;
+  var ONE_PLACE = 1;
   var BAND_TEXT = { early: "before 08:00", morning: "between 08:00 and 12:00", afternoon: "between 12:00 and 17:00", evening: "from 17:00" };
   function statementFor(e) {
     const n = e.numbers;
     if (e.id.startsWith("regularity.slot.")) return cap2(e.text.replace("Fixed slot among recognised activities: ", "").replace(", in ", " in "));
-    if (e.id === "volume.per_week") return `Weekly average over 4 weeks: ${r(n.workoutsPerWeek, 1)} workouts and ${r(n.minutesPerWeek, 0)} workout minutes.`;
-    if (e.id === "load.ratio") return `Load over the last 7 days: ${r(n.load7, 0)} ${n.basis === "minutes" ? "minutes" : "effort-minutes"}, ${r(n.ratio, 2)} times the 28-day weekly average.`;
-    if (e.id === "body.sleep") return `Average sleep is ${r(n.average7, 1)} h a night over 7 days and ${r(n.average28, 1)} h over 28 days.`;
-    if (e.id === "body.resting_hr") return `Average resting heart rate is ${r(n.average7, 0)} bpm over 7 days and ${r(n.average28, 0)} bpm over 28 days.`;
+    if (e.id === "volume.per_week") return `Weekly average over 4 weeks: ${r(n.workoutsPerWeek, ONE_PLACE)} workouts and ${r(n.minutesPerWeek, WHOLE_PLACES)} workout minutes.`;
+    if (e.id === "load.ratio") return `Load over the last 7 days: ${r(n.load7, WHOLE_PLACES)} ${n.basis === "minutes" ? "minutes" : "effort-minutes"}, ${r(n.ratio, RATIO_PLACES)} times the 28-day weekly average.`;
+    if (e.id === "body.sleep") return `Average sleep is ${r(n.average7, ONE_PLACE)} h a night over 7 days and ${r(n.average28, ONE_PLACE)} h over 28 days.`;
+    if (e.id === "body.resting_hr") return `Average resting heart rate is ${r(n.average7, WHOLE_PLACES)} bpm over 7 days and ${r(n.average28, WHOLE_PLACES)} bpm over 28 days.`;
     if (e.id === "mix.count" && e.text.includes("last 28 days: ")) return `Workouts by activity over the last 28 days: ${e.text.split("last 28 days: ")[1]}`;
     if (e.id.startsWith("gear.") || e.id.startsWith("goal.")) return e.text;
     if (e.id === "place.home") return PLACE_STATEMENT;
@@ -3383,6 +3397,7 @@
 
   // src/agent/engine.mjs
   var REFS_KEPT = 40;
+  var REVIEW_ID_DIGITS = 4;
   var FORGET_REACH = 34;
   var freshState = (user) => ({ v: 1, user, seq: 0, off: false, evidence: {}, outcomes: {}, extras: {}, processed: {}, memories: [], reviews: [], events: [], stopped: {} });
   var current = (m) => m.versions[m.versions.length - 1];
@@ -3525,98 +3540,144 @@
     if (state.processed[day] === hash) return { ok: true, day, alreadyDone: true, applied: [], rejected: [], review: [] };
     const list2 = Array.isArray(proposals) ? proposals : isObj2(proposals) ? proposals.proposals : null;
     if (!Array.isArray(list2)) return fail("bad_proposals");
-    const ctx = { day, at };
+    const run2 = startRun(state, { day, at }, all);
+    list2.forEach((p, index) => applyProposal(run2, p, index));
+    state.processed[day] = hash;
+    for (const d of Object.keys(state.processed)) if (d <= addDays3(day, -EVIDENCE_KEPT)) delete state.processed[d];
+    return { ok: true, day, alreadyDone: false, applied: run2.applied, rejected: run2.rejected, review: reviewQueue(state).filter((r3) => run2.asked.includes(r3.memoryId)) };
+  }
+  function startRun(state, ctx, all) {
     sweep(state, ctx);
     const evidence = Object.fromEntries(all.map((i) => [i.id, i]));
     const neighbors = new Set(neighborsFor(state, shown(state, all)).map((n) => n.memoryId));
-    const seen = /* @__PURE__ */ new Set();
-    const applied = [];
-    const rejected = [];
-    const asked = [];
-    list2.forEach((p, index) => {
-      const drop = (code) => {
-        rejected.push({ index, code, text: CODE_TEXT[code] });
-        log(state, { day, at, actor: "system", op: "DROP", slot: isObj2(p) && typeof p.slot === "string" && SLOT_RE.test(p.slot) ? p.slot : null, code });
-      };
-      if (index >= MAX_PROPOSALS) return drop("too_many");
-      if (!shapeOk(p)) return drop("bad_shape");
-      if (!SLOT_RE.test(p.slot)) return drop("bad_slot");
-      const group = groupOf(p.slot);
-      if (!GROUPS.includes(group)) return drop("slot_family");
-      if (seen.has(p.slot)) return drop("duplicate_slot");
-      seen.add(p.slot);
-      if (state.stopped[p.slot]) return drop("slot_stopped");
-      const cited = p.evidenceIds.map((id) => evidence[id]);
-      if (cited.some((c) => c === void 0)) return drop("unknown_evidence");
-      const supporting = cited.filter((c) => c.slots.some((s) => s.slot === p.slot));
-      if (supporting.length === 0) return drop("slot_not_supported");
-      const support = (supporting.find((c) => c.window !== "day") ?? supporting[0]).slots.find((s) => s.slot === p.slot);
-      if (support.kind !== p.kind) return drop("kind_mismatch");
-      const allowed = allowedNumbers(cited);
-      if (numbersNotIn(p.statement, allowed).length > 0 || Object.values(p.numbers ?? {}).some((v) => v < 0 || !allowed.numbers.has(String(v)))) return drop("number_not_in_evidence");
-      if (p.kind === PLACE_KIND ? p.statement !== PLACE_STATEMENT : lintWords(p.statement).filter((x) => !(group === "goal" && /number/.test(x))).length > 0) return drop("not_a_fact");
-      if (group !== "response" && supporting.every((c) => c.window === "day")) return drop("raw_reading");
-      if (inSlot(state, p.slot).some((m2) => m2.state === REJECTED && norm(current(m2).statement) === norm(p.statement))) return drop("rejected_before");
-      const usable = usableIn(state, p.slot);
-      const candidate2 = candidateIn(state, p.slot);
-      let target2 = null;
-      if (typeof p.targetMemoryId === "string") {
-        target2 = byId(state, p.targetMemoryId);
-        if (!neighbors.has(p.targetMemoryId) || target2 === null || target2.slot !== p.slot) return drop("target_not_neighbor");
-        if (!OPEN.includes(target2.state)) return drop("target_not_open");
-      } else if (p.op === "NOOP" || p.op === "MERGE" || p.op === "SUPERSEDE") return drop("target_missing");
-      if (p.op === "ADD" && (usable || candidate2)) return drop("slot_occupied");
-      const days = supportDays(state, p.slot, day);
-      p = { ...p, confidence: confidenceOf(p.kind, support.data, days) };
-      const strong = (need) => p.kind === "usual_slot" ? support.data.weeksSeen >= SLOT_WEEKS2 : days >= need[group];
-      let op = p.op;
-      let guard = null;
-      if (op === "ADD" || (op === "MERGE" || op === "SUPERSEDE") && target2.state !== CANDIDATE) {
-        if (p.confidence < MIN_CONFIDENCE) guard = "low_confidence";
-        else if (!strong(op === "ADD" ? ADD_DAYS : STRONG_DAYS)) guard = "weak_evidence";
-        else if (op !== "ADD" && target2.updated > day) guard = "older_evidence";
-        if (guard) op = "REVIEW";
-      }
-      let m;
-      if (op === "ADD") {
-        m = newMemory(state, p, support, SAVED, ctx);
-        log(state, { day, at, actor: "system", op: "ADD", memoryId: m.id, slot: m.slot, from: null, to: SAVED, version: 1 });
-      } else if (op === "NOOP") {
-        m = target2;
-        addRef(m, p, ctx);
-        current(m).confidence = p.confidence;
-        log(state, { day, at, actor: "system", op: "CORROBORATE", memoryId: m.id, slot: m.slot, from: m.state, to: m.state, version: current(m).n });
-      } else if (op === "MERGE" || op === "SUPERSEDE" && target2.state === CANDIDATE) {
-        m = target2;
-        newVersion(m, p, support, ctx);
-        log(state, { day, at, actor: "system", op: "MERGE", memoryId: m.id, slot: m.slot, from: m.state, to: m.state, version: current(m).n });
-      } else if (op === "SUPERSEDE") {
-        m = newMemory(state, p, support, SAVED, ctx, target2.id);
-        log(state, { day, at, actor: "system", op: "ADD", memoryId: m.id, slot: m.slot, from: null, to: SAVED, version: 1 });
-        move(state, target2, SUPERSEDED, "system", ctx, "SUPERSEDE");
-        target2.supersededBy = m.id;
-        for (const r3 of state.reviews) if (r3.targetMemoryId === target2.id) r3.targetMemoryId = m.id;
-      } else {
-        if (candidate2) {
-          m = candidate2;
-          if (norm(current(m).statement) === norm(p.statement)) addRef(m, p, ctx);
-          else newVersion(m, p, support, ctx);
-        } else m = newMemory(state, p, support, CANDIDATE, ctx);
-        const reason = guard ?? "model_unsure";
-        const open2 = state.reviews.find((r3) => r3.memoryId === m.id);
-        if (open2) Object.assign(open2, { reason, day, targetMemoryId: usable?.id ?? null });
-        else {
-          state.seq += 1;
-          state.reviews.push({ id: `rev_${String(state.seq).padStart(4, "0")}`, memoryId: m.id, targetMemoryId: usable?.id ?? null, reason, day });
-        }
-        log(state, { day, at, actor: "system", op: "REVIEW", memoryId: m.id, slot: m.slot, from: null, to: CANDIDATE, version: current(m).n, code: guard });
-        asked.push(m.id);
-      }
-      applied.push({ index, op, slot: m.slot, memoryId: m.id, version: current(m).n, ...guard ? { guard } : {} });
-    });
-    state.processed[day] = hash;
-    for (const d of Object.keys(state.processed)) if (d <= addDays3(day, -EVIDENCE_KEPT)) delete state.processed[d];
-    return { ok: true, day, alreadyDone: false, applied, rejected, review: reviewQueue(state).filter((r3) => asked.includes(r3.memoryId)) };
+    return { state, ctx, evidence, neighbors, seen: /* @__PURE__ */ new Set(), applied: [], rejected: [], asked: [] };
+  }
+  function applyProposal(run2, p, index) {
+    const drop = slotDrop(run2, p, index);
+    if (drop) return dropProposal(run2, p, { index, code: drop });
+    const group = groupOf(p.slot);
+    const cited = evidenceCheck(run2, p, group);
+    if (cited.drop) return dropProposal(run2, p, { index, code: cited.drop });
+    const aimed = targetCheck(run2, p);
+    if (aimed.drop) return dropProposal(run2, p, { index, code: aimed.drop });
+    const c = { group, support: cited.support, ...aimed };
+    const g = guardOf(run2, p, c);
+    const m = execute(run2, c, g);
+    run2.applied.push({ index, op: g.op, slot: m.slot, memoryId: m.id, version: current(m).n, ...g.guard ? { guard: g.guard } : {} });
+  }
+  function dropProposal(run2, p, { index, code }) {
+    const { day, at } = run2.ctx;
+    run2.rejected.push({ index, code, text: CODE_TEXT[code] });
+    log(run2.state, { day, at, actor: "system", op: "DROP", slot: isObj2(p) && typeof p.slot === "string" && SLOT_RE.test(p.slot) ? p.slot : null, code });
+  }
+  function slotDrop(run2, p, index) {
+    if (index >= MAX_PROPOSALS) return "too_many";
+    if (!shapeOk(p)) return "bad_shape";
+    if (!SLOT_RE.test(p.slot)) return "bad_slot";
+    if (!GROUPS.includes(groupOf(p.slot))) return "slot_family";
+    if (run2.seen.has(p.slot)) return "duplicate_slot";
+    run2.seen.add(p.slot);
+    if (run2.state.stopped[p.slot]) return "slot_stopped";
+    return null;
+  }
+  function evidenceCheck(run2, p, group) {
+    const cited = p.evidenceIds.map((id) => run2.evidence[id]);
+    if (cited.some((c) => c === void 0)) return { drop: "unknown_evidence" };
+    const supporting = cited.filter((c) => c.slots.some((s) => s.slot === p.slot));
+    if (supporting.length === 0) return { drop: "slot_not_supported" };
+    const support = (supporting.find((c) => c.window !== "day") ?? supporting[0]).slots.find((s) => s.slot === p.slot);
+    if (support.kind !== p.kind) return { drop: "kind_mismatch" };
+    const drop = statementDrop(p, cited, group);
+    if (drop) return { drop };
+    if (group !== "response" && supporting.every((c) => c.window === "day")) return { drop: "raw_reading" };
+    if (inSlot(run2.state, p.slot).some((m) => m.state === REJECTED && norm(current(m).statement) === norm(p.statement))) return { drop: "rejected_before" };
+    return { support };
+  }
+  function statementDrop(p, cited, group) {
+    const allowed = allowedNumbers(cited);
+    if (numbersNotIn(p.statement, allowed).length > 0 || Object.values(p.numbers ?? {}).some((v) => v < 0 || !allowed.numbers.has(String(v)))) return "number_not_in_evidence";
+    if (p.kind === PLACE_KIND ? p.statement !== PLACE_STATEMENT : lintWords(p.statement).filter((x) => !(group === "goal" && /number/.test(x))).length > 0) return "not_a_fact";
+    return null;
+  }
+  function targetCheck(run2, p) {
+    const usable = usableIn(run2.state, p.slot);
+    const candidate2 = candidateIn(run2.state, p.slot);
+    let target2 = null;
+    if (typeof p.targetMemoryId === "string") {
+      target2 = byId(run2.state, p.targetMemoryId);
+      if (!run2.neighbors.has(p.targetMemoryId) || target2 === null || target2.slot !== p.slot) return { drop: "target_not_neighbor" };
+      if (!OPEN.includes(target2.state)) return { drop: "target_not_open" };
+    } else if (p.op === "NOOP" || p.op === "MERGE" || p.op === "SUPERSEDE") return { drop: "target_missing" };
+    if (p.op === "ADD" && (usable || candidate2)) return { drop: "slot_occupied" };
+    return { usable, candidate: candidate2, target: target2 };
+  }
+  function guardOf(run2, proposal2, c) {
+    const days = supportDays(run2.state, proposal2.slot, run2.ctx.day);
+    const p = { ...proposal2, confidence: confidenceOf(proposal2.kind, c.support.data, days) };
+    const strong = (need) => p.kind === "usual_slot" ? c.support.data.weeksSeen >= SLOT_WEEKS2 : days >= need[c.group];
+    let guard = null;
+    if (p.op === "ADD" || (p.op === "MERGE" || p.op === "SUPERSEDE") && c.target.state !== CANDIDATE) {
+      if (p.confidence < MIN_CONFIDENCE) guard = "low_confidence";
+      else if (!strong(p.op === "ADD" ? ADD_DAYS : STRONG_DAYS)) guard = "weak_evidence";
+      else if (p.op !== "ADD" && c.target.updated > run2.ctx.day) guard = "older_evidence";
+    }
+    return { p, op: guard ? "REVIEW" : p.op, guard };
+  }
+  function execute(run2, c, g) {
+    const { op, p } = g;
+    if (op === "ADD") return addMemory(run2, p, c.support);
+    if (op === "NOOP") return corroborate(run2, p, c.target);
+    if (op === "MERGE" || op === "SUPERSEDE" && c.target.state === CANDIDATE) return merge(run2, p, c);
+    if (op === "SUPERSEDE") return supersede(run2, p, c);
+    return review(run2, g, c);
+  }
+  function addMemory(run2, p, support) {
+    const m = newMemory(run2.state, p, support, SAVED, run2.ctx);
+    log(run2.state, { day: run2.ctx.day, at: run2.ctx.at, actor: "system", op: "ADD", memoryId: m.id, slot: m.slot, from: null, to: SAVED, version: 1 });
+    return m;
+  }
+  function corroborate(run2, p, m) {
+    addRef(m, p, run2.ctx);
+    current(m).confidence = p.confidence;
+    log(run2.state, { day: run2.ctx.day, at: run2.ctx.at, actor: "system", op: "CORROBORATE", memoryId: m.id, slot: m.slot, from: m.state, to: m.state, version: current(m).n });
+    return m;
+  }
+  function merge(run2, p, c) {
+    const m = c.target;
+    newVersion(m, p, c.support, run2.ctx);
+    log(run2.state, { day: run2.ctx.day, at: run2.ctx.at, actor: "system", op: "MERGE", memoryId: m.id, slot: m.slot, from: m.state, to: m.state, version: current(m).n });
+    return m;
+  }
+  function supersede(run2, p, c) {
+    const { state, ctx } = run2;
+    const { target: target2 } = c;
+    const m = newMemory(state, p, c.support, SAVED, ctx, target2.id);
+    log(state, { day: ctx.day, at: ctx.at, actor: "system", op: "ADD", memoryId: m.id, slot: m.slot, from: null, to: SAVED, version: 1 });
+    move(state, target2, SUPERSEDED, "system", ctx, "SUPERSEDE");
+    target2.supersededBy = m.id;
+    for (const r3 of state.reviews) if (r3.targetMemoryId === target2.id) r3.targetMemoryId = m.id;
+    return m;
+  }
+  function review(run2, g, c) {
+    const { state, ctx } = run2;
+    const m = reviewCandidate(run2, g.p, c);
+    const reason = g.guard ?? "model_unsure";
+    const open2 = state.reviews.find((r3) => r3.memoryId === m.id);
+    if (open2) Object.assign(open2, { reason, day: ctx.day, targetMemoryId: c.usable?.id ?? null });
+    else {
+      state.seq += 1;
+      state.reviews.push({ id: `rev_${String(state.seq).padStart(REVIEW_ID_DIGITS, "0")}`, memoryId: m.id, targetMemoryId: c.usable?.id ?? null, reason, day: ctx.day });
+    }
+    log(state, { day: ctx.day, at: ctx.at, actor: "system", op: "REVIEW", memoryId: m.id, slot: m.slot, from: null, to: CANDIDATE, version: current(m).n, code: g.guard });
+    run2.asked.push(m.id);
+    return m;
+  }
+  function reviewCandidate(run2, p, c) {
+    const m = c.candidate;
+    if (!m) return newMemory(run2.state, p, c.support, CANDIDATE, run2.ctx);
+    if (norm(current(m).statement) === norm(p.statement)) addRef(m, p, run2.ctx);
+    else newVersion(m, p, c.support, run2.ctx);
+    return m;
   }
   var REASON_TEXT = { model_unsure: "The model was not sure." };
   function reviewQueue(state) {
@@ -3870,7 +3931,7 @@
 Output ONLY a JSON object that matches the schema: {"proposals": [...]}. Return {"proposals": []} when nothing qualifies.
 
 WHAT IS WORTH KEEPING: what a planner can use next week and next month.
-- routine: a usual time for an activity, the usual weekly volume, the mix of activities, where they train (place.home: 8 weeks of workouts with none of a gym-equipment type)
+- routine: a usual time for an activity, the usual weekly volume, the mix of activities, where they train (place.home: the last 8 weeks of workouts hold none of a gym-equipment type: elliptical, stair climber, indoor rowing, indoor cycling or climbing)
 - body: the usual sleep and resting heart rate
 - load: the last 7 days against the usual week
 - response: how the person answers the plan, such as planned early sessions that are repeatedly not done
@@ -3976,12 +4037,13 @@ ${JSON.stringify(neighbors, null, 1)}`;
     return m ? storeKeySlots("regularity", `${m[1]}.${m[2]}.${m[3]}`) : [];
   }
   var isOff = (store) => DERIVED_KINDS.some((k) => store.kindSuppressed(k));
-  function record(ctx, state, snapshot, now, day, trim = true) {
+  function record(ctx, state, entry) {
+    const { snapshot, now, day, trim = true } = entry;
     const sup = suppressedTypes(ctx.store);
     if (sup.days.includes(day)) return false;
     const facts = computeFacts(snapshot, midnightOf(now), { suppressed: engineSuppression(sup), forgottenDays: sup.days, dayMode: "completed" });
     recordFacts(state, day, facts, sup.types, trim);
-    const place = placeEvidence(snapshot, day, parseTimestamp(midnightOf(now)).ms, sup.days);
+    const place = placeEvidence(snapshot, { day, nowMs: parseTimestamp(midnightOf(now)).ms, forgottenDays: sup.days });
     state.evidence[day].push(...place.items);
     if (place.gym) retireSlot(state, PLACE_SLOT, { day, at: now });
     const stopped = new Set(sup.keys.flatMap((k) => storeKeySlots(k.type, k.key)));
@@ -4001,7 +4063,7 @@ ${JSON.stringify(neighbors, null, 1)}`;
         return fail("memory_off");
       }
       state.off = false;
-      if (!record(ctx, state, snapshot, now, day)) return fail("day_forgotten");
+      if (!record(ctx, state, { snapshot, now, day })) return fail("day_forgotten");
       return { ok: true, day, items: state.evidence[day].length };
     });
   }
@@ -4018,7 +4080,7 @@ ${JSON.stringify(neighbors, null, 1)}`;
       if (gone.includes(day)) return fail("day_forgotten");
       recordOutcomes(state, clean.filter((o) => !gone.includes(o.day)), day);
       recordExtras(state, more, day);
-      if (!Object.hasOwn(state.evidence, day) && snapshot !== void 0) record(ctx, state, snapshot, now, day);
+      if (!Object.hasOwn(state.evidence, day) && snapshot !== void 0) record(ctx, state, { snapshot, now, day });
       const r3 = dailyEvidence(state, day, ctx.io.sha256);
       if (!r3.ok) return r3;
       return { ok: true, day, alreadyDone: r3.alreadyDone, system: SYSTEM, user: userMessage(r3), schema: PROPOSALS_SCHEMA, evidence: r3.evidence, neighbors: r3.neighbors };
@@ -4053,19 +4115,20 @@ ${JSON.stringify(neighbors, null, 1)}`;
       return offset && days.length > 0 ? `${addDays3(days[days.length - 1], 1)}T00:00:00${offset[1]}` : null;
     });
   }
-  function forgetOne(ctx, state, day, snapshot) {
+  function forgetOne(ctx, state, forget2) {
+    const { day, snapshot } = forget2;
     const offset = OFFSET.exec(snapshot?.exportDate ?? "");
     if (!offset) return forgetDay(state, day);
     const days = Object.keys(state.evidence).filter((d) => d > day).sort();
     for (const d of days) {
       const now = `${addDays3(d, 1)}T00:00:00${offset[1]}`;
-      record(ctx, state, { ...snapshot, exportDate: now }, now, d, false);
+      record(ctx, state, { snapshot: { ...snapshot, exportDate: now }, now, day: d, trim: false });
     }
     return forgetDayRecomputed(state, day, days);
   }
   function onForget(ctx, a) {
     return run(ctx, (state) => {
-      if (a.what === "day") return forgetOne(ctx, state, a.date ?? a.day, a.snapshot);
+      if (a.what === "day") return forgetOne(ctx, state, { day: a.date ?? a.day, snapshot: a.snapshot });
       if (a.what === "key" && a.type === "daily") return forgetDay(state, a.key);
       if (a.what === "key") return stopSlots(state, storeKeySlots(a.type, a.key), stamp(state, a)) || true;
       if (a.what === "type") return TYPE_SLOTS[a.type] ? forgetSlots(state, TYPE_SLOTS[a.type]) : true;
@@ -4091,18 +4154,22 @@ ${JSON.stringify(neighbors, null, 1)}`;
   }
 
   // src/agent/demo-model.mjs
+  var KIND_PREFIX = 4;
+  var MISSED_TO_ASK = 2;
+  var SLEEP_MOVED_H = 0.2;
+  var RHR_MOVED_BPM = 2;
   function candidate(e) {
     const n = e.numbers;
     const base = { slot: e.slots[0], statement: statementFor(e) };
     if (e.id.startsWith("regularity.slot.")) return { ...base, kind: "usual_slot" };
     if (e.id === "volume.per_week") return { ...base, kind: "weekly_volume" };
     if (e.id === "load.ratio") return { ...base, kind: "load" };
-    if (e.id === "body.sleep") return { ...base, kind: "sleep", moved: (old) => Math.abs(Number(/and (\d+(?:\.\d+)?) h over 28/.exec(old)?.[1] ?? n.average28) - n.average28) >= 0.2 };
-    if (e.id === "body.resting_hr") return { ...base, kind: "resting_hr", moved: (old) => Math.abs(Number(/and (\d+) bpm over 28/.exec(old)?.[1] ?? n.average28) - n.average28) >= 2 };
+    if (e.id === "body.sleep") return { ...base, kind: "sleep", moved: (old) => Math.abs(Number(/and (\d+(?:\.\d+)?) h over 28/.exec(old)?.[1] ?? n.average28) - n.average28) >= SLEEP_MOVED_H };
+    if (e.id === "body.resting_hr") return { ...base, kind: "resting_hr", moved: (old) => Math.abs(Number(/and (\d+) bpm over 28/.exec(old)?.[1] ?? n.average28) - n.average28) >= RHR_MOVED_BPM };
     if (e.id === "mix.count") return { ...base, kind: "mix" };
     if (e.id === "place.home") return { ...base, kind: "training_place" };
-    if (e.id.startsWith("gear.") || e.id.startsWith("goal.")) return { ...base, kind: e.id.slice(0, 4), moved: () => true };
-    if (e.id.startsWith("outcomes.") && n.notDone >= 2) return { ...base, kind: "response", ask: true };
+    if (e.id.startsWith("gear.") || e.id.startsWith("goal.")) return { ...base, kind: e.id.slice(0, KIND_PREFIX), moved: () => true };
+    if (e.id.startsWith("outcomes.") && n.notDone >= MISSED_TO_ASK) return { ...base, kind: "response", ask: true };
     return null;
   }
   function demoModel(request) {

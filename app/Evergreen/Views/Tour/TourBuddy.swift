@@ -20,7 +20,10 @@ struct TourBuddy: View {
     /// Goes up each time the scene wants the reaction.
     var fired: Int
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
     @State private var start: Date?
 
     var body: some View {

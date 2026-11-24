@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// The rules the person set: what they said, kept as they said it and never
 /// worked out from data. Memory is what Evergreen noticed; these are what the
@@ -10,9 +11,18 @@ import Foundation
 struct UserRules: Codable, Equatable, Sendable {
     static let storeKey = "user_rules"
 
-    /// What a movement is to the person: not tried yet, can do it, can't do it.
+    /// What a movement is to the person: not tried yet, can do it, can't do it (plan 5.C.1). "Can't do" is never planned or
+    /// offered as a swap: the easier one on its chain comes instead, until the person changes it in My rules.
     enum MovementState: String, Codable, Sendable, CaseIterable {
         case untried, can, cannot
+
+        var title: String {
+            switch self {
+            case .untried: "Not tried yet"
+            case .can: "I can do it"
+            case .cannot: "Can’t do yet"
+            }
+        }
     }
 
     /// Things to train with at home. Floor and wall are always there.
@@ -55,12 +65,16 @@ struct UserRules: Codable, Equatable, Sendable {
     // MARK: Saved
 
     static func load(from defaults: UserDefaults = .standard) -> UserRules {
-        guard let data = defaults.data(forKey: storeKey), let rules = try? JSONDecoder().decode(UserRules.self, from: data) else { return UserRules() }
-        return rules
+        guard let data = defaults.data(forKey: storeKey) else { return UserRules() }
+        return Logger.model.attempt("The saved rules couldn't be read; the defaults stand") {
+            try JSONDecoder().decode(UserRules.self, from: data)
+        } ?? UserRules()
     }
 
     func save(to defaults: UserDefaults = .standard) {
-        if let data = try? JSONEncoder().encode(self) { defaults.set(data, forKey: Self.storeKey) }
+        if let data = Logger.model.attempt("The rules couldn't be kept", { try JSONEncoder().encode(self) }) {
+            defaults.set(data, forKey: Self.storeKey)
+        }
     }
 
     // MARK: To the engine
@@ -91,6 +105,8 @@ struct UserRules: Codable, Equatable, Sendable {
     // MARK: For the screens
 
     static let weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    /// Monday = 0 … Sunday = 6.
+    static let weekdays = 0...6
 
     var restDaysText: String {
         restWeekdays.isEmpty ? "None" : restWeekdays.sorted().map { Self.weekdayShort[$0] }.joined(separator: "  ")
@@ -100,7 +116,7 @@ struct UserRules: Codable, Equatable, Sendable {
 
     /// The hour notifications may start: 09:00, or the hour the person's own sessions may start when that is earlier.
     var notificationsFrom: Int {
-        let start = mornings ? NotificationBudget.earliestSessionHour : (Self.minutes(windowFrom) ?? 0) / 60
+        let start = mornings ? NotificationBudget.earliestSessionHour : (Self.minutes(windowFrom) ?? 0) / ClockUnits.minutesPerHour
         return max(NotificationBudget.earliestSessionHour, min(NotificationBudget.quietUntilHour, start))
     }
 
@@ -110,32 +126,85 @@ struct UserRules: Codable, Equatable, Sendable {
         equipment.isEmpty ? "None" : "None · " + equipment.map(\.title).joined(separator: " · ")
     }
 
+    /// Calendar weekdays run 1 (Sunday) to 7 (Saturday): adding this and wrapping at a week makes Monday 0 and Sunday 6.
+    private static let mondayFirstShift = 5
+
     /// The weekday of a date in the engine's numbering (Monday = 0).
     static func weekdayIndex(_ date: Date, calendar: Calendar) -> Int {
-        (calendar.component(.weekday, from: date) + 5) % 7
+        (calendar.component(.weekday, from: date) + mondayFirstShift) % ClockUnits.daysPerWeek
     }
 
     func isRestDay(_ date: Date, calendar: Calendar) -> Bool {
         restWeekdays.contains(Self.weekdayIndex(date, calendar: calendar))
     }
 
+    // MARK: Movements
+
+    /// What a movement is to the person; "not tried yet" when nothing was said.
+    func state(of id: String) -> MovementState { movements[id] ?? .untried }
+
+    /// Sets what a movement is to the person. "Not tried yet" is kept as nothing said, as older rules saved it.
+    mutating func setState(_ state: MovementState, of id: String) {
+        movements[id] = state == .untried ? nil : state
+    }
+
     // MARK: Checks
 
-    /// Whether the rules make sense, so the screens never save one the engine would refuse.
-    var isValid: Bool {
-        guard restWeekdays.allSatisfy({ (0...6).contains($0) }), sessionMin >= 10, sessionMax >= sessionMin, sessionMax <= 90,
-              let from = Self.minutes(windowFrom), let to = Self.minutes(windowTo), to >= from else { return false }
-        return avoid.allSatisfy(Self.isMovementId) && movements.keys.allSatisfy(Self.isMovementId)
+    static let shortestSession = 10
+    static let longestSession = 90
+    /// The session steppers move by this many minutes.
+    static let sessionStep = 5
+
+    /// What can be wrong with the rules, each said beside the answer it is about as soon as it is wrong.
+    enum Problem: Equatable, Sendable {
+        case restDays, shortest, lengths, longest, clock, window, movements
+
+        var words: String {
+            switch self {
+            case .restDays: "A rest day here isn’t a weekday. Pick the days again."
+            case .shortest: "The shortest session is \(UserRules.shortestSession) minutes at least."
+            case .lengths: "The longest session is shorter than the shortest one. Make it at least as long."
+            case .longest: "The longest session is \(UserRules.longestSession) minutes at most."
+            case .clock: "A time here couldn’t be read. Pick it again."
+            case .window: "“Latest start” is before “From”. Move one of them so the hours don’t cross."
+            case .movements: "A movement in these rules isn’t one the app knows. Import the profile again."
+            }
+        }
     }
+
+    /// Everything wrong with the rules, in the order the screen shows the answers; empty when they make sense.
+    var problems: [Problem] {
+        var found: [Problem] = []
+        if !restWeekdays.allSatisfy({ Self.weekdays.contains($0) }) { found.append(.restDays) }
+        if sessionMin < Self.shortestSession { found.append(.shortest) }
+        if sessionMax < sessionMin { found.append(.lengths) }
+        if sessionMax > Self.longestSession { found.append(.longest) }
+        if let from = Self.minutes(windowFrom), let to = Self.minutes(windowTo) {
+            if to < from { found.append(.window) }
+        } else {
+            found.append(.clock)
+        }
+        if !(avoid.allSatisfy(Self.isMovementId) && movements.keys.allSatisfy(Self.isMovementId)) { found.append(.movements) }
+        return found
+    }
+
+    /// Whether the rules make sense, so the screens never save one the engine would refuse.
+    var isValid: Bool { problems.isEmpty }
+
+    /// "HH:MM" is five characters.
+    private static let clockLength = 5
+    /// A movement id is at most this long.
+    private static let longestMovementId = 48
 
     static func minutes(_ clock: String) -> Int? {
         let parts = clock.split(separator: ":").compactMap { Int($0) }
-        guard parts.count == 2, (0...23).contains(parts[0]), (0...59).contains(parts[1]), clock.count == 5 else { return nil }
-        return parts[0] * 60 + parts[1]
+        guard parts.count == ClockUnits.clockParts, (0..<ClockUnits.hoursPerDay).contains(parts[0]), (0..<ClockUnits.minutesPerHour).contains(parts[1]),
+              clock.count == clockLength else { return nil }
+        return parts[0] * ClockUnits.minutesPerHour + parts[1]
     }
 
     static func isMovementId(_ id: String) -> Bool {
-        !id.isEmpty && id.count <= 48 && id.allSatisfy { ($0.isASCII && ($0.isLowercase || $0.isNumber)) || $0 == "_" }
+        !id.isEmpty && id.count <= longestMovementId && id.allSatisfy { ($0.isASCII && ($0.isLowercase || $0.isNumber)) || $0 == "_" }
     }
 
     // MARK: Importing a profile
@@ -164,7 +233,9 @@ struct UserRules: Codable, Equatable, Sendable {
     /// The rules with a profile's answers in them, turned on. Throws without changing anything when a value can't be used,
     /// a movement id that isn't in `library` (the movement library's ids, when it could be read) included.
     func importing(_ data: Data, library: Set<String> = []) throws -> UserRules {
-        guard let profile = try? JSONDecoder().decode(Profile.self, from: data) else { throw ImportError.unreadable }
+        guard let profile = Logger.model.attempt("The rules file couldn't be read", { try JSONDecoder().decode(Profile.self, from: data) }) else {
+            throw ImportError.unreadable
+        }
         var rules = self
         rules.isOn = true
         rules.takeSchedule(from: profile)
@@ -218,7 +289,7 @@ extension UserRules {
     init(from decoder: any Decoder) throws {
         self.init()
         let saved = try decoder.container(keyedBy: CodingKeys.self)
-        func read<T: Decodable>(_ key: CodingKeys, _ type: T.Type) -> T? { (try? saved.decodeIfPresent(type, forKey: key)) ?? nil }
+        func read<T: Decodable>(_ key: CodingKeys, _ type: T.Type) -> T? { saved.field(type, key) }
         isOn = read(.isOn, Bool.self) ?? isOn
         restWeekdays = read(.restWeekdays, [Int].self) ?? restWeekdays
         sessionMin = read(.sessionMin, Int.self) ?? sessionMin

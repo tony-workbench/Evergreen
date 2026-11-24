@@ -10,7 +10,7 @@ import { readMemory, slotFor, activityOf, labelOf, readStopped, isStopped } from
 import { readHistory } from './history.mjs';
 import { condition } from './condition.mjs';
 import { readRules, readDayKinds } from './rules.mjs';
-import { homeContext, homeWeek, homeWeekView, readDayOffsets, offOf, FOCUS, FOCUS_WORDS } from './homeweek.mjs';
+import { homeContextOf, homeWeek, homeWeekView, offOf, FOCUS_WORDS } from './homeweek.mjs';
 
 export const DAYS = 7;               // the week is 7 local days starting today
 export const TODAY_LEAD_MIN = 60;    // a session today starts at least this long after now
@@ -26,6 +26,18 @@ export const MIN_SESSION = 20;
 export const LONG_RUN_MIN = 60;      // the longest run of the week is called long_run from this many minutes
 export const HARD_EFFORT = 6;
 export const EASY_EFFORT = 4;
+export const TAPER_SHARE = 0.8;      // a run in the taper keeps this share of its usual length
+export const TAPER_LONG_SHARE = 0.6; // and the long run this share
+export const DAY_BEFORE_RACE = 1;    // the rest day is this many days before the race
+export const TOMORROW = 1;           // tired: nothing hard from today (day 0) to this day
+const EASE_SHARE = 0.8;              // an eased hard session keeps this share of its length
+const BREAK_IN_RUNS = 2;             // the first runs in a new pair that stay short and easy
+const RACE_HOUR = 8;                 // the hour a race-day note sits at
+const MAX_TRIM_SHARE = 0.5;          // the load trim takes at most this share of a session
+const LATE_HOUR = 21;                // a session ending at or after this hour is flagged as late
+const ACTION_POINTS = 10;            // points a planned session is worth
+const LIGHT_LOAD_RATIO = 0.9;        // the last 7 days below this share of usual: a light week
+const HEAVY_LOAD_RATIO = 1.1;        // above this share: a heavy week
 export const NOUN = {
   Running: 'run', Cycling: 'bike ride', Elliptical: 'elliptical session', Walking: 'walk', Yoga: 'yoga',
   FunctionalStrengthTraining: 'strength session', TraditionalStrengthTraining: 'strength session',
@@ -151,7 +163,10 @@ export function longDay(week) {
   return best;
 }
 
-/** Reads the request: { now, history, shoes?, newPairArrives?, raceDate?, calendar?, memory?, stopped? }. */
+/**
+ * Reads the request: { now, history, shoes?, newPairArrives?, raceDate?, calendar?, memory?, stopped?, rules?, dayKinds?,
+ * carry?, queue?, doneToday?, dayOffsets? }. With rules, the home week is read as planContext reads it (homeContextOf).
+ */
 export function parseRequest(a) {
   if (!a || typeof a !== 'object') throw new InputError('bad_request');
   const now = parseDT(a.now);
@@ -159,10 +174,11 @@ export function parseRequest(a) {
   const shoes = a.shoes ? { boughtOn: day(a.shoes.boughtOn), startMiles: Number(a.shoes.startMiles ?? 0) } : null;
   if (shoes && (shoes.boughtOn === null || !Number.isFinite(shoes.startMiles))) throw new InputError('bad_shoes');
   const busy = (a.busy ?? a.calendar ?? []).map((b) => ({ start: parseDT(b.start), end: parseDT(b.end), title: typeof b.title === 'string' ? b.title : null }));
-  const carry = Array.isArray(a.carry) ? a.carry.filter((f) => FOCUS.includes(f)) : [];
+  const rules = readRules(a.rules);
+  const dayKinds = readDayKinds(a.dayKinds);
   return {
     now, shoes, newPairArrives: day(a.newPairArrives), raceDate: day(a.raceDate), busy, memory: a.memory ?? null, history: a.history ?? null, stopped: a.stopped ?? null,
-    rules: readRules(a.rules), dayKinds: readDayKinds(a.dayKinds), carry, offsets: readDayOffsets(a.dayOffsets),
+    rules, dayKinds, home: rules ? homeContextOf(a, { now, calendar: busy, rules, dayKinds }) : null,
   };
 }
 
@@ -170,7 +186,7 @@ const HOME_EFFORT = 5;   // a home strength session counts as steady
 
 /** With rules: one strength session on every day at home, at its first free time, and nothing on rest or out days. */
 function homeBuild(req, base) {
-  const h = homeContext({ now: req.now, calendar: req.busy, rules: req.rules, dayKinds: req.dayKinds, carry: req.carry, offsets: req.offsets });
+  const h = req.home;
   const week = homeWeek(h);
   const minutes = req.rules.session.max;
   const sessions = week.days.filter((d) => d.focus !== null).map((d) => {
@@ -190,169 +206,216 @@ function homeBuild(req, base) {
  * `firstDay` is 0 for a week that starts today; the Python rules start tomorrow (1), which the golden tests use.
  */
 export function build(req, firstDay = 0) {
+  const k = buildContext(req);
+  if (req.rules) return homeBuild(req, { sig: k.sig, condition: k.cond, memory: k.mem, memorySource: k.mem.given ? 'phone' : null, historySource: k.historySource, week: k.week, long: k.long });
+  const sessions = weekSessions(req, k, firstDay);
+  // No more sessions than the week may have: the earliest ones stay. (The Python rules have no such limit.)
+  if (firstDay === 0) keepToLimit(sessions, k);
+  trimInProportion(sessions, k.sig);
+  trimToLoadCap(sessions, k.sig);
+  if (firstDay === 0) trimToMinutes(sessions, k);
+  k.sig.plannedLoad = pyRound(sessionLoad(sessions));
+  for (const s of sessions) placeSession(s, req);
+  dropStopped(sessions, k);
+  dropTooLate(sessions, k);
+  return { sessions, signals: k.sig, condition: k.cond, memory: k.mem, memorySource: k.mem.given ? 'phone' : null, historySource: k.historySource, week: k.week, long: k.long };
+}
+
+// What the week is built from: the history's signals and usual week, memory, stopped times and the shoes.
+function buildContext(req) {
   const { now } = req;
   const [ws, days] = readHistory(req.history, now);
-  const historySource = 'phone';
   const sig = signals(ws, days, now);
   const mem = readMemory(req.memory);
   const stopped = readStopped(req.stopped, mem);
   const week = usualWeek(ws, now);
   const cond = req.shoes ? condition(ws, req.shoes, now) : null;
-  const worn = Boolean(cond && cond.status === 'replace');
-  const long = longDay(week);
-  const hasBike = ws.some((w) => w.activityType === 'Cycling');
-  const tired = tiredSignals(sig);
-  if (req.rules) return homeBuild(req, { sig, condition: cond, memory: mem, memorySource: mem.given ? 'phone' : null, historySource, week, long });
-  let eased = false;
-  let brokenIn = 0;
+  return {
+    now, ws, sig, mem, stopped, week, cond, worn: Boolean(cond && cond.status === 'replace'), long: longDay(week),
+    hasBike: ws.some((w) => w.activityType === 'Cycling'), tired: tiredSignals(sig), historySource: 'phone',
+  };
+}
+
+// The usual week's sessions from `firstDay`, each with the rules it met. `w` carries what the days share: one eased
+// session and the break-in runs.
+function weekSessions(req, k, firstDay) {
+  const w = { req, k, firstDay, eased: false, brokenIn: 0 };
   const sessions = [];
   for (let i = firstDay; i < firstDay + DAYS; i += 1) {
-    const day = dayOf(now) + i;
-    const wd = weekdayOf(day);
-    if (req.raceDate !== null && day === req.raceDate) {
-      sessions.push({ date: day, activityType: 'Running', usualActivity: 'Running', minutes: 0, hour: 8, tags: [{ code: 'race_day' }], race: true });
-      continue;
-    }
-    if (req.raceDate !== null && day === req.raceDate - 1) continue; // rest the day before the race
-    const usual = week.get(wd);
-    if (!usual) continue;
-    const slot = slotFor(mem, wd, usual.activityType);
-    if (i === 0 && atDay(day, now.off, slot ? slot.hour : usual.hour).mic < now.mic + TODAY_LEAD_MIN * US_MIN) continue; // too late for today
-    if (isStopped(stopped, activityOf(usual.activityType), wd, slot ? slot.hour : usual.hour)) continue; // the person stopped this usual time
-    const s = {
-      date: day, activityType: usual.activityType, usualActivity: usual.activityType, minutes: usual.minutes, effort: usual.effort,
-      hour: slot ? slot.hour : usual.hour, tags: [], usual: usual.label, label: slot ? slot.label : null,
-    };
-    if (slot) {
-      s.basedOn = [slot.key]; // the memory keys this session rests on, so the phone can stop them when the person says no
-      s.tags.push({ code: 'memory_slot', hour: s.hour });
-    }
-    if (wd === long) s.tags.push({ code: 'long_run' });
-    const daysToRace = req.raceDate !== null ? req.raceDate - day : null;
-    if (daysToRace !== null && daysToRace > 0 && daysToRace <= TAPER_DAYS && s.activityType === 'Running') {
-      s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes * (wd === long ? 0.6 : 0.8)));
-      s.tags.push({ code: 'taper', daysToRace });
-    }
-    // The first hard session is eased; in a week that starts today, so is any other hard one today or tomorrow.
-    if (sig.readiness !== 'normal' && (!eased || (firstDay === 0 && i <= 1)) && s.effort >= HARD_EFFORT) {
-      s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes * 0.8));
-      s.effort = Math.min(s.effort, EASY_EFFORT);
-      s.tags.push({ code: 'ease_off', signals: tired });
-      eased = true;
-    }
-    if (s.activityType === 'Running') {
-      const arrived = req.newPairArrives !== null && day > req.newPairArrives;
-      if (worn && !arrived && s.minutes > WORN_RUN_MAX_MIN) {
-        s.activityType = hasBike ? 'Cycling' : 'Elliptical';
-        s.tags.push({ code: 'worn_shoes_swap', percentLife: cond.percentLife, to: s.activityType });
-      } else if (arrived && brokenIn < 2) {
-        s.minutes = Math.min(s.minutes, BREAK_IN_MIN);
-        s.effort = Math.min(s.effort, EASY_EFFORT);
-        s.tags.push({ code: 'break_in' });
-        brokenIn += 1;
-      }
-    }
-    sessions.push(s);
+    const s = sessionOn(w, i);
+    if (s) sessions.push(s);
   }
+  return sessions;
+}
 
-  // No more sessions than the week may have: the earliest ones stay. (The Python rules have no such limit.)
-  if (firstDay === 0) {
-    const limit = sessionLimit(ws, week, now, mem);
-    let kept = 0;
-    for (let i = 0; i < sessions.length; i += 1) {
-      if (sessions[i].race) continue;
-      kept += 1;
-      if (kept > limit) { sessions.splice(i, 1); i -= 1; }
-    }
-  }
+function sessionOn(w, i) {
+  const { req, k } = w;
+  const day = dayOf(k.now) + i;
+  const wd = weekdayOf(day);
+  if (req.raceDate !== null && day === req.raceDate) return { date: day, activityType: 'Running', usualActivity: 'Running', minutes: 0, hour: RACE_HOUR, tags: [{ code: 'race_day' }], race: true };
+  if (req.raceDate !== null && day === req.raceDate - DAY_BEFORE_RACE) return null; // rest the day before the race
+  const usual = k.week.get(wd);
+  if (!usual) return null;
+  const slot = slotFor(k.mem, wd, usual.activityType);
+  if (i === 0 && atDay(day, k.now.off, slot ? slot.hour : usual.hour).mic < k.now.mic + TODAY_LEAD_MIN * US_MIN) return null; // too late for today
+  if (isStopped(k.stopped, activityOf(usual.activityType), wd, slot ? slot.hour : usual.hour)) return null; // the person stopped this usual time
+  const s = usualSession(day, usual, slot);
+  if (wd === k.long) s.tags.push({ code: 'long_run' });
+  taperSession(s, req, wd === k.long);
+  easeSession(s, w, i);
+  shoeSession(s, w);
+  return s;
+}
 
-  // Weekly load limit: shrink every session but the long run in proportion until the week fits.
-  const load = (rows) => pySum(rows.filter((s) => !s.race).map((s) => s.effort * s.minutes));
-  const planned = load(sessions);
-  if (planned > sig.loadCap && sig.loadCap > 0) {
-    const flex = sessions.filter((s) => !s.race && !s.tags.some((t) => t.code === 'long_run'));
-    const excess = planned - sig.loadCap;
-    const flexLoad = load(flex) || 1;
-    for (const s of flex) {
-      const cut = s.minutes * Math.min(0.5, excess / flexLoad);
-      if (cut >= 1) {
-        s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes - cut));
-        s.tags.push({ code: 'load_trim' });
-      }
-    }
+function usualSession(day, usual, slot) {
+  const s = {
+    date: day, activityType: usual.activityType, usualActivity: usual.activityType, minutes: usual.minutes, effort: usual.effort,
+    hour: slot ? slot.hour : usual.hour, tags: [], usual: usual.label, label: slot ? slot.label : null,
+  };
+  if (slot) {
+    s.basedOn = [slot.key]; // the memory keys this session rests on, so the phone can stop them when the person says no
+    s.tags.push({ code: 'memory_slot', hour: s.hour });
   }
-  // A second pass, so the week never leaves here over the limit: take a minute at a time from the longest session that is
-  // still above the shortest length, the long run last.
-  if (sig.loadCap > 0) {
-    for (;;) {
-      if (load(sessions) <= sig.loadCap) break;
-      const open = sessions.filter((s) => !s.race && s.minutes > MIN_SESSION);
-      const flex = open.filter((s) => !s.tags.some((t) => t.code === 'long_run'));
-      const pool = flex.length ? flex : open;
-      if (!pool.length) break;
-      let longest = pool[0];
-      for (const s of pool) if (s.minutes > longest.minutes) longest = s;
-      longest.minutes -= 1;
-      if (!longest.tags.some((t) => t.code === 'load_trim')) longest.tags.push({ code: 'load_trim' });
-    }
-  }
-  // And never more minutes than the week may have: the same trim, then the last sessions go. (Not in the Python rules.)
-  if (firstDay === 0) {
-    const { limit } = minutesBudget(ws, now, mem, week);
-    const total = () => sessions.reduce((sum, s) => sum + (s.race ? 0 : s.minutes), 0);
-    while (limit !== null && total() > limit) {
-      const open = sessions.filter((s) => !s.race && s.minutes > MIN_SESSION);
-      const flex = open.filter((s) => !s.tags.some((t) => t.code === 'long_run'));
-      const pool = flex.length ? flex : open;
-      if (pool.length) {
-        let longest = pool[0];
-        for (const s of pool) if (s.minutes > longest.minutes) longest = s;
-        longest.minutes -= 1;
-        if (!longest.tags.some((t) => t.code === 'load_trim')) longest.tags.push({ code: 'load_trim' });
-      } else {
-        const booked = sessions.filter((s) => !s.race);
-        if (booked.length <= 1) break;
-        const last = sessions.lastIndexOf(booked[booked.length - 1]);
-        sessions.splice(last, 1);
-      }
-    }
-  }
-  sig.plannedLoad = pyRound(load(sessions));
+  return s;
+}
 
-  // Busy times: move a session to just after an overlapping event.
-  for (const s of sessions) {
-    const length = Math.max(s.minutes, 1) * US_MIN;
-    let start = atDay(s.date, now.off, s.hour);
-    let end = addUs(start, length);
-    for (const b of req.busy) {
-      if (b.start.mic < end.mic && start.mic < b.end.mic) {
-        start = { mic: b.end.mic, off: now.off };
-        end = addUs(start, length);
-        s.tags.push({ code: 'calendar_moved', to: clock(hourOf(start), minuteOf(start)) });
-      }
-    }
-    if (hourOf(end) >= 21 && !s.race) s.tags.push({ code: 'no_free_slot' });
-    s.start = start;
-    s.end = end;
+function taperSession(s, req, isLong) {
+  const daysToRace = req.raceDate !== null ? req.raceDate - s.date : null;
+  if (daysToRace !== null && daysToRace > 0 && daysToRace <= TAPER_DAYS && s.activityType === 'Running') {
+    s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes * (isLong ? TAPER_LONG_SHARE : TAPER_SHARE)));
+    s.tags.push({ code: 'taper', daysToRace });
   }
-  // A session that a move or a swap put on a stopped usual time is left out as well.
+}
+
+// The first hard session is eased; in a week that starts today, so is any other hard one today or tomorrow.
+function easeSession(s, w, i) {
+  if (w.k.sig.readiness !== 'normal' && (!w.eased || (w.firstDay === 0 && i <= TOMORROW)) && s.effort >= HARD_EFFORT) {
+    s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes * EASE_SHARE));
+    s.effort = Math.min(s.effort, EASY_EFFORT);
+    s.tags.push({ code: 'ease_off', signals: w.k.tired });
+    w.eased = true;
+  }
+}
+
+// Worn-out shoes move a long run to the bike or the elliptical; the first runs in a new pair are short and easy.
+function shoeSession(s, w) {
+  if (s.activityType !== 'Running') return;
+  const arrived = w.req.newPairArrives !== null && s.date > w.req.newPairArrives;
+  if (w.k.worn && !arrived && s.minutes > WORN_RUN_MAX_MIN) {
+    s.activityType = w.k.hasBike ? 'Cycling' : 'Elliptical';
+    s.tags.push({ code: 'worn_shoes_swap', percentLife: w.k.cond.percentLife, to: s.activityType });
+  } else if (arrived && w.brokenIn < BREAK_IN_RUNS) {
+    s.minutes = Math.min(s.minutes, BREAK_IN_MIN);
+    s.effort = Math.min(s.effort, EASY_EFFORT);
+    s.tags.push({ code: 'break_in' });
+    w.brokenIn += 1;
+  }
+}
+
+function keepToLimit(sessions, k) {
+  const limit = sessionLimit(k.ws, k.week, k.now, k.mem);
+  let kept = 0;
+  for (let i = 0; i < sessions.length; i += 1) {
+    if (sessions[i].race) continue;
+    kept += 1;
+    if (kept > limit) { sessions.splice(i, 1); i -= 1; }
+  }
+}
+
+const sessionLoad = (rows) => pySum(rows.filter((s) => !s.race).map((s) => s.effort * s.minutes));
+const isLongRun = (s) => s.tags.some((t) => t.code === 'long_run');
+
+// Weekly load limit: shrink every session but the long run in proportion until the week fits.
+function trimInProportion(sessions, sig) {
+  const planned = sessionLoad(sessions);
+  if (!(planned > sig.loadCap && sig.loadCap > 0)) return;
+  const flex = sessions.filter((s) => !s.race && !isLongRun(s));
+  const excess = planned - sig.loadCap;
+  const flexLoad = sessionLoad(flex) || 1;
+  for (const s of flex) {
+    const cut = s.minutes * Math.min(MAX_TRIM_SHARE, excess / flexLoad);
+    if (cut >= 1) {
+      s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes - cut));
+      s.tags.push({ code: 'load_trim' });
+    }
+  }
+}
+
+// A second pass, so the week never leaves here over the limit: take a minute at a time from the longest session that is
+// still above the shortest length, the long run last.
+function trimToLoadCap(sessions, sig) {
+  if (!(sig.loadCap > 0)) return;
+  for (;;) {
+    if (sessionLoad(sessions) <= sig.loadCap) break;
+    if (!trimLongest(sessions)) break;
+  }
+}
+
+// One minute off the longest session above the shortest length (the long run last); false when none is left to trim.
+function trimLongest(sessions) {
+  const open = sessions.filter((s) => !s.race && s.minutes > MIN_SESSION);
+  const flex = open.filter((s) => !isLongRun(s));
+  const pool = flex.length ? flex : open;
+  if (!pool.length) return false;
+  let longest = pool[0];
+  for (const s of pool) if (s.minutes > longest.minutes) longest = s;
+  longest.minutes -= 1;
+  if (!longest.tags.some((t) => t.code === 'load_trim')) longest.tags.push({ code: 'load_trim' });
+  return true;
+}
+
+// And never more minutes than the week may have: the same trim, then the last sessions go. (Not in the Python rules.)
+function trimToMinutes(sessions, k) {
+  const { limit } = minutesBudget(k.ws, k.now, k.mem, k.week);
+  const total = () => sessions.reduce((sum, s) => sum + (s.race ? 0 : s.minutes), 0);
+  while (limit !== null && total() > limit) {
+    if (trimLongest(sessions)) continue;
+    const booked = sessions.filter((s) => !s.race);
+    if (booked.length <= 1) break;
+    sessions.splice(sessions.lastIndexOf(booked[booked.length - 1]), 1);
+  }
+}
+
+// Busy times: move a session to just after an overlapping event.
+function placeSession(s, req) {
+  const { now } = req;
+  const length = Math.max(s.minutes, 1) * US_MIN;
+  let start = atDay(s.date, now.off, s.hour);
+  let end = addUs(start, length);
+  for (const b of req.busy) {
+    if (b.start.mic < end.mic && start.mic < b.end.mic) {
+      start = { mic: b.end.mic, off: now.off };
+      end = addUs(start, length);
+      s.tags.push({ code: 'calendar_moved', to: clock(hourOf(start), minuteOf(start)) });
+    }
+  }
+  if (hourOf(end) >= LATE_HOUR && !s.race) s.tags.push({ code: 'no_free_slot' });
+  s.start = start;
+  s.end = end;
+}
+
+// A session that a move or a swap put on a stopped usual time is left out as well.
+function dropStopped(sessions, k) {
   const before = sessions.length;
   for (let i = sessions.length - 1; i >= 0; i -= 1) {
     const s = sessions[i];
-    if (!s.race && isStopped(stopped, activityOf(s.activityType), weekdayOf(s.date), hourOf(s.start))) sessions.splice(i, 1);
+    if (!s.race && isStopped(k.stopped, activityOf(s.activityType), weekdayOf(s.date), hourOf(s.start))) sessions.splice(i, 1);
   }
-  if (sessions.length !== before) sig.plannedLoad = pyRound(load(sessions));
-  // Today's session must still end by 22:00 after any move; if it cannot, today has none.
-  const tooLate = sessions.findIndex((s) => !s.race && s.date === dayOf(now) && s.end.mic > atDay(s.date, now.off, TODAY_END_HOUR).mic);
-  if (tooLate >= 0) {
-    sessions.splice(tooLate, 1);
-    sig.plannedLoad = pyRound(load(sessions));
-  }
-  return { sessions, signals: sig, condition: cond, memory: mem, memorySource: mem.given ? 'phone' : null, historySource, week, long };
+  if (sessions.length !== before) k.sig.plannedLoad = pyRound(sessionLoad(sessions));
+}
+
+// Today's session must still end by 22:00 after any move; if it cannot, today has none.
+function dropTooLate(sessions, k) {
+  const tooLate = sessions.findIndex((s) => !s.race && s.date === dayOf(k.now) && s.end.mic > atDay(s.date, k.now.off, TODAY_END_HOUR).mic);
+  if (tooLate < 0) return;
+  sessions.splice(tooLate, 1);
+  k.sig.plannedLoad = pyRound(sessionLoad(sessions));
 }
 
 const TIRED_WORDS = { sleep: 'you have been sleeping less than usual', resting_hr: 'your resting heart rate is higher than usual' };
 const tiredWords = (list) => list.map((k) => TIRED_WORDS[k]).filter(Boolean).join(' and ') || 'your body needs a lighter day';
+
+const withArticle = (words) => `${/^[aeiou]/i.test(words) ? 'an' : 'a'} ${words}`;
 
 // A rule as a sentence of its own, or as the part after "Your usual Tuesday run, ...".
 function wording(tag, s) {
@@ -371,7 +434,7 @@ function wording(tag, s) {
     case 'calendar_moved': return { part: `moved to ${tag.to} because your calendar is busy before that` };
     case 'no_free_slot': return { whole: 'It ends late because the rest of that day is full, so skip it if that is too late.' };
     case 'race_day': return { whole: 'Race day. Rest and fuel.' };
-    case 'home_day': return { whole: `${weekday} is a day at home, so it has a ${FOCUS_WORDS[tag.focus] ?? 'full-body'} strength session.` };
+    case 'home_day': return { whole: `${weekday} is a day at home, so it has ${withArticle(FOCUS_WORDS[tag.focus] ?? 'full-body')} strength session.` };
     default: return { whole: '' };
   }
 }
@@ -465,25 +528,29 @@ export function citations(s) {
 /** The week's summary as [{ code, text }]. */
 export function summaryReasons(plan) {
   const sig = plan.signals;
-  const out = [];
   if (plan.home) {
     const n = plan.home.trainingDays;
-    out.push({ code: 'home_week', text: plan.home.note ?? `This week has ${plural(n, 'day')} at home with time to train, so ${plural(n, 'strength session')}.` });
-    return out;
+    return [{ code: 'home_week', text: plan.home.note ?? `This week has ${plural(n, 'day')} at home with time to train, so ${plural(n, 'strength session')}.` }];
   }
-  if (!plan.sessions.length) out.push({ code: 'no_history', text: 'Nothing is planned yet because there is not enough recent history to see your usual week.' });
-  else if (sig.loadRatio === null) out.push({ code: 'load_unknown', text: 'This week follows your usual pattern.' });
-  else if (sig.loadRatio < 0.9) {
-    const trimmed = plan.sessions.some((s) => s.tags.some((t) => t.code === 'load_trim'));
-    out.push({ code: 'load_light', text: trimmed ? 'Last week was lighter than usual, so this week builds back up gently.' : 'A lighter week than usual, so there is room to build.' });
-  }
-  else if (sig.loadRatio > 1.1) out.push({ code: 'load_heavy', text: 'A heavier week than usual, so this week stays close to your normal.' });
-  else out.push({ code: 'load_normal', text: 'Last week was close to your normal, so this week keeps your usual pattern.' });
+  const out = [loadReason(plan)];
   const tired = tiredSignals(sig);
   if (tired.length) out.push({ code: 'readiness_ease', text: `Take it easier for now, because ${tiredWords(tired)}.` });
   const swaps = plan.sessions.filter((s) => s.tags.some((t) => t.code === 'worn_shoes_swap')).length;
   if (swaps) out.push({ code: 'worn_shoes', text: `${swaps === 1 ? 'One long run moves' : `${COUNT[swaps] ?? 'Several'} long runs move`} off the road while your shoes are worn out.` });
   return out;
+}
+
+// How the last 7 days compare with the usual week, as the summary's first reason.
+function loadReason(plan) {
+  const sig = plan.signals;
+  if (!plan.sessions.length) return { code: 'no_history', text: 'Nothing is planned yet because there is not enough recent history to see your usual week.' };
+  if (sig.loadRatio === null) return { code: 'load_unknown', text: 'This week follows your usual pattern.' };
+  if (sig.loadRatio < LIGHT_LOAD_RATIO) {
+    const trimmed = plan.sessions.some((s) => s.tags.some((t) => t.code === 'load_trim'));
+    return { code: 'load_light', text: trimmed ? 'Last week was lighter than usual, so this week builds back up gently.' : 'A lighter week than usual, so there is room to build.' };
+  }
+  if (sig.loadRatio > HEAVY_LOAD_RATIO) return { code: 'load_heavy', text: 'A heavier week than usual, so this week stays close to your normal.' };
+  return { code: 'load_normal', text: 'Last week was close to your normal, so this week keeps your usual pattern.' };
 }
 
 export const actionId = (s) => `wk-${dayISO(s.date)}-${s.activityType.toLowerCase()}`;
@@ -510,28 +577,28 @@ export function recommendWeek(args, firstDay = 0) {
   const req = parseRequest(args);
   const plan = build(req, firstDay);
   const ids = plan.sessions.map(actionId);
-  const createdAt = isoDT(req.now);
-  const sessions = [];
-  const reasonsById = {};
-  const notes = [];
-  const actions = plan.sessions.map((s, i) => {
-    const reasons = sessionReasons(s);
-    const session = toSession(s, reasons);
-    if (session) { sessions.push(session); reasonsById[session.id] = reasons; }
-    if (s.race) notes.push({ day: dayISO(s.date), code: 'race_day', text: reasons[0].text });
-    return {
-      id: ids[i], kind: s.race ? 'note' : 'addWorkout', sessionId: session ? session.id : null,
-      title: s.race ? 'Race day' : `Planned a ${s.minutes}-minute ${nounOf(s.activityType)}`, planItemId: ids[i],
-      after: s.race ? null : { start: isoDT(s.start), end: isoDT(s.end), activityType: s.activityType },
-      reason: sentence(reasons), reasons, points: s.race ? null : 10, createdAt,
-      rules: s.tags.map((t) => t.code), basedOn: s.basedOn ?? [], intensity: s.race ? null : intensityOf(s.effort), evidence: citations(s),
-    };
-  });
+  const week = { createdAt: isoDT(req.now), sessions: [], reasonsById: {}, notes: [] };
+  const actions = plan.sessions.map((s, i) => weekAction(s, ids[i], week));
   const summary = summaryReasons(plan);
   return {
-    sessions, reasons: reasonsById, notes, summary: sentence(summary), summaryReasons: summary, signals: plan.signals,
-    actions, suggestions: suggestions(req, plan, ids, firstDay), memoryUsed: [...new Set(sessions.flatMap((x) => x.basedOn))],
+    sessions: week.sessions, reasons: week.reasonsById, notes: week.notes, summary: sentence(summary), summaryReasons: summary, signals: plan.signals,
+    actions, suggestions: suggestions(req, plan, ids, firstDay), memoryUsed: [...new Set(week.sessions.flatMap((x) => x.basedOn))],
     memorySource: plan.memorySource, historySource: plan.historySource, live: false, source: 'rules', condition: plan.condition,
     ...(plan.home ? { homeWeek: plan.home } : {}),
+  };
+}
+
+// One planned session as a calendar action; its shared session, reasons and race note go into `week`.
+function weekAction(s, id, week) {
+  const reasons = sessionReasons(s);
+  const session = toSession(s, reasons);
+  if (session) { week.sessions.push(session); week.reasonsById[session.id] = reasons; }
+  if (s.race) week.notes.push({ day: dayISO(s.date), code: 'race_day', text: reasons[0].text });
+  return {
+    id, kind: s.race ? 'note' : 'addWorkout', sessionId: session ? session.id : null,
+    title: s.race ? 'Race day' : `Planned a ${s.minutes}-minute ${nounOf(s.activityType)}`, planItemId: id,
+    after: s.race ? null : { start: isoDT(s.start), end: isoDT(s.end), activityType: s.activityType },
+    reason: sentence(reasons), reasons, points: s.race ? null : ACTION_POINTS, createdAt: week.createdAt,
+    rules: s.tags.map((t) => t.code), basedOn: s.basedOn ?? [], intensity: s.race ? null : intensityOf(s.effort), evidence: citations(s),
   };
 }

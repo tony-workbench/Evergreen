@@ -102,6 +102,18 @@ struct MemoryBriefTests {
         #expect(thin.noticedLines(rows: [Self.home]).map(\.text) == thin.noticed)
     }
 
+    @Test func eachNoticedLineKeepsItsIdentityWhenAnotherGoes() {
+        let withPlace = Self.full.noticedLines(rows: [Self.home])
+        #expect(withPlace.last?.id == Self.home.key)
+        #expect(Set(withPlace.map(\.id)).count == withPlace.count)
+        // Once the place is said no to, the lines that stay keep the identity they had.
+        let without = Self.full.noticedLines(rows: [])
+        for line in withPlace.dropLast() { #expect(without.first { $0.text == line.text }?.id == line.id) }
+        // Two lines that read the same are still told apart.
+        let twice = MemoryBrief.NoticedLine.plain(["Same words.", "Same words."])
+        #expect(twice.map(\.id) == ["Same words.", "Same words.#1"] && twice.allSatisfy { $0.key == nil })
+    }
+
     @Test func theMemoryListSaysWhereThePersonTrains() throws {
         #expect(RowWords.sentence(Self.home) == "You train at home, without gym equipment.")
         #expect(RowWords.title(Self.home) == "training at home")

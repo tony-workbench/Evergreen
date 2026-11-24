@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// One request to a model: who it is, what was said so far, the tools it may
 /// call and, for a structured answer, the JSON schema the answer must fit.
@@ -77,4 +78,16 @@ enum ModelFailure: Error, Equatable {
 /// Something that answers a `ModelRequest`: the Gemini API, or a script in tests.
 protocol LanguageModel: Sendable {
     func reply(to request: ModelRequest) async throws(ModelFailure) -> ModelReply
+}
+
+extension LanguageModel {
+    /// `reply(to:)` for callers that fall back when no answer comes: nil, with the failure in the log.
+    func replyIfPossible(to request: ModelRequest) async -> ModelReply? {
+        do {
+            return try await reply(to: request)
+        } catch {
+            Logger.agent.notice("No answer from the model: \(String(describing: error), privacy: .public)")
+            return nil
+        }
+    }
 }

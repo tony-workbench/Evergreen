@@ -109,7 +109,7 @@ struct ShoeSearchTests {
 
     @Test func theSearchIsOneRequestWithGoogleSearchAndNoOtherTool() async throws {
         let model = ScriptedModel([.success(try GeminiClient.reply(from: try #require(JSONValue.parse(Self.grounded))))])
-        let advice = try #require(await ShoeSearch.advice(for: Self.status, model: model, modelId: AIModels.standard))
+        let advice = try #require(await ShoeSearch.advice(for: .init(status: Self.status), model: model, modelId: AIModels.standard))
         #expect(advice.links.count == 2)
         let request = try #require(await model.requests.first)
         #expect(await model.requests.count == 1 && request.tools.isEmpty && request.answerSchema == nil)
@@ -122,8 +122,8 @@ struct ShoeSearchTests {
     }
 
     @Test func withoutSearchResultsThereIsARecommendationAndNoPageButton() async {
-        #expect(await ShoeSearch.advice(for: Self.status, model: ScriptedModel([.failure(.unreachable)]), modelId: AIModels.standard) == nil)
-        #expect(await ShoeSearch.advice(for: Self.status, model: ScriptedModel([ScriptedModel.text("x", stop: "refusal")]), modelId: AIModels.standard) == nil)
+        #expect(await ShoeSearch.advice(for: .init(status: Self.status), model: ScriptedModel([.failure(.unreachable)]), modelId: AIModels.standard) == nil)
+        #expect(await ShoeSearch.advice(for: .init(status: Self.status), model: ScriptedModel([ScriptedModel.text("x", stop: "refusal")]), modelId: AIModels.standard) == nil)
         let general = ShoeAdvice.general(Self.status)
         #expect(general.links.isEmpty && general.text.contains("652 km"))
     }

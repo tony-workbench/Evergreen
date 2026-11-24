@@ -29,6 +29,22 @@ final class EarnedTimeModel {
         EarnMath.available(credit: isOn ? credit : weekMinutes, rate: rates[group] ?? group.defaultRate)
     }
 
+    /// Minutes of a group the page shows: once on, today's free time left plus what the credit buys; before that, what
+    /// this week earned.
+    func usable(_ group: FunGroup) -> Int {
+        Self.usable(minutes: minutes(group), baseLeft: baseLeft[group], isOn: isOn)
+    }
+
+    static func usable(minutes: Int, baseLeft: Int?, isOn: Bool) -> Int {
+        minutes + (isOn ? baseLeft ?? 0 : 0)
+    }
+
+    /// Today's free minutes of a group left, for its row once on.
+    func baseLeftMinutes(_ group: FunGroup) -> Int { baseLeft[group] ?? 0 }
+
+    /// The groups with an app or category picked, for "Lock these apps?".
+    var pickedGroups: [FunGroup] { FunGroup.allCases.filter { picked($0) > 0 } }
+
     func picked(_ group: FunGroup) -> Int {
         guard let s = selections[group] else { return 0 }
         return s.applicationTokens.count + s.categoryTokens.count + s.webDomainTokens.count

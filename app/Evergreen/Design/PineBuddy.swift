@@ -232,7 +232,10 @@ struct PineBuddy: View {
 struct WalkingBuddy: View {
     var filled: Int? = nil
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
 
     var body: some View {
         if reduceMotion {

@@ -26,7 +26,7 @@ struct BundlePlanRules: PlanRules {
 
     /// What every call is given: `planContext`'s input, which `checkPlan` takes as its `context`.
     func input(rows: [MemoryRow], now: Date) -> JSONValue {
-        var input: JSONValue = [
+        var fields: [String: JSONValue] = [
             "now": .string(LocalTime(now, in: timeZone).text),
             "memory": ["rows": .from(rows)],
             // The usual times the person stopped: the bundle's `stopped_slot` rule keeps sessions off them.
@@ -35,26 +35,34 @@ struct BundlePlanRules: PlanRules {
             "calendar": .array(busy.map { ["start": .string(LocalTime($0.start, in: timeZone).text), "end": .string(LocalTime($0.end, in: timeZone).text)] }),
         ]
         // A race the person has coming, from the goal they are remembered to have: the rules' own week tapers for it too.
-        let today = LocalTime(now, in: timeZone).day
-        if let race = rows.filter({ $0.kind == "goal" && $0.isUsable }).compactMap({ $0.data["date"]?.string }).filter({ $0 >= today }).min(),
-           case .object(var fields) = input {
-            fields["raceDate"] = .string(race)
-            input = .object(fields)
-        }
-        if let rules, rules.isOn, case .object(var fields) = input {
-            fields["rules"] = rules.engineValue
-            fields["dayKinds"] = DayKinds.engineValue(dayKinds)
-            fields["dayOffsets"] = Self.dayOffsets(from: now, timeZone: timeZone)
-            if !carry.isEmpty { fields["carry"] = .array(carry.map { .string($0) }) }
-            if !queue.isEmpty { fields["queue"] = .object(queue.mapValues { .string($0) }) }
-            if doneToday { fields["doneToday"] = .bool(true) }
-            input = .object(fields)
-        }
-        return input
+        if let race = Self.nextRace(in: rows, from: LocalTime(now, in: timeZone).day) { fields["raceDate"] = .string(race) }
+        if let rules, rules.isOn { fields.merge(rulesFields(rules, now: now)) { _, new in new } }
+        return .object(fields)
+    }
+
+    /// The date of the nearest race from `today` on, from the goals remembered and still usable.
+    private static func nextRace(in rows: [MemoryRow], from today: String) -> String? {
+        rows.filter { $0.kind == "goal" && $0.isUsable }.compactMap { $0.data["date"]?.string }.filter { $0 >= today }.min()
+    }
+
+    /// What the rules' own week needs besides the shared input: the rules, each day's kind and offset, and what carries over.
+    private func rulesFields(_ rules: UserRules, now: Date) -> [String: JSONValue] {
+        var fields: [String: JSONValue] = [
+            "rules": rules.engineValue,
+            "dayKinds": DayKinds.engineValue(dayKinds),
+            "dayOffsets": Self.dayOffsets(from: now, timeZone: timeZone),
+        ]
+        if !carry.isEmpty { fields["carry"] = .array(carry.map { .string($0) }) }
+        if !queue.isEmpty { fields["queue"] = .object(queue.mapValues { .string($0) }) }
+        if doneToday { fields["doneToday"] = .bool(true) }
+        return fields
     }
 
     /// Each day's UTC offset at noon, from today through the week the engine plans, so a session after a clock change keeps
     /// its own day's offset.
+    /// Each day's offset is read at noon, clear of a change to or from summer time in the night.
+    private static let noonHour = 12
+
     static func dayOffsets(from now: Date, timeZone: TimeZone) -> JSONValue {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
@@ -62,9 +70,10 @@ struct BundlePlanRules: PlanRules {
         var out: [String: JSONValue] = [:]
         for offset in 0..<DayKinds.days {
             guard let day = calendar.date(byAdding: .day, value: offset, to: start),
-                  let noon = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: day) else { continue }
-            let minutes = timeZone.secondsFromGMT(for: noon) / 60
-            out[LocalTime(noon, in: timeZone).day] = .string(String(format: "%@%02d:%02d", minutes < 0 ? "-" : "+", abs(minutes) / 60, abs(minutes) % 60))
+                  let noon = calendar.date(bySettingHour: noonHour, minute: 0, second: 0, of: day) else { continue }
+            let minutes = timeZone.secondsFromGMT(for: noon) / ClockUnits.secondsPerMinute
+            let hours = abs(minutes) / ClockUnits.minutesPerHour, rest = abs(minutes) % ClockUnits.minutesPerHour
+            out[LocalTime(noon, in: timeZone).day] = .string(String(format: "%@%02d:%02d", minutes < 0 ? "-" : "+", hours, rest))
         }
         return .object(out)
     }

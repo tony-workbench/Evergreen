@@ -20,7 +20,7 @@ Any file added under `app/Evergreen/` or `app/EvergreenTests/` is in the build a
 | `Agent/` | The model client (`LLM/`), the router, the agents (`Agents/`), the JavaScript host (`JS/`), the hand-offs (`Handoff/`), `Orchestrator.swift` |
 | `Memory/` | The memory engine's host and what the app reads from it |
 | `Model/` | App state. `AppModel` is the one object the views read; it owns `PlanStore`, `WeekSuggestions`, `AskEvergreen`, `MemoryModel` and `EarnedTimeModel`. `Storage/` is SwiftData |
-| `CalendarSync/` | The Evergreen calendar and reading busy times |
+| `CalendarSync/` | The Evergreen calendar, and reading busy times and event places (`EventReader.swift`, an actor, off the main thread; titles are never read) |
 | `Background/` | Background refresh, the rain and shoe checks (`TriggerCenter.swift`), the debug seeds |
 | `Weather/`, `Gear/`, `Health/`, `Notifications/` | The forecast, shoe mileage, Apple Health, notifications |
 | `Contract/` | The plan, workout and busy-time shapes behind the agent card |
@@ -28,7 +28,7 @@ Any file added under `app/Evergreen/` or `app/EvergreenTests/` is in the build a
 | `Resources/` | The three engine bundles and the asset catalog |
 | `ScreenTime/` | Earned screen time: its model and screen |
 
-The exercise rules: `Model/UserRules.swift` and `HomePlace.swift` hold My rules, `CalendarSync/DayKind.swift` sorts each day into home, out or rest, `Model/HomeWeek.swift` and `AppModel+HomeWeek.swift` keep the week planned day by day, `Model/WorkoutLog.swift` and `AppModel+Workout.swift` record each session, `Views/Workout/WorkoutSessionView.swift` is the workout page, `Views/Week/WeekTableView.swift` the week table, `Notifications/WorkoutReminders.swift` and `AppModel+Reminders.swift` a day at home's reminders, and `Weather/RainSnacks.swift` the short breaks on a rainy afternoon. `Health/WorkoutWriter.swift` saves a finished session to Apple Health as a strength workout.
+The exercise rules: `Model/UserRules.swift` and `HomePlace.swift` hold My rules, `CalendarSync/DayKind.swift` sorts each day into home, out or rest, `Model/HomeWeek.swift` and `AppModel+HomeWeek.swift` keep the week planned day by day, `Model/WorkoutLog.swift` and `AppModel+Workout.swift` record each session, `AppModel+WorkoutPage.swift` answers the workout page's buttons, `Views/Workout/` is the workout page (`WorkoutSessionView.swift`, with `WorkoutParts.swift`, `RestCountdown.swift` and `WorkoutFinishPage.swift`), `Views/Week/WeekTableView.swift` the week table, `Notifications/WorkoutReminders.swift` and `AppModel+Reminders.swift` a day at home's reminders, and `Weather/RainSnacks.swift` the short breaks on a rainy afternoon. `Health/WorkoutWriter.swift` saves a finished session to Apple Health as a strength workout.
 
 Earned screen time also uses folders beside `app/Evergreen/`. `ScreenTimeShared/` holds the chosen apps, the rates and every other number (`EarnRules`), the counted workouts and spent minutes, each day's free time, the weekly escape and the comeback day, and locking and unlocking; it is built into the app and all three extensions, which share it through the App Group `group.com.evergreentraining.app`. `EarnShieldConfiguration/` draws the screen over a locked app, `EarnShieldAction/` handles its two buttons (use time, or the weekly "Unlock for 10 minutes"), and `EarnActivityMonitor/` locks the apps again when the unlocked time is up. Evergreen also locks any unlock that ran out each time it opens. Their Info.plist and entitlements files are in `ExtensionSettings/`.
 
@@ -72,6 +72,8 @@ Three checks run when the app comes forward, when the calendar changes and in a 
 xcodebuild test -project app/Evergreen.xcodeproj -scheme Evergreen \
   -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO
 ```
+
+The scheme runs two targets. `EvergreenTests` holds the unit and flow tests, including the view logic kept in the model (`ViewLogicTests`) and the flows from the last review (`ReviewFlowTests`). `EvergreenUITests` drives the app on the `-uiTest home` seed: the key path (start, every set, finish; "Too hard"; skip today and take it back; pick a time in the week table; My rules saying what is wrong at once), every permission row on the first-setup page, a reminder opening today's workout page or another day's week, the week table offline and then reloading online, the onboarding lines appearing at once with Reduce Motion, Xcode's accessibility audit on Today, the workout page, the week table and My rules in light and dark, the key path again at the largest accessibility text size, and the rest countdown read out by VoiceOver. Run one target with `-only-testing:EvergreenTests` or `-only-testing:EvergreenUITests`.
 
 No test uses the network. The model is a script (`ScriptedModel.swift`) or a fake network with Gemini-shaped answers (`FakeAPI.swift`, `ScriptedNetwork.swift`); the three engine bundles are the real ones. `AppRig.swift` builds the whole app for a test with a clock the test sets, a fixed time zone, a calendar that records what is written to it and scripted Apple Health. `HandOffTests` decodes every file in `contract/fixtures/swift/`.
 
@@ -117,5 +119,9 @@ With a seed, these also work:
 - `-uiAsk "sentence"` asks Evergreen that sentence.
 - `-uiNoKey YES` stays without a key, to see the connect card.
 - `-uiAnswers YES` adds the top suggestion and says "Not now" to the next.
+- `-uiFakePermissions` makes the first-setup "Allow" buttons answer yes at once, with no system prompt.
+- `-uiTestRoute session` opens today's workout page, and `-uiTestRoute week:YYYY-MM-DD` the week table on that day, as a reminder's tap does.
+- `-uiOfflineFor <seconds>` counts the phone as offline for that long after launch, then online.
+- `-reduceMotion` moves the screens as with Reduce Motion on.
 
 A normal launch takes none of these.

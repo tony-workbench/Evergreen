@@ -16,32 +16,24 @@ struct RainCard: View {
     var showsPlaces = false
 
     @State private var indoors = false
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
+
+    /// How long the gyms take to open.
+    private static let openSeconds = 0.2
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.sm) {
             Text(RainWords.headline(ask, now: now))
-                .agentFont(22, relativeTo: .title2)
+                .agentFont(Theme.questionTitleSize, relativeTo: .title2)
                 .foregroundStyle(Theme.accent)
                 .fixedSize(horizontal: false, vertical: true)
             Text(RainWords.detail(ask))
                 .font(.footnote)
                 .foregroundStyle(Theme.textMuted)
             if indoors || showsPlaces {
-                ForEach(ask.places) { place in
-                    Rectangle().fill(Theme.rule).frame(height: 1)
-                    HStack(spacing: Theme.sm) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(place.name).font(.body).foregroundStyle(Theme.text)
-                            Text("\(place.distanceText) away").font(.footnote).foregroundStyle(Theme.textMuted)
-                        }
-                        Spacer(minLength: Theme.sm)
-                        Button("Open in Maps") { place.mapItem.openInMaps() }
-                            .font(.footnote.weight(.medium))
-                            .foregroundStyle(Theme.text)
-                            .frame(minHeight: 44)
-                            .accessibilityLabel("Open \(place.name) in Maps")
-                    }
-                }
+                ForEach(ask.places) { place in placeRow(place) }
             }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: Theme.sm) { buttons }
@@ -54,25 +46,49 @@ struct RainCard: View {
         .agentCardBackground()
     }
 
+    /// One gym nearby: its name, how far, and "Open in Maps".
+    @ViewBuilder private func placeRow(_ place: IndoorPlace) -> some View {
+        Rectangle().fill(Theme.rule).frame(height: Theme.borderWidth)
+        HStack(spacing: Theme.sm) {
+            VStack(alignment: .leading, spacing: Theme.xxs) {
+                Text(place.name).font(.body).foregroundStyle(Theme.text)
+                Text("\(place.distanceText) away").font(.footnote).foregroundStyle(Theme.textMuted)
+            }
+            Spacer(minLength: Theme.sm)
+            Button("Open in Maps") { place.mapItem.openInMaps() }
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Theme.text)
+                .frame(minHeight: TapTargetButtonStyle.minSide)
+                .accessibilityLabel("Open \(place.name) in Maps")
+                .accessibilityIdentifier("rain.openInMaps.\(place.name)")
+        }
+    }
+
     @ViewBuilder
     private var buttons: some View {
         if ask.intent != nil, ask.dryWindow != nil {
             Button("Move", action: onMove)
                 .buttonStyle(PrimaryButtonStyle())
                 .accessibilityHint("Moves it to the dry time")
+                .accessibilityIdentifier("rain.move")
         }
-        if !ask.places.isEmpty, !indoors, !showsPlaces {
-            Button("Indoors") { withAnimation(.easeInOut(duration: 0.2)) { indoors = true } }
-                .buttonStyle(GhostButtonStyle())
-                .accessibilityHint("Shows gyms nearby")
-        }
+        if !ask.places.isEmpty, !indoors, !showsPlaces { indoorsButton }
         if ask.snacks != nil, let onSnacks {
             Button("Short breaks through the day", action: onSnacks)
                 .buttonStyle(GhostButtonStyle())
                 .accessibilityHint("Adds a few short breaks through the afternoon instead")
+                .accessibilityIdentifier("rain.snacks")
         }
         Button("Keep", action: onKeep)
             .buttonStyle(GhostButtonStyle())
             .accessibilityHint("Leaves the workout where it is")
+            .accessibilityIdentifier("rain.keep")
+    }
+
+    private var indoorsButton: some View {
+        Button("Indoors") { withAnimation(reduceMotion ? nil : .easeInOut(duration: Self.openSeconds)) { indoors = true } }
+            .buttonStyle(GhostButtonStyle())
+            .accessibilityHint("Shows gyms nearby")
+            .accessibilityIdentifier("rain.indoors")
     }
 }

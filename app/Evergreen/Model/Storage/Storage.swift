@@ -27,23 +27,35 @@ enum Storage {
     static func container(at url: URL = Storage.url) -> ModelContainer {
         let schema = Schema(versionedSchema: StoreV1.self)
         let configuration = ModelConfiguration(schema: schema, url: url)
-        if let container = try? ModelContainer(for: schema, migrationPlan: StoreMigration.self, configurations: configuration) {
-            return container
-        }
+        if let container = open(schema, configuration) { return container }
         // Set the unreadable store aside rather than deleting it.
         fresh.withLock { $0 = true }
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let stamp = Int(Date().timeIntervalSince1970)
-        for suffix in ["", "-shm", "-wal"] {
-            let file = URL(filePath: url.path(percentEncoded: false) + suffix)
-            try? FileManager.default.moveItem(at: file, to: URL(filePath: url.path(percentEncoded: false) + ".unreadable-\(stamp)" + suffix))
-        }
-        if let container = try? ModelContainer(for: schema, migrationPlan: StoreMigration.self, configurations: configuration) {
-            return container
-        }
+        setAside(url)
+        if let container = open(schema, configuration) { return container }
         // Nothing on disk works: run in memory so the app still opens.
         let memory = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         // An in-memory store can't fail to open for a fixed schema.
         return try! ModelContainer(for: schema, configurations: memory)
+    }
+
+    /// The store on disk, opened and migrated; nil with the reason in the log.
+    private static func open(_ schema: Schema, _ configuration: ModelConfiguration) -> ModelContainer? {
+        Logger.model.attempt("The saved store couldn't be opened") {
+            try ModelContainer(for: schema, migrationPlan: StoreMigration.self, configurations: configuration)
+        }
+    }
+
+    /// Renames the store and its side files to `.unreadable-<time>`. A side file that isn't there is skipped.
+    private static func setAside(_ url: URL) {
+        let files = FileManager.default
+        _ = Logger.model.attempt("The store's folder couldn't be made") {
+            try files.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        }
+        let path = url.path(percentEncoded: false), stamp = Int(Date().timeIntervalSince1970)
+        for suffix in ["", "-shm", "-wal"] where files.fileExists(atPath: path + suffix) {
+            _ = Logger.model.attempt("The unreadable store couldn't be set aside") {
+                try files.moveItem(at: URL(filePath: path + suffix), to: URL(filePath: path + ".unreadable-\(stamp)" + suffix))
+            }
+        }
     }
 }

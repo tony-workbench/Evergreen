@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// What Evergreen read from Apple Health: recent workouts and, per day, minutes
 /// asleep and resting heart rate. Kept in Application Support so the app opens
@@ -24,16 +25,19 @@ struct HealthHistory: Codable, Equatable, Sendable {
         URL.applicationSupportDirectory.appending(path: "health-history.json")
     }
 
+    /// The history kept from the last read. None kept yet (the first launch) is the usual empty start, not a fault.
     static func cached() -> HealthHistory {
-        guard let data = try? Data(contentsOf: cacheURL),
-              let history = try? JSONDecoder.contract.decode(HealthHistory.self, from: data)
-        else { return HealthHistory() }
-        return history
+        guard FileManager.default.fileExists(atPath: cacheURL.path(percentEncoded: false)) else { return HealthHistory() }
+        return Logger.health.attempt("The kept Health history couldn't be read; it is read again from Apple Health") {
+            try JSONDecoder.contract.decode(HealthHistory.self, from: Data(contentsOf: cacheURL))
+        } ?? HealthHistory()
     }
 
     func saveToCache() {
-        guard let data = try? JSONEncoder.contract.encode(self) else { return }
-        try? FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
-        try? data.write(to: Self.cacheURL, options: [.atomic, .completeFileProtection])
+        _ = Logger.health.attempt("The Health history couldn't be kept") {
+            let data = try JSONEncoder.contract.encode(self)
+            try FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
+            try data.write(to: Self.cacheURL, options: [.atomic, .completeFileProtection])
+        }
     }
 }

@@ -8,7 +8,10 @@ struct MoveScene: View {
     /// Asks the buddy beside the caption for its reaction to this scene.
     let react: () -> Void
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
     @State private var demo = TourDemo()
     @State private var meeting = false
     @State private var moved: AgentAction?

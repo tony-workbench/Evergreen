@@ -28,7 +28,7 @@ struct PlanCheckTests {
     }
 
     static func week(history: HealthHistory? = nil) async throws -> Week {
-        let rig = try AppRig(now: Clocks.morning, history: history)
+        let rig = try AppRig(.init(now: Clocks.morning, history: history))
         try await rig.model.loadWeekPlan()
         let week = Week(rig: rig, rules: try #require(rig.model.planRules), rows: rig.model.memoryRows, sessions: rig.model.plannedSessions)
         // Where every case starts: a week with a session today and one on each of the next days, and nothing wrong with it.
@@ -146,7 +146,7 @@ struct ThinHistoryTests {
     }
 
     @Test(arguments: [1, 9, 12]) func aThinHistoryGetsAShortWeekThatPassesAndShowsNoLoad(days: Int) async throws {
-        let rig = try AppRig(now: Clocks.morning, history: days == 12 ? Self.lastDays(12) : AppRig.runs(days: days, before: Clocks.morning))
+        let rig = try AppRig(.init(now: Clocks.morning, history: days == 12 ? Self.lastDays(12) : AppRig.runs(days: days, before: Clocks.morning)))
         let model = rig.model
         #expect(model.historyDepth.isThin)
         try await model.loadWeekPlan()

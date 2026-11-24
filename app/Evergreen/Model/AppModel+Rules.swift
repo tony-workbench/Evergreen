@@ -45,6 +45,8 @@ extension AppModel {
         rules.save(to: settings)
         if !quiet { log("Your rules changed; the week was planned again") }
         await replanForRules()
+        // "Can", "can't do", the things at hand and the avoid list change what Swap may offer.
+        if !movements.isEmpty { await refreshClosedMovements() }
     }
 
     /// "I'm going out today", and "I'm home" to correct a day taken for a day out.
@@ -63,7 +65,10 @@ extension AppModel {
             workoutLog.skipped?.removeValue(forKey: day)
             workoutLog.save(to: settings)
         }
-        await replanForRules()
+        // From the lock screen the app may have just started: the calendar is read first, so the days are worked out
+        // with its events and not as if the week were empty.
+        await refreshBusy()
+        await replanForRules(day: day)
     }
 
     /// When the app comes forward: a phone far from home makes today a day out, and what is left of today's reminders goes.
@@ -95,22 +100,34 @@ extension AppModel {
     /// Today and the next seven days as home, out or rest. Nothing without rules.
     func refreshDayKinds() async {
         guard userRules.isOn else { dayKinds = [:]; return }
+        let request = DayKinds.Request(rules: userRules, busy: busyNow + placedCache, goingOut: goingOutDays, stayingHome: stayingHomeDays,
+                                       farToday: settings.string(forKey: Self.farDayKey) == todayISO, today: now, calendar: calendar)
         // Places found while online are kept, so the days can still be told apart offline.
-        let places = PlaceMemory(PlaceMemory.load(from: settings))
-        dayKinds = await DayKinds.classify(rules: userRules, busy: busyNow + placedCache, goingOut: goingOutDays,
-                                           stayingHome: stayingHomeDays, farToday: settings.string(forKey: Self.farDayKey) == todayISO,
-                                           from: now, calendar: calendar, geocoder: RememberingGeocoder(geocoder: geocoder, memory: places))
-        PlaceMemory.save(await places.found, to: settings)
+        dayKinds = await DayKinds.classify(request, geocoder: RememberingGeocoder(geocoder: geocoder, memory: placeMemory))
     }
 
-    private func replanForRules() async {
+    /// The one keeper of found places: read once for the settings in use, and saved by itself each time a place is found.
+    var placeMemory: PlaceMemory {
+        if let kept = placeMemoryKept, kept.defaults === settings { return kept }
+        let memory = PlaceMemory(defaults: settings)
+        placeMemoryKept = memory
+        return memory
+    }
+
+    /// The rules or a day's kind changed: the days, the week and its reminders again. The reminders follow the week as
+    /// soon as it is kept, before anything that may wait for the network (the week's suggestions, the AI's movements),
+    /// and once more after. `day` is the day a lock-screen button was about: locked, only it changes (`keepHomeWeek`).
+    private func replanForRules(day: String? = nil) async {
         await refreshDayKinds()
-        await scheduleNotifications()
+        await keepHomeWeek(onlyDay: deviceUnlocked ? nil : day)
+        await scheduleNotifications(day: day)
+        guard deviceUnlocked else { return }
         do { _ = try await loadWeekPlan(quiet: true) } catch {
             // With no AI key the rules' own week stands, which is the usual case; engines that didn't load are a fault.
             if error == .unavailable { Logger.workout.error("The plan engines didn't load when the rules changed") }
         }
         await rememberHomeWeek()
+        await scheduleNotifications()
     }
 
     /// For the week cache's key: the rules and each day's kind, so a change plans the week again.
@@ -132,21 +149,42 @@ extension AppModel {
     /// (for the week table and the reminders), and which days were planned (for the lighter fifth week).
     /// Called after the week is planned, and by the week's own checks (AppModel+HomeWeek.swift).
     func rememberHomeWeek() async {
+        guard await keepHomeWeek() else { return }
+        await fillHomeWeek()
+    }
+
+    /// Works the week out with the rules and keeps it, as `rememberHomeWeek` without filling in what each day holds.
+    /// With `onlyDay`, only that day of the kept week changes: the phone is locked, so the rest can't be worked out
+    /// with Apple Health. False when there is no week (rules off, or the engine couldn't say).
+    @discardableResult
+    func keepHomeWeek(onlyDay: String? = nil) async -> Bool {
         guard userRules.isOn, let rules = planRules,
-              let week = HomeWeek.from(engine: await rules.planContext(rows: memoryRows, now: now)["homeWeek"], madeOn: todayISO)
-        else { return }
+              var week = HomeWeek.from(engine: await rules.planContext(rows: memoryRows, now: now)["homeWeek"], madeOn: todayISO)
+        else { return false }
+        if let onlyDay, let kept = homeWeek {
+            guard let changed = week.day(onlyDay), let index = kept.days.firstIndex(where: { $0.day == onlyDay }) else { return false }
+            week = kept
+            week.days[index] = changed
+        }
         homeWeek = week
         week.save(to: settings)
-        var kept = homeFocus.filter { $0.key >= dayISO(offset: -Self.keptDays) }
+        keepFocusAndPlannedDays(of: week)
+        return true
+    }
+
+    /// What the kept week says beyond itself: each day's focus (for a missed day, a week back), the missed days passed
+    /// on, and the days planned (for the lighter fifth week).
+    private func keepFocusAndPlannedDays(of week: HomeWeek) {
+        var focus = homeFocus.filter { $0.key >= dayISO(offset: -Self.keptDays) }
         for day in week.days {
-            if let focus = day.focus { kept[day.day] = focus } else { kept.removeValue(forKey: day.day) }
+            if let worked = day.focus { focus[day.day] = worked } else { focus.removeValue(forKey: day.day) }
         }
-        settings.set(kept, forKey: Self.homeFocusKey)
+        settings.set(focus, forKey: Self.homeFocusKey)
         markCarried()
         var planned = PlannedDays.load(from: settings)
         planned.update(with: week, today: todayISO)
+        planned.settleLighterWeek(monday: thisMonday, done: trainedDays, calendar: calendar)
         planned.save(to: settings)
-        await fillHomeWeek()
     }
 
     /// The focus of each day at home in the last three days that had a session planned and no strength workout done,

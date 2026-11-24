@@ -6,7 +6,10 @@ import SwiftUI
 struct RainScene: View {
     let react: () -> Void
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
     @State private var demo = TourDemo()
     @State private var ask: RainAsk?
     /// The card as it is laid out, from the first frame.

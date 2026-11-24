@@ -8,7 +8,7 @@ import UserNotifications
 @MainActor
 struct WorkoutPageTests {
     private func rig(focus: String?, kind: DayKind = .home) throws -> AppRig {
-        let rig = try AppRig(history: AppRig.runs(days: 0, before: Clocks.morning))
+        let rig = try AppRig(.init(history: AppRig.runs(days: 0, before: Clocks.morning)))
         rig.model.userRules.isOn = true
         rig.model.dayKinds = [rig.model.todayISO: kind]
         if let focus { rig.settings.set([rig.model.todayISO: focus], forKey: AppModel.homeFocusKey) }
@@ -51,9 +51,20 @@ struct WorkoutPageTests {
 
     @Test func tooHardLeavesTheHarderOneOutFromNowOn() async throws {
         let rig = try rig(focus: "full")
-        await rig.model.leaveOut("push_up")
+        await rig.model.loadMovements()
+        let move = try #require(rig.model.movement("push_up"))
+        let item = WorkoutContent.Item(movementId: move.id, sets: move.dose.sets, reps: move.dose.reps, seconds: move.dose.seconds,
+                                       load: nil, rest: move.rest, isNew: false)
+        func pushUps() -> WorkoutProgress {
+            WorkoutProgress(day: rig.model.todayISO, content: WorkoutContent(focus: "full", minutes: 20, items: [item]),
+                            results: [WorkoutResult(movementId: move.id)], startedAt: rig.model.now)
+        }
+        var first = pushUps()
+        _ = rig.model.tooHard(&first, entered: item.low)
         #expect(rig.model.userRules.avoid.contains("push_up"))
-        await rig.model.leaveOut("push_up")
+        var again = pushUps()
+        _ = rig.model.tooHard(&again, entered: item.low)
+        await rig.model.pageSaved()
         #expect(rig.model.userRules.avoid.filter { $0 == "push_up" }.count == 1)
     }
 
@@ -82,17 +93,19 @@ struct WorkoutPageTests {
 
     @Test func aTapOnAReminderOpensTheWorkoutPage() async throws {
         let tap = UNNotificationDefaultActionIdentifier
-        #expect(Notifier.route(action: tap, day: "2026-11-19", kind: "now", move: nil) == .workout(.start, day: "2026-11-19"))
-        #expect(Notifier.route(action: tap, day: "2026-11-19", kind: "ask", move: nil) == .workout(.start, day: "2026-11-19"))
-        #expect(Notifier.route(action: tap, day: "2026-11-20", kind: "evening", move: nil) == .open)
-        #expect(Notifier.route(action: tap, day: nil, kind: nil, move: nil) == .open)
-        #expect(Notifier.route(action: "pick|18:10", day: "2026-11-19", kind: "evening", move: nil) == .pick("18:10", day: "2026-11-19"))
-        #expect(Notifier.route(action: "already_done", day: "2026-11-19", kind: "now", move: nil) == .workout(.alreadyDone, day: "2026-11-19"))
-        // Start on today's reminder asks Today to open the page; on another day's it doesn't.
+        #expect(Notifier.route(.init(action: tap, day: "2026-11-19", kind: "now", move: nil)) == .workout(.start, day: "2026-11-19"))
+        #expect(Notifier.route(.init(action: tap, day: "2026-11-19", kind: "ask", move: nil)) == .workout(.start, day: "2026-11-19"))
+        #expect(Notifier.route(.init(action: tap, day: "2026-11-20", kind: "evening", move: nil)) == .open)
+        #expect(Notifier.route(.init(action: tap, day: nil, kind: nil, move: nil)) == .open)
+        #expect(Notifier.route(.init(action: "pick|18:10", day: "2026-11-19", kind: "evening", move: nil)) == .pick("18:10", day: "2026-11-19"))
+        #expect(Notifier.route(.init(action: "already_done", day: "2026-11-19", kind: "now", move: nil)) == .workout(.alreadyDone, day: "2026-11-19"))
+        // Start on today's reminder opens the workout page; on another day's, the week table on that day.
         let rig = try rig(focus: "full")
         await rig.model.handleWorkoutAction(.start, day: "2026-11-20")
-        #expect(!rig.model.workoutRequested)
+        #expect(rig.model.workoutRoute == .week(day: "2026-11-20") && !rig.model.workoutRequested)
         await rig.model.handleWorkoutAction(.start, day: rig.model.todayISO)
-        #expect(rig.model.workoutRequested)
+        #expect(rig.model.workoutRoute == .session && rig.model.workoutRequested)
+        rig.model.workoutRequested = false
+        #expect(rig.model.workoutRoute == nil)
     }
 }

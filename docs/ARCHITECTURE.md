@@ -28,7 +28,7 @@ A sentence typed in Ask goes to the agent it belongs to. Requests to forget or d
 
 - A model proposes; code checks and executes.
 - Memory comes only from data, never from what was recommended.
-- Nothing is on the calendar until the person adds it, except moving an added workout out of the way of a new meeting, which can be undone and turned off.
+- Nothing is on the calendar until the person adds it. Code moves an added workout by itself: out of the way of a new meeting, which can be undone and turned off; and, on a day at home with no time picked, to the day's next time when a time passed twenty minutes ago without a start, as the reminder says (off with "Keep reminding me until I’ve trained" off, or once a time is picked).
 - Every suggestion names what it is based on, and only things that are true.
 - Forgetting deletes.
 

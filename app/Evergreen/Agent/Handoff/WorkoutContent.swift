@@ -36,7 +36,7 @@ struct WorkoutContent: Codable, Equatable, Sendable {
         /// "8–12 reps", "20–40 seconds", with "each side" when the movement has two.
         func target(sides: Int) -> String {
             let unit = isHold ? "seconds" : "reps"
-            return "\(low)–\(high) \(unit)" + (sides == 2 ? " each side" : "")
+            return "\(low)–\(high) \(unit)" + (sides == Movement.bothSides ? " each side" : "")
         }
     }
 }
@@ -70,6 +70,23 @@ struct Movement: Codable, Equatable, Sendable, Identifiable {
     struct Tempo: Codable, Equatable, Sendable { var down: Int; var hold: Int; var up: Int }
     struct Dose: Codable, Equatable, Sendable { var sets: Int; var reps: [Int]?; var seconds: [Int]? }
 
+    /// `sides` of a movement done on each side in turn.
+    static let bothSides = 2
+
+    /// One numbered step of a movement, told apart by its words.
+    struct Step: Equatable, Identifiable, Sendable {
+        var number: Int
+        var text: String
+        var id: String
+    }
+
+    /// The steps numbered from 1, each with an identity that stays when another step is added or removed.
+    var numberedSteps: [Step] {
+        zip(steps, TextIdentity.ids(steps)).enumerated().map { place, step in
+            Step(number: place + 1, text: step.0, id: step.1)
+        }
+    }
+
     var usesBackpack: Bool { equipment.contains("backpack") }
     /// "Down in 3 seconds, hold 1, up in 1." for a movement with a tempo.
     var tempoLine: String? {
@@ -96,10 +113,13 @@ enum BackpackWater {
         return "\(litres) \(unit) of water in the backpack" + (bottles(kg).map { " (\($0))" } ?? "")
     }
 
+    /// The big bottle, in litres: whole litres are said as these and at most one 1-litre bottle.
+    static let bigBottleLitres = 2
+
     /// Whole litres as 2-litre and 1-litre bottles; nil for a part litre or a single 1-litre bottle.
     static func bottles(_ kg: Double) -> String? {
-        guard kg >= 2, kg <= maxKg, kg == kg.rounded() else { return nil }
-        let twos = Int(kg) / 2, ones = Int(kg) % 2
+        guard kg >= Double(bigBottleLitres), kg <= maxKg, kg == kg.rounded() else { return nil }
+        let twos = Int(kg) / bigBottleLitres, ones = Int(kg) % bigBottleLitres
         let count = { (n: Int) in ["one", "two", "three", "four", "five", "six"][n - 1] }
         var parts = ["\(count(twos)) 2-litre bottle" + (twos == 1 ? "" : "s")]
         if ones == 1 { parts.append("one 1-litre bottle") }

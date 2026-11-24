@@ -11,7 +11,7 @@ export const SYSTEM = `You keep the long-term memory of ONE person for an app th
 Output ONLY a JSON object that matches the schema: {"proposals": [...]}. Return {"proposals": []} when nothing qualifies.
 
 WHAT IS WORTH KEEPING: what a planner can use next week and next month.
-- routine: a usual time for an activity, the usual weekly volume, the mix of activities, where they train (place.home: 8 weeks of workouts with none of a gym-equipment type)
+- routine: a usual time for an activity, the usual weekly volume, the mix of activities, where they train (place.home: the last 8 weeks of workouts hold none of a gym-equipment type: elliptical, stair climber, indoor rowing, indoor cycling or climbing)
 - body: the usual sleep and resting heart rate
 - load: the last 7 days against the usual week
 - response: how the person answers the plan, such as planned early sessions that are repeatedly not done

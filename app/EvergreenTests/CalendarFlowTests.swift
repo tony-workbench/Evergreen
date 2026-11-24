@@ -159,7 +159,7 @@ struct CalendarFlowTests {
     /// Four weeks of 7 AM runs behind the person and tomorrow's 7 AM run on the plan, with the clock stopped at `now`,
     /// answering without a model.
     static func seeded(now: Date = Clocks.morning) throws -> AppModel {
-        let rig = try AppRig(now: now, history: AppRig.runs(days: 28, before: now))
+        let rig = try AppRig(.init(now: now, history: AppRig.runs(days: 28, before: now)))
         try rig.plan(.run, id: "ui-test-run", day: 1, hour: 7)
         rig.model.askWithoutModel = true
         return rig.model
@@ -266,7 +266,7 @@ struct CalendarFlowTests {
     // MARK: What a real person would lose
 
     @Test(arguments: Clocks.all) func whatWasAddedIsStillThereTheNextDay(now: Date) async throws {
-        let rig = try AppRig(now: now, history: AppRig.runs(days: 28, before: now))
+        let rig = try AppRig(.init(now: now, history: AppRig.runs(days: 28, before: now)))
         let model = rig.model
         let run = try rig.plan(.run, id: "ui-test-run", day: 1, hour: 7)
         // A workout for three days after that, added today.
@@ -274,8 +274,9 @@ struct CalendarFlowTests {
         // The app is opened again the next day: the same store, a new model.
         try rig.container.mainContext.save()
         let tomorrow = now.addingTimeInterval(86_400), today = model.storyDay
-        let next = AppModel(context: rig.container.mainContext, memory: nil, health: HealthHistory(), calendar: Fixture.calendar, clock: { tomorrow },
-                            calendarSync: RecordingCalendar(access: .off), healthReader: ScriptedHealth())
+        let next = AppModel(context: rig.container.mainContext, setup: AppModel.Setup(
+            memory: nil, health: HealthHistory(), calendar: Fixture.calendar, clock: { tomorrow },
+            calendarSync: RecordingCalendar(access: .off), healthReader: ScriptedHealth()))
         #expect(next.storyDay == Fixture.calendar.startOfDay(for: tomorrow) && next.storyDay > today)
         #expect(next.plan.map(\.id).contains("thu") && next.plan.map(\.id).contains(run.id))
         #expect(next.appliedActions.count == model.appliedActions.count)

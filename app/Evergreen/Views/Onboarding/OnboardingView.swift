@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Onboarding: the tour, the three permissions on one page, "How you train"
+/// Onboarding: the tour, the four permissions on one page, "How you train"
 /// (five skippable questions that become the person's rules), what Evergreen
 /// noticed (worked out on the phone, the pay-off for the permissions), then
 /// "Connect your AI" (which can be put off), and straight into Today, where
@@ -9,8 +9,12 @@ struct OnboardingView: View {
     enum Step { case tour, permissions, howYouTrain, noticed, connect }
 
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
     @State private var step = Step.tour
+    /// How long one step takes to slide in.
+    private static let stepSeconds = 0.25
 
     var body: some View {
         Group {
@@ -31,6 +35,6 @@ struct OnboardingView: View {
                     .transition(.move(edge: .trailing))
             }
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: step)
+        .animation(reduceMotion ? nil : .easeInOut(duration: Self.stepSeconds), value: step)
     }
 }

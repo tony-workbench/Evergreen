@@ -42,6 +42,7 @@ Once a day a model proposes one operation per memory (ADD, NOOP, MERGE, SUPERSED
 | Slot | What | Since | Sure? |
 | --- | --- | --- | --- |
 | response.run.early | 2 of 3 planned run sessions before 08:00 were not done in the last 28 days. | 2026-11-13 | confirmed |
+| routine.training_place | You train at home, without gym equipment. | 2026-10-21 | likely |
 | routine.mix | Workouts by activity over the last 28 days: running 20, strength training 4, yoga 2. | 2026-11-01 | likely |
 | routine.weekly_volume | Weekly average over 4 weeks: 6.5 workouts and 323 workout minutes. | 2026-11-01 | likely |
 | routine.run.thu_06 | Running on Thu between 06:00 and 07:00 in 3 of the last 4 weeks. | 2026-11-12 | likely |

@@ -18,7 +18,7 @@ struct StopNoteRow: View {
             Button("Undo") { Task { await model.undoDecline(answerKey) } }
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(Theme.text)
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: TapTargetButtonStyle.minSide, minHeight: TapTargetButtonStyle.minSide)
                 .accessibilityHint("Plans around it again")
         }
         .padding(.vertical, Theme.xs)

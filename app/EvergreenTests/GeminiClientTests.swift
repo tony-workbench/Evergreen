@@ -210,9 +210,14 @@ struct GeminiClientTests {
         #expect(AIModels.model(defaults: defaults) == "gemini-3.8-flash")
     }
 
-    @MainActor @Test func checkConnectionSavesOnlyAKeyGoogleAcceptsAndSaysWhatWentWrong() async throws {
+    /// A model with a key store of its own, nothing saved in it, and that store.
+    @MainActor private func unconnected() throws -> (model: AppModel, store: AIKey) {
         let store = AIKey(account: "test-key-\(UUID().uuidString)")
-        let model = AppModel(context: try SuggestionTests.container().mainContext, memory: nil, aiKey: store)
+        return (AppModel(context: try SuggestionTests.container().mainContext, setup: AppModel.Setup(memory: nil, aiKey: store)), store)
+    }
+
+    @MainActor @Test func checkConnectionSavesNoKeyGoogleRefusesAndSaysWhatWentWrong() async throws {
+        let (model, store) = try unconnected()
         #expect(!model.aiConnected && model.languageModel == nil)
         #expect(await model.connectAI(key: " ") == "Paste your key first.")
 
@@ -224,7 +229,10 @@ struct GeminiClientTests {
             #expect(problem.contains(said) && !problem.contains(Self.key) && !problem.contains("9f3a"))
             #expect(!model.aiConnected && store.load() == nil && model.aiModels.isEmpty)
         }
+    }
 
+    @MainActor @Test func checkConnectionSavesAKeyGoogleAcceptsAndCountsItsModels() async throws {
+        let (model, store) = try unconnected()
         model.aiSession = FakeAPI.session([.init(status: 200, body: Self.models)])
         #expect(await model.connectAI(key: "  \(Self.key)\n") == nil)
         #expect(model.aiConnected && model.aiKeyTail == "…9f3a" && store.load() == Self.key)
@@ -236,7 +244,13 @@ struct GeminiClientTests {
         #expect(FakeAPI.requests.count == 1 && sent.request.url?.absoluteString == "https://generativelanguage.googleapis.com/v1beta/models")
         #expect(sent.request.value(forHTTPHeaderField: "x-goog-api-key") == Self.key)
         #expect(model.languageModel is GeminiClient && model.activity.first?.contains("AI connected: 2 models") == true)
+        model.disconnectAI()
+    }
 
+    @MainActor @Test func checkingAgainKeepsTheSavedKeyAndDisconnectingForgetsIt() async throws {
+        let (model, store) = try unconnected()
+        model.aiSession = FakeAPI.session([.init(status: 200, body: Self.models)])
+        #expect(await model.connectAI(key: Self.key) == nil)
         // Checking again with an empty field checks the saved key and keeps it.
         model.aiSession = FakeAPI.session([.init(status: 200, body: Self.models)])
         #expect(await model.connectAI(key: "") == nil && store.load() == Self.key)
@@ -292,8 +306,8 @@ struct AutomaticTests {
     @Test func callsAndTokensAreCountedPerDay() async {
         let usage = AIUsage(defaults: nil)
         let day = Date(timeIntervalSince1970: 1_800_000_000)
-        await usage.count(input: 100, output: 20, now: day)
-        await usage.count(input: 50, output: 5, now: day.addingTimeInterval(60))
+        await usage.count(.init(input: 100, output: 20), now: day)
+        await usage.count(.init(input: 50, output: 5), now: day.addingTimeInterval(60))
         let counted = await usage.day(now: day.addingTimeInterval(120))
         #expect(counted.calls == 2 && counted.input == 150 && counted.output == 25)
         // The next day starts again.

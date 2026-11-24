@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// How much the AI was used today: calls, and tokens in and out. Kept in
 /// memory and in the app's defaults, and started again each local day.
@@ -18,16 +19,25 @@ actor AIUsage {
 
     init(defaults: UserDefaults? = .standard) {
         self.defaults = defaults
-        today = defaults?.data(forKey: Self.storeKey).flatMap { try? JSONDecoder().decode(Day.self, from: $0) } ?? Day()
+        today = defaults?.data(forKey: Self.storeKey).flatMap { data in
+            Logger.agent.attempt("Today's AI use couldn't be read; it counts from zero") { try JSONDecoder().decode(Day.self, from: data) }
+        } ?? Day()
     }
 
-    func count(input: Int, output: Int, thinking: Int = 0, now: Date = Date()) {
+    /// The tokens of one call: sent, answered, and spent thinking.
+    struct Tokens: Sendable {
+        var input: Int
+        var output: Int
+        var thinking = 0
+    }
+
+    func count(_ tokens: Tokens, now: Date = Date()) {
         roll(now)
         today.calls += 1
-        today.input += input
-        today.output += output
-        today.thinking += thinking
-        defaults?.set(try? JSONEncoder().encode(today), forKey: Self.storeKey)
+        today.input += tokens.input
+        today.output += tokens.output
+        today.thinking += tokens.thinking
+        defaults?.set(Logger.agent.attempt("Today's AI use couldn't be kept") { try JSONEncoder().encode(today) }, forKey: Self.storeKey)
     }
 
     func day(now: Date = Date()) -> Day {

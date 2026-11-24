@@ -6,7 +6,9 @@ import SwiftUI
 /// the one drawn thing on Today; everything around it is type.
 struct WeekPicture: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
     @State private var why: WeekPlan.Session?
     /// Show only the first few blocks in time order (the tour drops them in one by one).
     var limit: Int? = nil

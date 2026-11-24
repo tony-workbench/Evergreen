@@ -6,6 +6,8 @@ import { planContext, planBrief, checkPlan } from '../src/plan.mjs';
 import { recommendWeek } from '../src/workouts.mjs';
 import { readRules } from '../src/rules.mjs';
 import { readFileSync } from 'node:fs';
+import { weekContent, movementOf } from '../src/content.mjs';
+import { FOCUS_WORDS } from '../src/homeweek.mjs';
 
 const MONDAY = '2026-11-30';
 const at = (day, time) => `${day}T${time}:00-08:00`;
@@ -137,6 +139,55 @@ test('the split stays as planned later in the week: Tuesday is still upper body 
 test('a day at home that turns into a day out passes its focus on to the next day at home', () => {
   const out = base({ now: at(DAYS[1], '08:00'), queue: { [DAYS[1]]: 'upper', [DAYS[3]]: 'lower', [DAYS[4]]: 'upper' }, dayKinds: { [DAYS[1]]: 'out' } });
   assert.deepEqual(weekOf(out).filter((d) => d.focus && d.day <= DAYS[6]).map((d) => d.focus), ['upper', 'lower']);
+});
+
+// What the rules engine (recommendWeek) planned: each day at home's focus, from its own homeWeek and from the reason it gives.
+const engineFocus = (ctx) => {
+  const week = recommendWeek(ctx);
+  const byDay = Object.fromEntries(week.homeWeek.days.filter((d) => d.focus).map((d) => [d.day, d.focus]));
+  for (const s of week.sessions) assert.match(s.reason, new RegExp(`${FOCUS_WORDS[byDay[s.day]]} strength session`), s.reason);
+  return week.sessions.map((s) => [s.day, byDay[s.day]]);
+};
+const contextFocus = (ctx) => weekOf(ctx).filter((d) => d.focus && d.day <= DAYS[6]).map((d) => [d.day, d.focus]);
+const TUESDAY_QUEUE = { [DAYS[1]]: 'upper', [DAYS[3]]: 'lower', [DAYS[4]]: 'upper' };
+
+test('the rules engine follows the queue as planContext does: Tuesday out moves upper body to Thursday', () => {
+  const ctx = base({ now: at(DAYS[1], '08:00'), queue: TUESDAY_QUEUE, dayKinds: { [DAYS[1]]: 'out' } });
+  assert.deepEqual(contextFocus(ctx), [[DAYS[3], 'upper'], [DAYS[4], 'lower']]);
+  assert.deepEqual(engineFocus(ctx), [[DAYS[3], 'upper'], [DAYS[4], 'lower']]);
+});
+
+test('the rules engine and planContext agree with carry and queue given together, and agree again on the next run', () => {
+  // Monday's lower body was missed; the queue still holds what Tuesday to Friday were planned to work.
+  const first = base({ now: at(DAYS[1], '08:00'), carry: ['lower'], queue: TUESDAY_QUEUE });
+  const planned = [[DAYS[1], 'lower'], [DAYS[3], 'upper'], [DAYS[4], 'lower']];
+  assert.deepEqual(contextFocus(first), planned);
+  assert.deepEqual(engineFocus(first), planned);
+  // The app keeps what was planned as the new queue and passes carry on once: the next run plans the same split.
+  const again = base({ now: at(DAYS[1], '10:00'), carry: [], queue: Object.fromEntries(planned) });
+  assert.deepEqual(contextFocus(again), planned);
+  assert.deepEqual(engineFocus(again), planned);
+});
+
+test('the rules engine keeps a done session to today, as planContext does', () => {
+  const ctx = base({ now: at(DAYS[1], '21:30'), queue: TUESDAY_QUEUE, doneToday: true });
+  assert.deepEqual(engineFocus(ctx), [[DAYS[3], 'lower'], [DAYS[4], 'upper']]);
+  assert.deepEqual(contextFocus(ctx), engineFocus(ctx));
+});
+
+test('a day out pushes its session to the next day at home: Thursday does what Tuesday would have done', () => {
+  const rules = { equipment: ['backpack', 'chair', 'table', 'sofa', 'book', 'step'] };
+  const contentOf = (ctx) => {
+    const days = recommendWeek({ ...ctx, rules }).homeWeek.days.filter((d) => d.focus);
+    const week = weekContent({ rules, sessions: days.map((d) => ({ sessionId: d.day, focus: d.focus })) });
+    return Object.fromEntries(week.contents.map((c) => [c.sessionId, c.items.map((i) => i.movementId)]));
+  };
+  const home = contentOf(base({ now: at(DAYS[1], '08:00'), queue: TUESDAY_QUEUE }));
+  const out = contentOf(base({ now: at(DAYS[1], '08:00'), queue: TUESDAY_QUEUE, dayKinds: { [DAYS[1]]: 'out' } }));
+  assert.equal(out[DAYS[1]], undefined, 'nothing on the day out');
+  assert.deepEqual(out[DAYS[3]].filter((id) => movementOf(id).pattern !== 'core'), home[DAYS[1]].filter((id) => movementOf(id).pattern !== 'core'));
+  assert.deepEqual(out[DAYS[4]].filter((id) => movementOf(id).pattern !== 'core'), home[DAYS[3]].filter((id) => movementOf(id).pattern !== 'core'));
+  assert.ok(out[DAYS[3]].every((id) => ['upper_push', 'upper_pull', 'core'].includes(movementOf(id).pattern)), out[DAYS[3]].join());
 });
 
 test('a session done today keeps its focus to today and passes nothing on to the days after it', () => {

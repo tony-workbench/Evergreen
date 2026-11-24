@@ -50,7 +50,7 @@
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
 			</array>
 		</dict>
-		<!-- To Open-Meteo, with rain check on: the location rounded to about a kilometre, with no account. -->
+		<!-- To Open-Meteo, with rain check on: the location rounded to about a kilometre, with no account; and to Apple Maps, when rain is due on an outdoor workout, the same rounded location to find gyms nearby. -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeCoarseLocation</string>

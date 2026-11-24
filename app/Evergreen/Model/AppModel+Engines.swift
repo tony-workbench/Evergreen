@@ -65,26 +65,37 @@ extension AppModel {
     func write(_ blocks: [PreviewBlock]) -> Bool {
         guard !blocks.isEmpty else { return false }
         for block in blocks {
-            guard let start = block.start.date, let end = block.end.date else { return false }
-            let id = block.sessionId ?? block.id
-            let existing = plan.first { $0.id == id || $0.id == block.id }
-            switch block.status {
-            case "cancelled":
-                // Off the plan altogether, wherever it had been moved to.
-                if let existing { remove(existing) }
-            case "moved", "resized":
-                // The block's own start and end: a resize changes the length.
-                if let existing { move(existing, to: start, end: end) }
-            default:
-                guard block.activity != .rest, existing == nil else { continue }
-                // An activity outside the list is kept by its own name, so the calendar and the rows can say it.
-                let named = block.activity == .other ? Activity.label(block.title) : nil
-                let slot = Slot(start: start, end: end, activityType: named ?? block.activity.healthType)
-                store.add(AgentAction(id: id, kind: .addWorkout, title: "Added a \(slot.minutes)-minute \(Activity.noun(slot))",
-                                      planItemId: id, after: slot, reason: block.reason, createdAt: now))
-            }
+            guard placeConfirmed(block) else { return false }
         }
         save()
         return true
+    }
+
+    /// One confirmed block on the plan; false when its times can't be read.
+    private func placeConfirmed(_ block: PreviewBlock) -> Bool {
+        guard let start = block.start.date, let end = block.end.date else { return false }
+        let id = block.sessionId ?? block.id
+        let existing = plan.first { $0.id == id || $0.id == block.id }
+        switch block.status {
+        case "cancelled":
+            // Off the plan altogether, wherever it had been moved to.
+            if let existing { remove(existing) }
+        case "moved", "resized":
+            // The block's own start and end: a resize changes the length.
+            if let existing { move(existing, to: (start, end)) }
+        default:
+            guard block.activity != .rest, existing == nil else { return true }
+            addConfirmed(block, id: id, span: (start, end))
+        }
+        return true
+    }
+
+    /// A new block added like any agent action, so Undo works.
+    private func addConfirmed(_ block: PreviewBlock, id: String, span: (start: Date, end: Date)) {
+        // An activity outside the list is kept by its own name, so the calendar and the rows can say it.
+        let named = block.activity == .other ? Activity.label(block.title) : nil
+        let slot = Slot(start: span.start, end: span.end, activityType: named ?? block.activity.healthType)
+        store.add(AgentAction(id: id, kind: .addWorkout, title: "Added a \(slot.minutes)-minute \(Activity.noun(slot))",
+                              planItemId: id, after: slot, reason: block.reason, createdAt: now))
     }
 }

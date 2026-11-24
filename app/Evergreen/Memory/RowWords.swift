@@ -5,37 +5,58 @@ import Foundation
 enum RowWords {
     /// "You usually run Sunday around 8 AM."
     static func sentence(_ row: MemoryRow) -> String {
-        func number(_ name: String) -> Double? { row.data[name]?.number }
+        said(row) ?? row.statement
+    }
+
+    /// The row in the app's words; nil when its data can't be read.
+    private static func said(_ row: MemoryRow) -> String? {
         switch row.kind {
-        case "usual_slot":
-            guard let slot = slot(row) else { return row.statement }
-            return "You usually \(verb(slot.activity, label: row.data["label"]?.string)) \(PlainWords.weekdays[slot.weekday]) around \(PlainWords.clock(slot.hour))."
-        case "weekly_volume":
-            guard let count = number("workoutsPerWeek") else { return row.statement }
-            return "You do about \(count.formatted(.number.precision(.fractionLength(0...1)))) workouts a week."
-        case "load":
-            guard let ratio = number("ratioToUsual") else { return row.statement }
-            let percent = Int((abs(ratio - 1) * 100).rounded())
-            return percent < 5 ? "This week’s training is about your usual." : "This week’s training is \(percent)% \(ratio > 1 ? "above" : "below") your usual."
-        case "sleep":
-            guard let hours = number("hours7d") else { return row.statement }
-            return "You’ve slept about \(hours.formatted(.number.precision(.fractionLength(0...1)))) hours a night this week."
-        case "resting_hr":
-            guard let rate = number("bpm7d") else { return row.statement }
-            return "Your resting heart rate is \(Int(rate.rounded())) bpm this week."
-        case "training_place":
-            guard row.data["place"]?.string == "home" else { return row.statement }
-            return "You train at home, without gym equipment."
-        default:
-            // "Workouts by activity over the last 28 days: running 28, yoga 4." said as a person would.
-            guard let found = row.statement.wholeMatch(of: /Workouts by activity over the last (\d+) days: (.+)\./), let days = Int(found.1) else { return row.statement }
-            let parts = found.2.split(separator: ", ").compactMap { part -> String? in
-                guard let space = part.lastIndex(of: " "), let count = Int(part[part.index(after: space)...]) else { return nil }
-                return "\(part[..<space]) \(count) \(count == 1 ? "time" : "times")"
-            }
-            guard !parts.isEmpty else { return row.statement }
-            return "Your last \(days % 7 == 0 ? "\(days / 7) weeks" : "\(days) days"): \(parts.joined(separator: ", "))."
+        case "usual_slot": usualSlot(row)
+        case "weekly_volume": number(row, "workoutsPerWeek").map { "You do about \(oneDecimal($0)) workouts a week." }
+        case "load": number(row, "ratioToUsual").map(loadWords)
+        case "sleep": number(row, "hours7d").map { "You’ve slept about \(oneDecimal($0)) hours a night this week." }
+        case "resting_hr": number(row, "bpm7d").map { "Your resting heart rate is \(Int($0.rounded())) bpm this week." }
+        case "training_place": row.data["place"]?.string == "home" ? "You train at home, without gym equipment." : nil
+        default: workoutsByActivity(row.statement)
         }
+    }
+
+    private static func number(_ row: MemoryRow, _ name: String) -> Double? { row.data[name]?.number }
+
+    private static func oneDecimal(_ value: Double) -> String { value.formatted(.number.precision(.fractionLength(0...1))) }
+
+    private static func usualSlot(_ row: MemoryRow) -> String? {
+        guard let slot = slot(row) else { return nil }
+        let doing = verb(slot.activity, label: row.data["label"]?.string)
+        return "You usually \(doing) \(PlainWords.weekdays[slot.weekday]) around \(PlainWords.clock(slot.hour))."
+    }
+
+    /// A ratio as a percentage.
+    private static let percentScale = 100.0
+    /// Within this many percent of the usual, the week's training is "about your usual".
+    private static let usualLoadPercent = 5
+
+    private static func loadWords(_ ratio: Double) -> String {
+        let percent = Int((abs(ratio - 1) * percentScale).rounded())
+        return percent < usualLoadPercent
+            ? "This week’s training is about your usual."
+            : "This week’s training is \(percent)% \(ratio > 1 ? "above" : "below") your usual."
+    }
+
+    /// "Workouts by activity over the last 28 days: running 28, yoga 4." said as a person would.
+    private static func workoutsByActivity(_ statement: String) -> String? {
+        guard let found = statement.wholeMatch(of: /Workouts by activity over the last (\d+) days: (.+)\./),
+              let days = Int(found.1) else { return nil }
+        let parts = found.2.split(separator: ", ").compactMap(timesWords)
+        guard !parts.isEmpty else { return nil }
+        let week = ClockUnits.daysPerWeek
+        return "Your last \(days % week == 0 ? "\(days / week) weeks" : "\(days) days"): \(parts.joined(separator: ", "))."
+    }
+
+    /// "running 28" as "running 28 times"; nil for a part that doesn't end in a count.
+    private static func timesWords(_ part: Substring) -> String? {
+        guard let space = part.lastIndex(of: " "), let count = Int(part[part.index(after: space)...]) else { return nil }
+        return "\(part[..<space]) \(count) \(count == 1 ? "time" : "times")"
     }
 
     /// A few words for "I won't use …": "Sunday 8 AM runs", "Sleep".

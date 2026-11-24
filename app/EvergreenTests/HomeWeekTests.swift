@@ -63,15 +63,59 @@ struct HomeWeekTests {
         #expect(!gap.isLighterWeek(monday: "2026-11-30", done: all, calendar: calendar))
     }
 
+    /// Monday and Thursday planned and done in each of the weeks starting on `mondays`.
+    private func doneWeeks(_ mondays: [String]) -> PlannedDays {
+        let calendar = Fixture.calendar
+        return PlannedDays(days: mondays.flatMap { monday -> [String] in
+            let start = PlannedDays.date(monday, calendar: calendar)!
+            return [0, 3].map { PlannedDays.iso(calendar.date(byAdding: .day, value: $0, to: start)!, calendar: calendar) }
+        })
+    }
+
+    /// The Mondays of eleven weeks in a row, from 21 September 2026: week 1 is [0], week 5 is [4], week 10 is [9].
+    private var elevenMondays: [String] {
+        let start = PlannedDays.date("2026-09-21", calendar: Fixture.calendar)!
+        return (0..<11).map { PlannedDays.iso(Fixture.calendar.date(byAdding: .day, value: 7 * $0, to: start)!, calendar: Fixture.calendar) }
+    }
+
+    @Test func theLighterWeekComesAfterEveryFourFullOnesAndNeverCounts() {
+        let mondays = elevenMondays
+        // Every week planned and done, the lighter ones too.
+        let planned = doneWeeks(Array(mondays.prefix(10)))
+        let done = Set(planned.days)
+        let lighter = mondays.indices.filter { planned.isLighterWeek(monday: mondays[$0], done: done, calendar: Fixture.calendar) }
+        #expect(lighter.map { $0 + 1 } == [5, 10], "weeks 5 and 10 are lighter; week 6 counts again from one")
+        #expect(!planned.isLighterWeek(monday: mondays[5], done: done, calendar: Fixture.calendar), "week 6 is full again")
+    }
+
+    @Test func aKeptLighterWeekStillResetsTheCountOnceItsDaysHaveDroppedOff() {
+        let mondays = elevenMondays
+        // Only weeks 2 to 9 are still kept: without knowing week 5 was lighter, week 6 would look like the fifth full one.
+        var planned = doneWeeks(Array(mondays[1...8]))
+        let done = Set(planned.days)
+        #expect(planned.isLighterWeek(monday: mondays[5], done: done, calendar: Fixture.calendar))
+        planned.lighterWeeks = [mondays[4]]
+        #expect(!planned.isLighterWeek(monday: mondays[5], done: done, calendar: Fixture.calendar))
+        #expect(planned.isLighterWeek(monday: mondays[9], done: done, calendar: Fixture.calendar))
+        // Settling week 10 keeps it, so it stays lighter all week, done or not.
+        planned.settleLighterWeek(monday: mondays[9], done: done, calendar: Fixture.calendar)
+        #expect(planned.lighterWeeks == [mondays[4], mondays[9]])
+        #expect(planned.isLighterWeek(monday: mondays[9], done: [], calendar: Fixture.calendar))
+        // An older saved copy without lighter weeks still reads.
+        let old = #"{"days":["2026-11-02"]}"#
+        #expect(try JSONDecoder().decode(PlannedDays.self, from: Data(old.utf8)).lighterWeeks == nil)
+    }
+
     @Test func aHomeSessionsCalendarEntryListsItsMovements() {
         let strength = PlanItem(id: "home", slot: Slot(start: Fixture.at(17, 0), end: Fixture.at(17, 25), activityType: "TraditionalStrengthTraining"))
         let walk = PlanItem(id: "walk", slot: Slot(start: Fixture.at(12, 0), end: Fixture.at(12, 30), activityType: "Walking"))
         let day = LocalTime(Fixture.storyDay, in: Fixture.calendar.timeZone).day
         let notes = [day: "Sit to stand, wall push-up, glute bridge"]
-        let entries = CalendarEntry.entries(for: [strength, walk], storyDay: Fixture.storyDay, calendar: Fixture.calendar, notes: notes)
+        let entries = CalendarEntry.entries(.init(plan: [strength, walk], storyDay: Fixture.storyDay, calendar: Fixture.calendar,
+                                                         marks: CalendarEntry.Marks(notes: notes)))
         // The strength session gets the movements; the walk the same day does not.
         #expect(entries.map(\.notes).sorted() == ["Planned by Evergreen.", "Planned by Evergreen.\nSit to stand, wall push-up, glute bridge"])
-        #expect(CalendarEntry.entries(for: [strength], storyDay: Fixture.storyDay, calendar: Fixture.calendar).first?.notes == "Planned by Evergreen.")
+        #expect(CalendarEntry.entries(.init(plan: [strength], storyDay: Fixture.storyDay, calendar: Fixture.calendar)).first?.notes == "Planned by Evergreen.")
     }
 
     #if DEBUG

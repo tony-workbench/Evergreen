@@ -7,7 +7,10 @@ import SwiftUI
 struct RecentWeeksGrid: View {
     let weeks: RecentWeeks
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
     @State private var shown = false
 
     var body: some View {

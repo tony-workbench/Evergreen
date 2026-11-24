@@ -7,7 +7,7 @@ import Testing
 @MainActor
 struct NoKeyTests {
     @Test func withNoKeyNoModelIsAskedAndTodayAndAskSayToConnect() async throws {
-        let rig = try AppRig(connected: false)
+        let rig = try AppRig(.init(connected: false))
         let model = rig.model
         // If anything were sent it would arrive here.
         let network = ScriptedNetwork.session([])
@@ -34,7 +34,7 @@ struct NoKeyTests {
     }
 
     @Test func aModelThatCouldAnswerIsStillNotAskedForSuggestionsWithoutAKey() async throws {
-        let rig = try AppRig(connected: false)
+        let rig = try AppRig(.init(connected: false))
         let model = rig.model
         let reachable = ScriptedModel { _ in try! ScriptedModel.text(#"{"sessions":[],"summary":"A quiet week."}"#).get() }
         model.scriptedModel = reachable
@@ -48,7 +48,7 @@ struct NoKeyTests {
     }
 
     @Test func withNoKeyThePlanTheCalendarAndWhatIsRememberedStillWork() async throws {
-        let rig = try AppRig(connected: false)
+        let rig = try AppRig(.init(connected: false))
         let model = rig.model, calendar = rig.calendar
         await model.tick()
         // What is remembered is still there to read.

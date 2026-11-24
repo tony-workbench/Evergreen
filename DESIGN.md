@@ -56,7 +56,7 @@ components:
     textColor: "{colors.on-accent}"
     rounded: "{rounded.md}"
   button-ghost:
-    borderColor: "{colors.rule}"
+    borderColor: "{colors.text-muted}"
     textColor: "{colors.text}"
     rounded: "{rounded.md}"
   badge:
@@ -85,7 +85,7 @@ components:
 
 **Strategy:** Restrained. One accent means "the agent did this"; neutrals carry a slight green tint derived from it.
 **Light or dark:** light by default; dark mode keeps the same hierarchy with a lighter accent (7.7:1 on dark card), not an inversion.
-Warning is used only for the offline label; error only for real failures. Every text pair is 4.5:1 or better.
+Warning marks what the person should know about or act on (a problem with an answer or a save, a destructive choice, a strong soreness note); the offline line is a muted footnote with a crossed-out Wi-Fi symbol, not a warning; error only for real failures. Every text pair is 4.5:1 or better.
 
 ## Typography
 
@@ -93,7 +93,7 @@ General Sans (Fontshare, ITF Free Font License, 12 static styles + variable) is 
 
 ## Layout
 
-iPhone portrait only. Single column on an 8pt grid, 16pt side margins, 24pt between sections, generous white space. One text hierarchy: title, body, muted footnote; numbers are tabular everywhere. Onboarding: the tour (four scenes) → Permissions (three Allow rows on one page) → What I noticed (worked out on the phone, no key needed) → Connect your AI ("Connect your key and I’ll plan your week."; "Not now" is allowed) → Today, with the first week being planned. Today: date → the hero (the top suggestion and why) → "More for your week" → the week strip with the buddy → "On your calendar" rows → a quiet "What I remember" link → "Ask Evergreen" pinned at the bottom; a gear at the top right opens Settings. Sheets (week plan, Why, What I remember) use the same column: a footnote label, then rows under 1px rules.
+iPhone portrait only. Single column on an 8pt grid, 16pt side margins, 24pt between sections, generous white space. One text hierarchy: title, body, muted footnote; numbers are tabular everywhere. Onboarding: the tour (four scenes) → Permissions (four Allow rows on one page: Calendar, Health, Notifications, Screen Time) → What I noticed (worked out on the phone, no key needed) → Connect your AI ("Connect your key and I’ll plan your week."; "Not now" is allowed) → Today, with the first week being planned. Today: date → the hero (the top suggestion and why) → "More for your week" → the week strip with the buddy → "On your calendar" rows → a quiet "What I remember" link → "Ask Evergreen" pinned at the bottom; a gear at the top right opens Settings. Sheets (week plan, Why, What I remember) use the same column: a footnote label, then rows under 1px rules.
 
 ## Elevation & Depth
 
@@ -129,7 +129,7 @@ Nothing is elevated. The agent card is the card colour with a 1px rule border in
 - **Ask Evergreen:** one field pinned to the bottom of Today under a 1px rule, with a round accent send button. Its placeholder goes through three examples ("Find me 45 minutes to run tonight", "Move Sunday’s run to the afternoon", "What do you remember about me?"). The answer is one card in the hero slot: a small muted label for the agent that answered ("Calendar", "Plan", "Memory"), the answer in body text, and Done. While it works the buddy walks beside "Working on it…". A failure is one plain sentence and never mentions the key.
 - **Words:** nothing the person reads says planner, memory agent, load cap, readiness or a file name. Reasons and the week's summary from the engines are rewritten in plain words (`PlainWords`).
 - **Why:** each step of the trail is a footnote label under a 1px rule, then body text. No timeline marks, no boxes around passages.
-- **Buttons:** primary = solid accent, ghost = 1px rule; both 48pt tall; text buttons have a 44pt target; focus ring is 2px accent.
+- **Buttons:** primary = solid accent, ghost = a 1px outline in the muted text colour (at least 3:1 against the surface and cards in both modes; the rule colour is only for lines between rows); both 48pt tall, and their words wrap at large text sizes instead of running out of the button. The main buttons of a day at home (Today's "Start today's workout", "Done with this set" and the other main buttons of the workout page) are 56pt and pinned at the bottom in reach of the thumb, over the content that scrolls behind them. Text buttons have a 44pt target; focus ring is 2px accent.
 - **Badge:** "Moved", accent outline.
 - **A workout's name:** one mapping (`Activity`) for the calendar entry, the week picture, the rows and the notifications: Run, Long run (a run of an hour or more), Walk, Strength, Yoga, Ride, Swim, Stretch, Elliptical; an activity outside the list goes by its own name, else "Workout"; a rest day is never written to the calendar.
 - **Forgetting by asking:** a sentence that names a day ("forget yesterday", "wipe 2026-11-21", "the 21st") gets the card for that day alone, "Forget Saturday, November 21?", with what is deleted said in full; everything is offered only when the sentence names no day and nothing narrower; a sentence that can't be placed gets "Forget one day, or everything?" with Keep (filled), "One day" (opens What I remember) and "Everything" (asks once more). Nothing is deleted from a sentence.
@@ -176,3 +176,4 @@ Nothing is elevated. The agent card is the card colour with a 1px rule border in
 | 2026-11-21 | Real triggers only | Rain comes from the forecast, shoe wear from running distance in Apple Health, a moved workout from the real calendar |
 | 2026-11-22 | Safe choice first, no waiting on memory | Launch is the surface colour, the preview block holds only its time, the empty What I remember says what will show up, "Keep" is the default on every destructive question, and the week shows before the day's memory update |
 | 2026-11-22 | Nothing unchecked is shown | Every week shown passes the plan check: the AI's, the rules' own, and the starter walks, which shrink to what passes |
+| 2026-11-24 | Controls you can see and reach mid-workout | A secondary button's outline is drawn in the muted text colour, at least 3:1 against the surface, since the rule colour (about 1.2:1) is too faint for a control; button words wrap at large text sizes; the main buttons of a day at home are 56pt and pinned at the bottom in reach of the thumb. Lock-screen notifications never name a calendar event |

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Any JSON value: tool schemas, tool inputs and the model's content blocks
 /// are passed around as these, and go over the wire unchanged.
@@ -12,6 +13,7 @@ enum JSONValue: Codable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
+        // Each `try?` asks whether the value is of that type; another type is the next question, not an error.
         if container.decodeNil() {
             self = .null
         } else if let value = try? container.decode(Bool.self) {
@@ -51,16 +53,22 @@ enum JSONValue: Codable, Equatable, Sendable {
     var array: [JSONValue]? { if case .array(let value) = self { return value } else { return nil } }
     var object: [String: JSONValue]? { if case .object(let value) = self { return value } else { return nil } }
 
-    /// Parses JSON text; nil when it isn't JSON.
+    /// Parses JSON text; nil when it isn't JSON (noted at debug level: callers try text that may not be JSON).
     static func parse(_ text: String) -> JSONValue? {
-        try? JSONDecoder().decode(JSONValue.self, from: Data(text.utf8))
+        do {
+            return try JSONDecoder().decode(JSONValue.self, from: Data(text.utf8))
+        } catch {
+            Logger.agent.debug("Text that isn't JSON: \(String(describing: error), privacy: .public)")
+            return nil
+        }
     }
 
     /// Compact JSON text with sorted keys.
     var text: String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        return (try? encoder.encode(self)).map { String(decoding: $0, as: UTF8.self) } ?? "null"
+        return Logger.agent.attempt("JSON couldn't be written as text") { try encoder.encode(self) }
+            .map { String(decoding: $0, as: UTF8.self) } ?? "null"
     }
 }
 

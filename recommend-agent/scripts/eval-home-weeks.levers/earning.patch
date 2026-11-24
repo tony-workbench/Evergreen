@@ -1,0 +1,92 @@
+diff --git a/src/content.mjs b/src/content.mjs
+--- a/src/content.mjs
++++ b/src/content.mjs
+@@ -74,7 +74,7 @@
+   if (!Array.isArray(raw)) throw new InputError('bad_content');
+   return raw.map((h) => {
+     if (!h || typeof h.movementId !== 'string' || !Array.isArray(h.sets) || !h.sets.every((n) => Number.isFinite(n) && n >= 0)) throw new InputError('bad_content');
+-    return { movementId: h.movementId, day: String(h.day ?? ''), sets: h.sets, load: Number.isFinite(h.load) ? h.load : null, slow: h.slow === true };
++    return { movementId: h.movementId, day: String(h.day ?? ''), sets: h.sets, load: Number.isFinite(h.load) ? h.load : null, slow: h.slow === true, tooHard: h.tooHard === true };
+   }).sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+ }
+ 
+@@ -82,23 +82,41 @@
+ const top = (m) => (m.dose.reps ?? m.dose.seconds)[1];
+ const timesOf = (history, id) => history.filter((h) => h.movementId === id);
+ const atTop = (m, t) => t.sets.length >= m.dose.sets && t.sets.every((n) => n >= top(m));
+-const toppedLastTime = (history, m) => { const last = timesOf(history, m.id).at(-1); return Boolean(last) && atTop(m, last); };
++/** A session that counts toward the next step: every set at the top, and "Too hard" not pressed. */
++const counts = (m, t) => !t.tooHard && atTop(m, t);
++const lastTwoCount = (m, times) => times.length >= 2 && times.slice(-2).every((t) => counts(m, t));
++const countedLastTime = (history, m) => { const last = timesOf(history, m.id).at(-1); return Boolean(last) && counts(m, last); };
+ 
+-/** Done every set at the top of the range in each of the last two times. */
++/** The last two sessions of this movement both count: every set at the top, "Too hard" not pressed. */
+ export function mastered(history, id) {
+-  const m = movementOf(id);
+-  const times = timesOf(history, id).slice(-2);
+-  return times.length === 2 && times.every((t) => atTop(m, t));
++  return lastTwoCount(movementOf(id), timesOf(history, id));
++}
++
++// Where in a movement's own sessions the slow step was finished (the second of two slow sessions in a row that count), or -1.
++function slowDoneAt(times, m) {
++  for (let k = 1; k < times.length; k += 1) if (times[k - 1].slow && times[k].slow && counts(m, times[k - 1]) && counts(m, times[k])) return k;
++  return -1;
+ }
+ 
+-/** The slow step is behind this movement: it has no tempo to slow, or a session done slow had every set at the top. */
+-export const slowStepDone = (history, m) => !m.tempo || timesOf(history, m.id).some((t) => t.slow && atTop(m, t));
++/** The slow step is behind this movement: it has no tempo to slow, or two slow sessions in a row counted. */
++export const slowStepDone = (history, m) => !m.tempo || slowDoneAt(timesOf(history, m.id), m) >= 0;
+ 
+-/** The next session of this movement is the slow step: topped at the usual tempo, or slow last time and not topped yet. */
++/** The next session of this movement is the slow step: two sessions in a row counted, or it is slow already and not done. */
+ export function nextIsSlow(history, m) {
+   if (slowStepDone(history, m)) return false;
+-  const last = timesOf(history, m.id).at(-1);
+-  return Boolean(last) && (last.slow || atTop(m, last));
++  const times = timesOf(history, m.id);
++  return times.some((t) => t.slow) || lastTwoCount(m, times);
++}
++
++// The heavier step is behind a backpack movement: a session after the slow step carried more than the slow step did, or the
++// slow step was already at what a backpack holds. A movement with no backpack has no heavier step.
++function heavierStepDone(history, m) {
++  if (!m.equipment.includes('backpack')) return true;
++  const times = timesOf(history, m.id);
++  const k = m.tempo ? slowDoneAt(times, m) : 0;
++  if (k < 0 || !times.length) return false;
++  const base = times[k].load ?? m.load ?? 0;
++  return base >= LOAD_MAX_KG || times.slice(k + 1).some((t) => t.load !== null && t.load > base);
+ }
+ 
+ const doneBefore = (history, id) => history.some((h) => h.movementId === id);
+@@ -124,13 +142,15 @@
+   if (m.entry || rules.movements[m.id] === 'can' || doneBefore(history, m.id)) return true;
+   const before = m.easier && movementOf(m.easier);
+   if (!before) return true;
++  if (excluded(rules, before)) return false;
+   if (!owns(rules, before)) return !m.gated && earned(rules, history, before);
+   return passed(history, before);
+ }
+ 
+-// Every set at the top twice in a row, the slow step done, and a backpack movement as heavy as a backpack gets.
+-const passed = (history, m) => mastered(history, m.id) && slowStepDone(history, m) && fullyLoaded(history, m);
+-const fullyLoaded = (history, m) => !m.equipment.includes('backpack') || (lastLoad(history, m.id) ?? 0) >= LOAD_MAX_KG;
++const excluded = (rules, m) => rules.avoid.includes(m.id) || rules.movements[m.id] === 'cannot';
++
++// Two sessions in a row that count, after the slow step and, with a backpack, after at least one heavier step.
++const passed = (history, m) => mastered(history, m.id) && slowStepDone(history, m) && heavierStepDone(history, m);
+ 
+ /** Can the person do any movement of this pattern now (owned, not avoided or "can't do", earned)? */
+ export const patternUsable = (rules, history, pattern) => MOVEMENTS.some((m) => m.pattern === pattern && blockOf(rules, history, m.id) === null);
+@@ -182,7 +202,7 @@
+ function loadFor(m, history, loads) {
+   if (Number.isFinite(loads[m.id])) return clampLoad(loads[m.id]);
+   const last = lastLoad(history, m.id);
+-  const up = last !== null && toppedLastTime(history, m) && slowStepDone(history, m);
++  const up = last !== null && countedLastTime(history, m) && slowStepDone(history, m);
+   return clampLoad((last ?? m.load ?? 2) + (up ? LOAD_STEP_KG : 0));
+ }
+ 

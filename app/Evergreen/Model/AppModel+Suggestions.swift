@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// A suggestion's answer key, and the action that adds it to the plan.
 extension AppModel {
@@ -111,6 +112,12 @@ extension AppModel {
     @discardableResult
     func loadWeekPlan(fresh: Bool = false, quiet: Bool = false) async throws(PlanFailure) -> WeekPlan { try await week.loadWeekPlan(fresh: fresh, quiet: quiet) }
 
+    /// The week planned again where it can be; why it couldn't goes to the log.
+    @discardableResult
+    func planIfPossible(fresh: Bool = false, quiet: Bool = false) async -> WeekPlan? {
+        await week.planIfPossible(fresh: fresh, quiet: quiet)
+    }
+
     func checkedStarters(rows: [MemoryRow]) async -> [PlanSession] { await week.checkedStarters(rows: rows) }
 
     func starterSessions(minutes: Int) -> [PlanSession] { week.starterSessions(minutes: minutes) }
@@ -120,6 +127,11 @@ extension AppModel {
     var openSuggestions: [WeekPlan.Session] { week.openSuggestions }
 
     func suggestionState(_ session: WeekPlan.Session) -> SuggestionState { week.suggestionState(session) }
+
+    /// A plan's suggestions that have a time and are still open, in the plan's order.
+    func answerableSuggestions(in plan: WeekPlan) -> [WeekPlan.Session] {
+        plan.sessions.filter { $0.after != nil && suggestionState($0) == .open }
+    }
 
     func addToPlan(_ session: WeekPlan.Session) { week.addToPlan(session) }
 

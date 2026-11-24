@@ -1,0 +1,30 @@
+diff --git a/src/workouts.mjs b/src/workouts.mjs
+--- a/src/workouts.mjs
++++ b/src/workouts.mjs
+@@ -10,7 +10,7 @@
+ import { readHistory } from './history.mjs';
+ import { condition } from './condition.mjs';
+ import { readRules, readDayKinds } from './rules.mjs';
+-import { homeContext, homeWeek, homeWeekView, readDayOffsets, offOf, FOCUS, FOCUS_WORDS } from './homeweek.mjs';
++import { homeContext, homeWeek, homeWeekView, readDayOffsets, readQueue, offOf, FOCUS, FOCUS_WORDS } from './homeweek.mjs';
+ 
+ export const DAYS = 7;               // the week is 7 local days starting today
+ export const TODAY_LEAD_MIN = 60;    // a session today starts at least this long after now
+@@ -162,7 +162,7 @@
+   const carry = Array.isArray(a.carry) ? a.carry.filter((f) => FOCUS.includes(f)) : [];
+   return {
+     now, shoes, newPairArrives: day(a.newPairArrives), raceDate: day(a.raceDate), busy, memory: a.memory ?? null, history: a.history ?? null, stopped: a.stopped ?? null,
+-    rules: readRules(a.rules), dayKinds: readDayKinds(a.dayKinds), carry, offsets: readDayOffsets(a.dayOffsets),
++    rules: readRules(a.rules), dayKinds: readDayKinds(a.dayKinds), carry, offsets: readDayOffsets(a.dayOffsets), queue: readQueue(a.queue), doneToday: a.doneToday === true,
+   };
+ }
+ 
+@@ -170,7 +170,7 @@
+ 
+ /** With rules: one strength session on every day at home, at its first free time, and nothing on rest or out days. */
+ function homeBuild(req, base) {
+-  const h = homeContext({ now: req.now, calendar: req.busy, rules: req.rules, dayKinds: req.dayKinds, carry: req.carry, offsets: req.offsets });
++  const h = homeContext({ now: req.now, calendar: req.busy, rules: req.rules, dayKinds: req.dayKinds, carry: req.carry, queue: req.queue, doneToday: req.doneToday, offsets: req.offsets });
+   const week = homeWeek(h);
+   const minutes = req.rules.session.max;
+   const sessions = week.days.filter((d) => d.focus !== null).map((d) => {

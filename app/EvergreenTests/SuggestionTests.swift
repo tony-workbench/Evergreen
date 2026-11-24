@@ -26,8 +26,9 @@ struct SuggestionTests {
     /// The app's model with the clock stopped at `now` in a fixed time zone, a month of made-up history ending the day
     /// before, and no calendar or Apple Health behind it. The same `now` as the container's.
     static func model(_ container: ModelContainer, memory: MemoryEngine? = try? MemoryEngineTests.engine(), now: Date = Clocks.morning) -> AppModel {
-        let model = AppModel(context: container.mainContext, memory: memory, health: AppRig.month(endingBefore: now),
-                             calendar: Fixture.calendar, clock: { now }, calendarSync: RecordingCalendar(access: .off), healthReader: ScriptedHealth())
+        let model = AppModel(context: container.mainContext, setup: AppModel.Setup(
+            memory: memory, health: AppRig.month(endingBefore: now),
+            calendar: Fixture.calendar, clock: { now }, calendarSync: RecordingCalendar(access: .off), healthReader: ScriptedHealth()))
         model.unlocked = { true }
         return model
     }

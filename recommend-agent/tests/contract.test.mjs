@@ -119,7 +119,7 @@ test('the globals without a schema of their own answer { ok: true } in the share
 
 test('workoutContent, weekContent and proposedContent fit workout-content.schema.json, slow step included', { skip }, () => {
   const rules = { equipment: ['backpack', 'chair', 'table', 'sofa', 'book', 'step'] };
-  const history = [{ movementId: 'backpack_row', day: '2026-11-23', sets: [15, 15, 15], load: 4 }];
+  const history = ['2026-11-20', '2026-11-23'].map((day) => ({ movementId: 'backpack_row', day, sets: [15, 15, 15], load: 4 }));
   const one = call('workoutContent', { sessionId: 's1', focus: 'upper', rules, history });
   assert.ok(one.content.items.some((i) => i.slow === true));
   fits('workout-content', one.content, 'workoutContent');

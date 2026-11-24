@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 /// Settings › My rules: the rules the person set, kept as they said them. The
 /// planner never puts a session on a rest weekday or a day out, and puts one
 /// on every day at home with time for it. Changes are saved on Done and plan the week again.
+/// An answer that doesn't make sense is said beside it as soon as it is given, and Done waits until it does.
 struct MyRulesView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -13,103 +14,162 @@ struct MyRulesView: View {
     @State private var settingHome = false
     @State private var homeLine: String?
 
+    /// "Far from home" goes from 5 to 100 kilometres, 5 at a time.
+    private static let farRange: ClosedRange<Double> = 5...100
+    private static let farStep: Double = 5
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Toggle("Plan by my rules", isOn: $rules.isOn)
+                    Toggle("Plan by my rules", isOn: $rules.isOn).accessibilityIdentifier("rules.on")
                 } footer: {
                     Text("Off, the week follows the days you usually train. On, every day at home with time gets one session, and rest days and days out get none.")
                 }
-                if rules.isOn {
-                    Section("Never plan on") {
-                        WeekdayChips(selected: $rules.restWeekdays)
-                    }
-                    Section {
-                        LabeledContent("Days I go out", value: "No workout")
-                        LabeledContent("Days I'm home all day", value: "Always plan one")
-                    } footer: {
-                        Text("A day with an event somewhere other than home is a day out. So is a day you mark with “I’m going out today”.")
-                    }
-                    Section("Session length") {
-                        Stepper("Shortest \(rules.sessionMin) min", value: $rules.sessionMin, in: 10...rules.sessionMax, step: 5)
-                        Stepper("Longest \(rules.sessionMax) min", value: $rules.sessionMax, in: rules.sessionMin...90, step: 5)
-                    }
-                    Section {
-                        ClockPicker(title: "From", clock: $rules.windowFrom)
-                        ClockPicker(title: "Latest start", clock: $rules.windowTo)
-                        Toggle("Mornings too, from 06:00", isOn: $rules.mornings)
-                    } header: {
-                        Text("Plan between")
-                    }
-                    Section("Equipment") {
-                        ForEach(UserRules.Equipment.allCases) { thing in
-                            Toggle(thing.title, isOn: Binding(
-                                get: { rules.equipment.contains(thing) },
-                                set: { on in rules.equipment = UserRules.Equipment.allCases.filter { $0 == thing ? on : rules.equipment.contains($0) } }
-                            ))
-                        }
-                    }
-                    Section {
-                        NavigationLink {
-                            AvoidMovementsView(rules: $rules)
-                        } label: {
-                            LabeledContent("Movements to leave out", value: rules.avoid.isEmpty ? "None" : "\(rules.avoid.count)")
-                        }
-                    } footer: {
-                        Text("A movement you couldn’t do is marked and the easier one comes instead. It’s left out for good only if you pick it here.")
-                    }
-                    Section {
-                        Button(settingHome ? "Finding where you are…" : (rules.home == nil ? "Set my current location as home" : "Move home to where I am now")) {
-                            Task { await setHome() }
-                        }
-                        .disabled(settingHome)
-                        if let homeLine { Text(homeLine).font(.footnote).foregroundStyle(Theme.textMuted) }
-                        Stepper("Far from home: \(Int(rules.farKilometres)) km", value: $rules.farKilometres, in: 5...100, step: 5)
-                    } header: {
-                        Text("Home")
-                    } footer: {
-                        Text("Within 200 m is home. Opening the app this far from home makes today a day out. Home stays on this phone.")
-                    }
-                }
-                Section {
-                    Button("Import a profile…") { importing = true }
-                    if let importProblem { Text(importProblem).font(.footnote).foregroundStyle(Theme.warning) }
-                } footer: {
-                    Text("A file with your rules, made somewhere else and sent to this phone. It fills in these answers once.")
-                }
+                if rules.isOn { ruleSections }
+                importSection
             }
             .navigationTitle("My rules")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        let rules = rules
-                        Task { await model.saveRules(rules) }
-                        dismiss()
-                    }
-                    .disabled(!rules.isValid)
-                }
-            }
+            .toolbar { toolbar }
             .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in importProfile(result) }
             .onAppear { rules = model.userRules }
             .task { await model.loadMovements() }
         }
     }
 
+    @ViewBuilder private var ruleSections: some View {
+        restSection
+        Section {
+            LabeledContent("Days I go out", value: "No workout")
+            LabeledContent("Days I'm home all day", value: "Always plan one")
+        } footer: {
+            Text("A day with an event somewhere other than home is a day out. So is a day you mark with “I’m going out today”.")
+        }
+        lengthSection
+        hoursSection
+        equipmentSection
+        movementsSection
+        homeSection
+    }
+
+    @ToolbarContentBuilder private var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.accessibilityIdentifier("rules.cancel") }
+        ToolbarItem(placement: .confirmationAction) {
+            Button("Done") {
+                let rules = rules
+                Task { await model.saveRules(rules) }
+                dismiss()
+            }
+            .disabled(!rules.isValid)
+            .accessibilityHint(rules.isValid ? "Saves your rules and plans the week again" : "Put right what’s marked first")
+            .accessibilityIdentifier("rules.done")
+        }
+    }
+
+    // MARK: Sections
+
+    private var restSection: some View {
+        Section {
+            WeekdayChips(selected: $rules.restWeekdays)
+        } header: {
+            Text("Never plan on")
+        } footer: {
+            ProblemLines(problems: rules.shownProblems([.restDays]))
+        }
+    }
+
+    private var lengthSection: some View {
+        Section {
+            Stepper("Shortest \(rules.sessionMin) min", value: $rules.sessionMin,
+                    in: rules.shortestRange, step: UserRules.sessionStep)
+                .accessibilityIdentifier("rules.shortest")
+            Stepper("Longest \(rules.sessionMax) min", value: $rules.sessionMax,
+                    in: rules.longestRange, step: UserRules.sessionStep)
+                .accessibilityIdentifier("rules.longest")
+        } header: {
+            Text("Session length")
+        } footer: {
+            ProblemLines(problems: rules.shownProblems([.shortest, .lengths, .longest]))
+        }
+    }
+
+    private var hoursSection: some View {
+        Section {
+            ClockPicker(title: "From", clock: $rules.windowFrom).accessibilityIdentifier("rules.from")
+            ClockPicker(title: "Latest start", clock: $rules.windowTo).accessibilityIdentifier("rules.latestStart")
+            Toggle("Mornings too, from 06:00", isOn: $rules.mornings).accessibilityIdentifier("rules.mornings")
+        } header: {
+            Text("Plan between")
+        } footer: {
+            ProblemLines(problems: rules.shownProblems([.clock, .window]))
+        }
+    }
+
+    private var equipmentSection: some View {
+        Section("Equipment") {
+            ForEach(UserRules.Equipment.allCases) { thing in
+                Toggle(thing.title, isOn: Binding(get: { rules.has(thing) }, set: { rules.setEquipment(thing, on: $0) }))
+                    .accessibilityIdentifier("rules.equipment.\(thing.rawValue)")
+            }
+        }
+    }
+
+    private var movementsSection: some View {
+        Section {
+            NavigationLink {
+                AvoidMovementsView(rules: $rules)
+            } label: {
+                LabeledContent("Movements", value: rules.movementsSummary)
+            }
+            .accessibilityIdentifier("rules.movements")
+        } footer: {
+            VStack(alignment: .leading, spacing: Theme.xs) {
+                Text("Each movement is not tried yet, one you can do, or one you can’t do yet. One you can’t do never comes; the easier one comes instead. “Too hard” on the workout page marks it, and you can change it here.")
+                ProblemLines(problems: rules.shownProblems([.movements]))
+            }
+        }
+    }
+
+    private var homeSection: some View {
+        Section {
+            Button(settingHome ? "Finding where you are…" : (rules.home == nil ? "Set my current location as home" : "Move home to where I am now")) {
+                Task { await setHome() }
+            }
+            .disabled(settingHome)
+            .accessibilityIdentifier("rules.setHome")
+            if let homeLine { Text(homeLine).font(.footnote).foregroundStyle(Theme.textMuted) }
+            Stepper("Far from home: \(Int(rules.farKilometres)) km", value: $rules.farKilometres, in: Self.farRange, step: Self.farStep)
+                .accessibilityIdentifier("rules.far")
+        } header: {
+            Text("Home")
+        } footer: {
+            Text("Within 200 m is home. Opening the app this far from home makes today a day out. Home stays on this phone.")
+        }
+    }
+
+    private var importSection: some View {
+        Section {
+            Button("Import a profile…") { importing = true }
+                .accessibilityIdentifier("rules.import")
+            if let importProblem { Text(importProblem).font(.footnote).foregroundStyle(Theme.warning) }
+        } footer: {
+            Text("A file with your rules, made somewhere else and sent to this phone. It fills in these answers once.")
+        }
+    }
+
+    // MARK: Doing
+
+    /// What reading and checking the file gave (`AppModel.importProfile`): the new answers, or what to say.
     private func importProfile(_ result: Result<URL, Error>) {
-        guard case .success(let url) = result else { return }
-        let opened = url.startAccessingSecurityScopedResource()
-        defer { if opened { url.stopAccessingSecurityScopedResource() } }
-        do {
-            // Every movement the profile names has to be in the library; the library is read when this screen opens.
-            rules = try rules.importing(try Data(contentsOf: url), library: Set(model.movements.map(\.id)))
+        switch model.importProfile(from: result, onto: rules) {
+        case .imported(let imported)?:
+            rules = imported
             importProblem = nil
-        } catch UserRules.ImportError.outOfRange {
-            importProblem = "That profile has a value I can’t use, so nothing was changed."
-        } catch {
-            importProblem = "That file couldn’t be read as a profile, so nothing was changed."
+        case .problem(let words)?:
+            importProblem = words
+        case nil:
+            break
         }
     }
 
@@ -125,7 +185,24 @@ struct MyRulesView: View {
     }
 }
 
-/// Every movement, by what it works, to leave out for good or to clear a "can't do" mark.
+/// What is wrong with the answers just above (`UserRules.shownProblems`), said where they are, in the warning colour and
+/// with a sign so it isn't told by colour alone. Nothing when they make sense.
+struct ProblemLines: View {
+    let problems: [UserRules.Problem]
+
+    var body: some View {
+        ForEach(problems, id: \.words) { problem in
+            Label(problem.words, systemImage: "exclamationmark.triangle")
+                .font(.footnote)
+                .foregroundStyle(Theme.warning)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("rules.problem")
+        }
+    }
+}
+
+/// Every movement, by what it works: whether the person can do it (not tried yet, can, can't do yet) and whether to
+/// leave it out for good.
 struct AvoidMovementsView: View {
     @Binding var rules: UserRules
     @Environment(AppModel.self) private var model
@@ -139,31 +216,40 @@ struct AvoidMovementsView: View {
         List {
             if model.movements.isEmpty { Text("Reading the movements…").foregroundStyle(Theme.textMuted) }
             ForEach(Self.groups, id: \.pattern) { group in
-                let moves = model.movements.filter { $0.pattern == group.pattern }
+                let moves = model.movements(working: group.pattern)
                 if !moves.isEmpty {
                     Section(group.title) {
-                        ForEach(moves) { move in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Toggle(move.name, isOn: Binding(
-                                    get: { rules.avoid.contains(move.id) },
-                                    set: { on in rules.avoid = on ? (rules.avoid + [move.id]) : rules.avoid.filter { $0 != move.id } }
-                                ))
-                                if rules.movements[move.id] == .cannot {
-                                    HStack {
-                                        Text("Marked “can’t do yet”").font(.footnote).foregroundStyle(Theme.textMuted)
-                                        Spacer()
-                                        Button("Clear") { rules.movements[move.id] = nil }.font(.footnote)
-                                    }
-                                }
-                            }
-                            .frame(minHeight: 44)
-                        }
+                        ForEach(moves) { move in MovementRuleRow(move: move, rules: $rules) }
                     }
                 }
             }
         }
-        .navigationTitle("Leave out")
+        .navigationTitle("Movements")
         .task { await model.loadMovements() }
+    }
+}
+
+/// One movement in My rules: its state, which the person can change, and "Leave out".
+private struct MovementRuleRow: View {
+    let move: Movement
+    @Binding var rules: UserRules
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.xs) {
+            Picker(move.name, selection: Binding(
+                get: { rules.state(of: move.id) },
+                set: { rules.setState($0, of: move.id) }
+            )) {
+                ForEach(UserRules.MovementState.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.menu)
+            .frame(minHeight: TapTargetButtonStyle.minSide)
+            .accessibilityIdentifier("rules.movement.\(move.id)")
+            Toggle("Leave out", isOn: Binding(get: { rules.isLeftOut(move.id) }, set: { rules.setLeftOut(move.id, $0) }))
+                .accessibilityLabel("Leave out \(move.name)")
+                .frame(minHeight: TapTargetButtonStyle.minSide)
+                .accessibilityIdentifier("rules.leaveOut.\(move.id)")
+        }
     }
 }
 
@@ -173,20 +259,21 @@ struct WeekdayChips: View {
 
     var body: some View {
         HStack(spacing: Theme.sm) {
-            ForEach(0..<7, id: \.self) { day in
+            ForEach(UserRules.weekdays, id: \.self) { day in
                 let on = selected.contains(day)
                 Button {
-                    selected = on ? selected.filter { $0 != day } : (selected + [day]).sorted()
+                    selected = UserRules.toggling(day, in: selected)
                 } label: {
                     Text(UserRules.weekdayShort[day])
                         .font(.footnote.weight(.medium))
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .frame(maxWidth: .infinity, minHeight: TapTargetButtonStyle.minSide)
                         .background(on ? Theme.accent : Theme.card, in: RoundedRectangle(cornerRadius: Theme.radiusSmall))
                         .foregroundStyle(on ? Theme.onAccent : Theme.text)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(DayDots.names[day])
                 .accessibilityAddTraits(on ? .isSelected : [])
+                .accessibilityIdentifier("rules.restDay.\(day)")
             }
         }
     }
@@ -196,17 +283,12 @@ struct WeekdayChips: View {
 struct ClockPicker: View {
     let title: String
     @Binding var clock: String
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         DatePicker(title, selection: Binding(
-            get: {
-                let minutes = UserRules.minutes(clock) ?? 12 * 60
-                return Calendar.current.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: Date()) ?? Date()
-            },
-            set: { date in
-                let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
-                clock = String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
-            }
+            get: { UserRules.date(ofClock: clock, on: model.now, calendar: model.calendar) },
+            set: { clock = UserRules.clock(of: $0, calendar: model.calendar) }
         ), displayedComponents: .hourAndMinute)
     }
 }

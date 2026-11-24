@@ -10,10 +10,10 @@ struct RainSnackCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.sm) {
             Text("Rain this afternoon. Short breaks through the day?")
-                .agentFont(22, relativeTo: .title2)
+                .agentFont(Theme.questionTitleSize, relativeTo: .title2)
                 .foregroundStyle(Theme.accent)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("\(snacks.blocks.count) breaks of \(snacks.minutes) minutes at \(snacks.blocks.map { $0.start.clock }.joined(separator: ", ")), to stand in for a walk. Your strength session stays as it is.")
+            Text(snacks.offerDetail)
                 .font(.footnote)
                 .foregroundStyle(Theme.textMuted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -47,23 +47,26 @@ struct SnacksTodayRow: View {
         if !snacks.isEmpty {
             VStack(alignment: .leading, spacing: Theme.xs) {
                 Text("Short breaks today").font(.headline).foregroundStyle(Theme.text)
-                ForEach(Array(snacks.enumerated()), id: \.element.id) { index, item in
-                    HStack {
-                        Text("\(item.slot.start.clock), \(item.slot.minutes) minutes").font(.body).foregroundStyle(Theme.text)
-                        Spacer()
-                        Button("Start") { open = item }
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Theme.accent)
-                            .accessibilityLabel("Start the \(item.slot.start.clock) break")
-                    }
-                    .frame(minHeight: 44)
-                }
+                ForEach(snacks) { item in row(item) }
             }
             .task { await model.loadMovements() }
             .sheet(item: $open) { item in
-                SnackView(minutes: item.slot.minutes, moves: model.snackMovements(turn: snacks.firstIndex { $0.id == item.id } ?? 0))
+                SnackView(minutes: item.slot.minutes, moves: model.snackMovements(for: item))
             }
         }
+    }
+
+    private func row(_ item: PlanItem) -> some View {
+        HStack {
+            Text("\(item.slot.start.clock), \(item.slot.minutes) minutes").font(.body).foregroundStyle(Theme.text)
+            Spacer()
+            Button("Start") { open = item }
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+                .accessibilityLabel("Start the \(item.slot.start.clock) break")
+                .accessibilityIdentifier("snacks.start.\(item.id)")
+        }
+        .frame(minHeight: TapTargetButtonStyle.minSide)
     }
 }
 
@@ -72,48 +75,56 @@ struct SnackView: View {
     let minutes: Int
     let moves: [Movement]
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppModel.self) private var model
     @State private var startedAt: Date?
 
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: Theme.md) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: Theme.md) {
-                        Text("Take turns, about 30 seconds each, until the clock runs out.")
-                            .font(.body).foregroundStyle(Theme.textMuted).fixedSize(horizontal: false, vertical: true)
-                        ForEach(moves) { move in
-                            VStack(alignment: .leading, spacing: Theme.xs) {
-                                Text(move.name).font(.headline).foregroundStyle(Theme.text)
-                                Text(move.setup).font(.body).foregroundStyle(Theme.textMuted).fixedSize(horizontal: false, vertical: true)
-                                ForEach(move.steps, id: \.self) { step in
-                                    Text(step).font(.body).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                if let startedAt {
-                    let end = startedAt.addingTimeInterval(TimeInterval(minutes * 60))
-                    Text(timerInterval: startedAt...end, countsDown: true)
-                        .agentFont(56, relativeTo: .largeTitle)
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.text)
-                        .accessibilityLabel("Time left")
-                        .frame(maxWidth: .infinity)
-                        .task {
-                            try? await Task.sleep(for: .seconds(max(0, end.timeIntervalSinceNow)))
-                            if !Task.isCancelled { dismiss() }
-                        }
-                } else {
-                    Button("Start") { startedAt = Date() }.buttonStyle(PrimaryButtonStyle())
+                ScrollView { steps }
+                if let startedAt { clock(from: startedAt) } else {
+                    Button("Start") { self.startedAt = model.now }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .accessibilityIdentifier("snack.start")
                 }
             }
             .padding(Theme.md)
             .navigationTitle("Short break")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.accessibilityIdentifier("snack.done") } }
             .sensoryFeedback(.success, trigger: startedAt)
         }
+    }
+
+    private var steps: some View {
+        VStack(alignment: .leading, spacing: Theme.md) {
+            Text("Take turns, about 30 seconds each, until the clock runs out.")
+                .font(.body).foregroundStyle(Theme.textMuted).fixedSize(horizontal: false, vertical: true)
+            ForEach(moves) { move in
+                VStack(alignment: .leading, spacing: Theme.xs) {
+                    Text(move.name).font(.headline).foregroundStyle(Theme.text)
+                    Text(move.setup).font(.body).foregroundStyle(Theme.textMuted).fixedSize(horizontal: false, vertical: true)
+                    ForEach(move.numberedSteps) { step in
+                        Text(step.text).font(.body).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The time left, counting down; the page closes by itself when it runs out.
+    private func clock(from start: Date) -> some View {
+        let end = AppModel.breakEnd(from: start, minutes: minutes)
+        return Text(timerInterval: start...end, countsDown: true)
+            .agentFont(Theme.statementSize, relativeTo: .largeTitle)
+            .monospacedDigit()
+            .foregroundStyle(Theme.text)
+            .accessibilityLabel("Time left")
+            .frame(maxWidth: .infinity)
+            .task {
+                try? await Task.sleep(for: .seconds(max(0, model.timeLeft(until: end))))
+                if !Task.isCancelled { dismiss() }
+            }
     }
 }

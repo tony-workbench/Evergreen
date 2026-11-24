@@ -19,6 +19,8 @@ protocol PlaceGeocoding: Sendable {
 }
 
 struct SystemGeocoder: PlaceGeocoding {
+    private static let log = Logger(subsystem: "com.evergreentraining.app", category: "calendar")
+
     func coordinate(for text: String) async throws -> Coordinate? {
         do {
             guard let point = try await CLGeocoder().geocodeAddressString(text).first?.location?.coordinate else { return nil }
@@ -26,6 +28,8 @@ struct SystemGeocoder: PlaceGeocoding {
         } catch let error as CLError where error.code == .network {
             throw error
         } catch {
+            // Usually no place by that name; logged without the place itself.
+            Self.log.debug("A place wasn't found: \(String(describing: (error as? CLError)?.code.rawValue), privacy: .public)")
             return nil
         }
     }
@@ -44,47 +48,42 @@ enum DayKinds {
     ///    typed place offline that was never found while online (`PlaceMemory` keeps every place found, so most are still
     ///    known offline). Without a home set, no place is home, so any placed event makes a day out (plan 5.B.1);
     /// 4. every other day is `home`.
-    static func classify(rules: UserRules, busy: [Busy], goingOut: Set<String>, stayingHome: Set<String> = [], farToday: Bool, from today: Date,
-                         calendar: Calendar, geocoder: any PlaceGeocoding) async -> [String: DayKind] {
+    static func classify(_ request: Request, geocoder: any PlaceGeocoding) async -> [String: DayKind] {
+        let calendar = request.calendar
         var kinds: [String: DayKind] = [:]
-        var places = PlaceLookup(geocoder: geocoder)
+        var away = AwayCheck(home: request.rules.home, calendar: calendar, places: PlaceLookup(geocoder: geocoder))
         for offset in 0..<days {
-            guard let date = calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: today)) else { continue }
+            guard let date = calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: request.today)) else { continue }
             let day = LocalTime(date, in: calendar.timeZone).day
-            if let said = saidKind(rules: rules, date: date, day: day, goingOut: goingOut, stayingHome: stayingHome,
-                                   farToday: offset == 0 && farToday, calendar: calendar) {
+            if let said = request.saidKind(date: date, day: day, isToday: offset == 0) {
                 kinds[day] = said
-                continue
+            } else {
+                kinds[day] = await away.isAway(on: date, events: request.busy) ? .out : .home
             }
-            let away = await isAway(on: date, events: busy, home: rules.home, places: &places, calendar: calendar)
-            kinds[day] = away ? .out : .home
         }
         return kinds
     }
 
-    /// Rules 1 and 2: what the rules or the person settle for a day, before the calendar is looked at.
-    private static func saidKind(rules: UserRules, date: Date, day: String, goingOut: Set<String>, stayingHome: Set<String>,
-                                 farToday: Bool, calendar: Calendar) -> DayKind? {
-        if rules.isRestDay(date, calendar: calendar) { return .rest }
-        if goingOut.contains(day) || farToday { return .out }
-        return stayingHome.contains(day) ? .home : nil
-    }
+    /// What the days are worked out from: the rules, the calendar's events, the person's word and where the phone is.
+    struct Request: Sendable {
+        var rules: UserRules
+        /// Timed events and all-day or free ones with a place.
+        var busy: [Busy]
+        /// Days the person said they go out, and days they said they are home.
+        var goingOut: Set<String> = []
+        var stayingHome: Set<String> = []
+        /// The phone was far from home when the app opened today.
+        var farToday = false
+        /// The first day to work out.
+        var today: Date
+        var calendar: Calendar
 
-    /// Rule 3: an event on that day placed somewhere that isn't home.
-    private static func isAway(on date: Date, events: [Busy], home: HomePlace?, places: inout PlaceLookup, calendar: Calendar) async -> Bool {
-        guard let end = calendar.date(byAdding: .day, value: 1, to: date) else { return false }
-        for event in events where event.start < end && event.end > date {
-            guard let place = event.place else { continue }
-            // Without a home no place is home, so the place needn't be looked up: it never leaves the phone.
-            if home == nil {
-                if case .text(let text) = place, DayKinds.isNoPlace(text) { continue }
-                return true
-            }
-            guard let point = await places.coordinate(of: place) else { continue }
-            guard let home, let point else { return true }
-            if !home.isHome(point) { return true }
+        /// Rules 1 and 2: what the rules or the person settle for a day, before the calendar is looked at.
+        func saidKind(date: Date, day: String, isToday: Bool) -> DayKind? {
+            if rules.isRestDay(date, calendar: calendar) { return .rest }
+            if goingOut.contains(day) || (isToday && farToday) { return .out }
+            return stayingHome.contains(day) ? .home : nil
         }
-        return false
     }
 
     /// The engine's `dayKinds` input. Rest days are left out: the engine works those out from the rules itself.
@@ -92,11 +91,46 @@ enum DayKinds {
         .object(kinds.filter { $0.value != .rest }.mapValues { .string($0.rawValue) })
     }
 
+    /// A location shorter than this names no place.
+    private static let shortestPlace = 3
+
     /// Text that names no place: a video call's link, or nothing much.
     static func isNoPlace(_ text: String) -> Bool {
         let lower = text.lowercased()
         let calls = ["http://", "https://", "zoom.us", "meet.google", "teams.microsoft", "webex", "facetime"]
-        return lower.count < 3 || calls.contains { lower.contains($0) }
+        return lower.count < shortestPlace || calls.contains { lower.contains($0) }
+    }
+}
+
+/// Rule 3 of `DayKinds.classify`: a day with an event placed somewhere that isn't home is a day out. Each typed place is
+/// asked of the geocoder once per classification (`PlaceLookup`).
+struct AwayCheck {
+    let home: HomePlace?
+    let calendar: Calendar
+    var places: PlaceLookup
+
+    /// An event on the day of `date` placed somewhere that isn't home.
+    mutating func isAway(on date: Date, events: [Busy]) async -> Bool {
+        guard let end = calendar.date(byAdding: .day, value: 1, to: date) else { return false }
+        for event in events where event.start < end && event.end > date {
+            if let place = event.place, await isAway(at: place) { return true }
+        }
+        return false
+    }
+
+    /// A place that isn't home. Without a home no place is home, so the place needn't be looked up: it never leaves the
+    /// phone. A place that can't be found counts as not home; a meeting link is no place.
+    private mutating func isAway(at place: EventPlace) async -> Bool {
+        guard let home else { return !Self.namesNoPlace(place) }
+        guard let found = await places.coordinate(of: place) else { return false }
+        guard let point = found else { return true }
+        return !home.isHome(point)
+    }
+
+    /// A typed place that names no place: a video call's link, or nothing much.
+    private static func namesNoPlace(_ place: EventPlace) -> Bool {
+        guard case .text(let text) = place else { return false }
+        return DayKinds.isNoPlace(text)
     }
 }
 
@@ -115,38 +149,61 @@ struct PlaceLookup {
         case .text(let text):
             if DayKinds.isNoPlace(text) { return nil }
             if let known = found[text] { return .some(known) }
-            let point: Coordinate? = try? await geocoder.coordinate(for: text)
+            let point = await lookUp(text)
             found.updateValue(point, forKey: text)
             return .some(point)
         }
     }
 }
 
+extension PlaceLookup {
+    private static let log = Logger(subsystem: "com.evergreentraining.app", category: "calendar")
+
+    /// The geocoder's answer; nil for a place it couldn't find, or couldn't be asked (offline), which is said in the log.
+    fileprivate func lookUp(_ text: String) async -> Coordinate? {
+        do {
+            return try await geocoder.coordinate(for: text)
+        } catch {
+            Self.log.error("A place couldn't be looked up, so its day counts as out: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+}
+
 /// Every typed place the geocoder found, kept on this phone so a day can still be judged with the phone offline. A
 /// place found once is not asked again: an address doesn't move, and it leaves the phone only the first time.
-actor PlaceMemory {
-    static let key = "found_places"
+/// One for the app (`AppModel.placeMemory`): read from the phone once, and saved each time a place is found, so two
+/// classifications at once can't lose each other's places.
+@MainActor
+final class PlaceMemory {
+    nonisolated static let key = "found_places"
     /// The places of a few months of events; the oldest go first.
-    static let keep = 200
-    private static let log = Logger(subsystem: "com.evergreentraining.app", category: "calendar")
+    nonisolated static let keep = 200
+    private nonisolated static let log = Logger(subsystem: "com.evergreentraining.app", category: "calendar")
 
     struct Found: Codable, Equatable, Sendable {
         var text: String
         var point: Coordinate
     }
 
+    /// Where the places are kept; nil keeps them in memory only.
+    let defaults: UserDefaults?
     private(set) var found: [Found]
 
-    init(_ found: [Found] = []) { self.found = found }
+    init(defaults: UserDefaults? = nil) {
+        self.defaults = defaults
+        found = defaults.map { Self.load(from: $0) } ?? []
+    }
 
     func point(for text: String) -> Coordinate? { found.last { $0.text == text }?.point }
 
     func remember(_ text: String, at point: Coordinate) {
         found.removeAll { $0.text == text }
         found = Array((found + [Found(text: text, point: point)]).suffix(Self.keep))
+        if let defaults { Self.save(found, to: defaults) }
     }
 
-    static func load(from defaults: UserDefaults) -> [Found] {
+    nonisolated static func load(from defaults: UserDefaults) -> [Found] {
         guard let data = defaults.data(forKey: key) else { return [] }
         do { return try JSONDecoder().decode([Found].self, from: data) } catch {
             log.error("Found places couldn't be read: \(error.localizedDescription, privacy: .public)")
@@ -154,7 +211,7 @@ actor PlaceMemory {
         }
     }
 
-    static func save(_ found: [Found], to defaults: UserDefaults) {
+    nonisolated static func save(_ found: [Found], to defaults: UserDefaults) {
         do { defaults.set(try JSONEncoder().encode(found), forKey: key) } catch {
             log.error("Found places couldn't be saved: \(error.localizedDescription, privacy: .public)")
         }

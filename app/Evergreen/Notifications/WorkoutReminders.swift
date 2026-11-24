@@ -77,19 +77,23 @@ enum WorkoutReminders {
         var date: Date
     }
 
+    /// One day's reminders to plan: the day, what its session holds, and how the person wants them.
+    struct Request: Sendable {
+        var day: HomeWeek.Day
+        var session: Session
+        var choice: Choice
+    }
+
     private typealias Entry = (kind: WorkoutReminder.Kind, fires: Date, copy: (title: String, body: String), choices: [String])
 
-    /// The reminders for `day`, from now on. Empty for a day with no session.
-    static func plan(day: HomeWeek.Day, session: Session, choice: Choice, now: Date, calendar: Calendar) -> [WorkoutReminder] {
-        guard day.trains, let first = day.first?.date else { return [] }
+    /// The reminders for the request's day, from now on. Empty for a day with no session.
+    static func plan(_ request: Request, now: Date, calendar: Calendar) -> [WorkoutReminder] {
+        let day = request.day, choice = request.choice
+        guard day.trains, day.first?.date != nil else { return [] }
         let kept = keptTime(day, choice: choice, calendar: calendar)
         var out: [Entry] = []
-        if let evening = evening(day, session: session, choice: choice, kept: kept, first: first, calendar: calendar) { out.append(evening) }
-        if let kept {
-            out += keptOnly(kept, after: later(than: kept.date, in: day), session: session)
-        } else {
-            out += everyTime(first, laters: day.fallbacks.compactMap(\.date), keepReminding: choice.keepReminding, session: session)
-        }
+        if let evening = evening(request, kept: kept, calendar: calendar) { out.append(evening) }
+        out += kept.map { keptOnly($0, after: later(than: $0.date, in: day), session: request.session) } ?? everyTime(request)
         let reminders = out.enumerated().compactMap { index, entry -> WorkoutReminder? in
             guard entry.fires > now, !NotificationBudget.isQuiet(entry.fires, calendar: calendar, from: choice.quietUntil) else { return nil }
             return WorkoutReminder(id: "\(prefix)\(day.day)-\(index + 1)", kind: entry.kind, fires: entry.fires,
@@ -123,9 +127,10 @@ enum WorkoutReminders {
 
     /// The moment of a clock ("18:10") on a day ("2026-11-19") in the calendar's time zone; nil for a clock that isn't one.
     static func date(_ day: String, clock: String, calendar: Calendar) -> Date? {
-        let parts = (day.split(separator: "-") + clock.split(separator: ":")).compactMap { Int($0) }
-        guard parts.count == 5, (0..<24).contains(parts[3]), (0..<60).contains(parts[4]) else { return nil }
-        return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: parts[3], minute: parts[4]))
+        let date = day.split(separator: "-").compactMap { Int($0) }, time = clock.split(separator: ":").compactMap { Int($0) }
+        guard date.count == ClockUnits.dayKeyParts, time.count == ClockUnits.clockParts,
+              (0..<ClockUnits.hoursPerDay).contains(time[0]), (0..<ClockUnits.minutesPerHour).contains(time[1]) else { return nil }
+        return calendar.date(from: DateComponents(year: date[0], month: date[1], day: date[2], hour: time[0], minute: time[1]))
     }
 
     /// The next time of a day after `date`, for the question twenty minutes after a picked time.
@@ -133,14 +138,15 @@ enum WorkoutReminders {
         times(of: day).first { $0.date > date }
     }
 
-    private static func evening(_ day: HomeWeek.Day, session: Session, choice: Choice, kept: Time?, first: Date,
-                                calendar: Calendar) -> Entry? {
-        guard let start = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: first)),
+    /// The evening before, at 21:00: what tomorrow holds, with a button for each of its times.
+    private static func evening(_ request: Request, kept: Time?, calendar: Calendar) -> Entry? {
+        guard let first = request.day.first?.date,
+              let start = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: first)),
               let fires = calendar.date(bySettingHour: eveningHour, minute: 0, second: 0, of: start) else { return nil }
-        let all = times(of: day)
+        let all = times(of: request.day), choice = request.choice
         let copy = choice.pickEachDay && choice.picked == nil
-            ? NotificationCopy.homePickTomorrow(session, times: all.map(\.date))
-            : NotificationCopy.homeTomorrow(session, at: kept?.date ?? first)
+            ? NotificationCopy.homePickTomorrow(request.session, times: all.map(\.date))
+            : NotificationCopy.homeTomorrow(request.session, at: kept?.date ?? first)
         return (.evening, fires, copy, Array(all.map(\.clock).prefix(maxChoices)))
     }
 
@@ -153,7 +159,9 @@ enum WorkoutReminders {
     }
 
     /// Every time of the day, with the move twenty minutes after the first.
-    private static func everyTime(_ first: Date, laters: [Date], keepReminding: Bool, session: Session) -> [Entry] {
+    private static func everyTime(_ request: Request) -> [Entry] {
+        guard let first = request.day.first?.date else { return [] }
+        let laters = request.day.fallbacks.compactMap(\.date), keepReminding = request.choice.keepReminding, session = request.session
         var out: [Entry] = [(.soon, first.addingTimeInterval(-soonLead), NotificationCopy.homeSoon(session), [])]
         let onlyOne = !keepReminding || laters.isEmpty
         out.append((onlyOne && keepReminding ? .last : .now, first, NotificationCopy.homeNow(session, last: onlyOne && keepReminding, at: first), []))
@@ -169,6 +177,13 @@ enum WorkoutReminders {
     /// Which of `ids` are the reminders of the session on `day`, and only those.
     static func ids(_ ids: [String], day: String) -> [String] {
         ids.filter { $0.hasPrefix("\(prefix)\(day)-") }
+    }
+
+    /// Where a day's session belongs at `now` when every time reminds: the first of its times whose twenty minutes
+    /// (`movedAfter`) haven't passed. A time passed without a start hands the session on to the next, as the "Moved to …"
+    /// reminder says. Nil once the last has passed.
+    static func dueTime(_ day: HomeWeek.Day, now: Date) -> Time? {
+        times(of: day).first { now < $0.date.addingTimeInterval(movedAfter) }
     }
 
     /// The next time after `now` on a day, for "Later today"; nil when none is left.

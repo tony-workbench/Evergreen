@@ -8,7 +8,10 @@ struct ListenScene: View {
     /// Asks the buddy beside the caption for its reaction to this scene.
     let react: () -> Void
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
     @State private var demo = TourDemo()
     @State private var taps = 0
     /// The first suggestion, then nothing for a moment, then the next one.

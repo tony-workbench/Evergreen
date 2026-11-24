@@ -22,7 +22,7 @@ struct MemoryComingSection: View {
                 Text(line)
                     .font(.body)
                     .foregroundStyle(Theme.text)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .frame(maxWidth: .infinity, minHeight: TapTargetButtonStyle.minSide, alignment: .leading)
                 Rectangle().fill(Theme.rule).frame(height: 1)
             }
             Text("Worked out on this phone from Apple Health. You can stop or forget any line.")

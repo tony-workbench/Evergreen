@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Observation
 
 /// The week's suggestions: planning them, what each rests on, the person's
@@ -80,7 +81,7 @@ final class WeekSuggestions {
 
     private func replan() async {
         guard weekPlan != nil else { return }
-        _ = try? await loadWeekPlan()
+        await planIfPossible()
     }
 
     // MARK: Placing an accepted session
@@ -177,6 +178,22 @@ final class WeekSuggestions {
 
     // MARK: Planning the week
 
+    /// `loadWeekPlan` for callers that go on without a new week: why it couldn't be planned goes to the log (without an AI
+    /// key that is the usual case, not a fault), and nil comes back.
+    @discardableResult
+    func planIfPossible(fresh: Bool = false, quiet: Bool = false) async -> WeekPlan? {
+        do {
+            return try await loadWeekPlan(fresh: fresh, quiet: quiet)
+        } catch {
+            if error == .notConnected {
+                Logger.model.debug("No week planned: no AI connected")
+            } else {
+                Logger.model.error("The week couldn't be planned: \(String(describing: error), privacy: .public)")
+            }
+            return nil
+        }
+    }
+
     /// Plans the week: the planning agent proposes it from the memory table,
     /// the rules check it, and only a week that passed is kept. When the AI
     /// can't be reached, or its week fails twice, the week from the rules is
@@ -211,48 +228,71 @@ final class WeekSuggestions {
             return nil
         }
         let busy = await app.refreshBusy()
-        // The week is shown from the table as it stands, and the day's memory (once a day) is settled after it,
-        // so the person never waits for both. Only with nothing remembered yet does memory come first: there is nothing to plan from.
-        let settles = Automatic.memory.isOn(app.settings)
-        var rows = app.shown(await loop.memory.table())
-        let settledFirst = settles && !rows.contains(where: \.isUsable)
-        if settledFirst { rows = await settleMemory(loop) }
-        // The same day, memory and calendar give the same week: the AI isn't asked again.
-        let key = weekKey(rows: rows, busy: busy)
-        let kept = weekCache ?? WeekCache.load(from: weekCacheStore)
-        let week: PlanAgent.Week
-        if !fresh, let kept, kept.key == key {
-            week = kept.week
-        } else {
-            var planned = await loop.recommend(rows: rows, now: app.now)
-            // With nothing to go on yet, two short walks to start from, said to be general.
-            if planned.sessions.isEmpty, app.historyDepth.isThin { planned.sessions = await checkedStarters(rows: rows) }
-            week = planned
-            weeksPlanned += 1
-            if week.source == .rules { app.fallbacks["plan", default: 0] += 1 }
-            app.log(week.source == .agent ? "Week planned: \(week.sessions.count) sessions" : "Week planned by my own rules")
-            // Only the AI's own week is kept: a week from the rules is planned again next time, when the AI may answer.
-            if week.source == .agent { WeekCache(key: key, week: week).save(to: weekCacheStore) }
-        }
+        let memory = await memoryToPlanFrom(loop)
+        let basis = PlanBasis(rows: memory.rows, busy: busy, key: weekKey(rows: memory.rows, busy: busy))
+        let planned = await week(from: loop, basis: basis, fresh: fresh)
         guard planGeneration == generation else { return nil }
-        weekCache = week.source == .agent ? WeekCache(key: key, week: week) : nil
+        let plan = await show(planned, loop: loop, basis: basis)
+        if memory.settles, !memory.settledFirst { settleMemoryAfterwards(loop, plannedFrom: basis.key) }
+        return plan
+    }
+
+    /// What a week is planned from: the memory rows, the busy times and the key the two make with the day.
+    private struct PlanBasis {
+        let rows: [MemoryRow]
+        let busy: [Busy]
+        let key: String
+    }
+
+    /// The week is shown from the table as it stands, and the day's memory (once a day) is settled after it, so the
+    /// person never waits for both. Only with nothing remembered yet does memory come first: there is nothing to plan from.
+    private func memoryToPlanFrom(_ loop: Orchestrator) async -> (rows: [MemoryRow], settles: Bool, settledFirst: Bool) {
+        let settles = Automatic.memory.isOn(app.settings)
+        let rows = app.shown(await loop.memory.table())
+        let settledFirst = settles && !rows.contains(where: \.isUsable)
+        guard settledFirst else { return (rows, settles, settledFirst) }
+        return (await settleMemory(loop), settles, settledFirst)
+    }
+
+    /// The same day, memory and calendar give the same week: the AI isn't asked again unless a fresh week is asked for.
+    private func week(from loop: Orchestrator, basis: PlanBasis, fresh: Bool) async -> PlanAgent.Week {
+        let kept = weekCache ?? WeekCache.load(from: weekCacheStore)
+        if !fresh, let kept, kept.key == basis.key { return kept.week }
+        return await newWeek(from: loop, basis: basis)
+    }
+
+    /// A week from the planning agent (or the rules when it can't answer), counted and logged.
+    private func newWeek(from loop: Orchestrator, basis: PlanBasis) async -> PlanAgent.Week {
+        var week = await loop.recommend(rows: basis.rows, now: app.now)
+        // With nothing to go on yet, two short walks to start from, said to be general.
+        if week.sessions.isEmpty, app.historyDepth.isThin { week.sessions = await checkedStarters(rows: basis.rows) }
+        weeksPlanned += 1
+        if week.source == .rules { app.fallbacks["plan", default: 0] += 1 }
+        app.log(week.source == .agent ? "Week planned: \(week.sessions.count) sessions" : "Week planned by my own rules")
+        // Only the AI's own week is kept: a week from the rules is planned again next time, when the AI may answer.
+        if week.source == .agent { WeekCache(key: basis.key, week: week).save(to: weekCacheStore) }
+        return week
+    }
+
+    /// Puts the planned week on screen and keeps what it was planned from.
+    private func show(_ week: PlanAgent.Week, loop: Orchestrator, basis: PlanBasis) async -> WeekPlan {
+        weekCache = week.source == .agent ? WeekCache(key: basis.key, week: week) : nil
         planProblem = week.keyProblem
-        busyForBases = busy
-        sentToAI = await loop.brief(rows: rows, now: app.now)
-        app.memoryRows = rows
+        busyForBases = basis.busy
+        sentToAI = await loop.brief(rows: basis.rows, now: app.now)
+        app.memoryRows = basis.rows
         plannedSessions = week.sessions
         let plan = WeekPlan(week)
         weekPlan = plan
         // Each day at home's focus, kept so a missed one can move to the next day at home.
         await app.rememberHomeWeek()
-        if settles, !settledFirst { settleMemoryAfterwards(loop, plannedFrom: key) }
         return plan
     }
 
     /// What a planned week depends on: the day, what is remembered, and the busy times near the hours a workout could go.
     func weekKey(rows: [MemoryRow], busy: [Busy]) -> String {
-        WeekCache.key(day: LocalTime(app.now, in: app.calendar.timeZone).day, rows: rows,
-                      busy: WeekCache.planning(busy, now: app.now, calendar: app.calendar), rules: app.rulesCacheText)
+        WeekCache.key(WeekCache.Basis(day: LocalTime(app.now, in: app.calendar.timeZone).day, rows: rows,
+                                      busy: WeekCache.planning(busy, now: app.now, calendar: app.calendar), rules: app.rulesCacheText))
     }
 
     /// The day's memory update, with what it did written to the log. Returns the rows as they are afterwards.
@@ -277,7 +317,7 @@ final class WeekSuggestions {
             app.memoryTask = nil
             guard app.week.weekKey(rows: rows, busy: app.busyNow) != key else { return }
             app.memoryRows = rows
-            _ = try? await app.loadWeekPlan(quiet: true)
+            await app.week.planIfPossible(quiet: true)
         }
     }
 
@@ -309,7 +349,7 @@ final class WeekSuggestions {
     /// Plans the week once, and again after the run is cleared.
     func loadSuggestionsIfNeeded() async {
         guard app.plannerAvailable, weekPlan == nil, Automatic.week.isOn(app.settings) else { return }
-        _ = try? await loadWeekPlan()
+        await planIfPossible()
     }
 
     // MARK: The person's answers
@@ -373,7 +413,7 @@ final class WeekSuggestions {
         }
         app.save()
         for key in stopped { await app.stop(key: key) }
-        if !stopped.isEmpty, weekPlan != nil { _ = try? await loadWeekPlan() }
+        if !stopped.isEmpty, weekPlan != nil { await planIfPossible() }
     }
 
     /// The memory keys a "not now" to this session stops: the usual times it is, by the hand-off's rule.
@@ -419,6 +459,6 @@ final class WeekSuggestions {
     /// Asks for the week again when one is on screen, so it reflects what memory now sends.
     private func reloadSuggestions() async {
         guard weekPlan != nil else { return }
-        _ = try? await loadWeekPlan()
+        await planIfPossible()
     }
 }

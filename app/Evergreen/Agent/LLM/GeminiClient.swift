@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Talks to Google's Gemini API (`generateContent`) over plain HTTPS with the
 /// person's own key. The key goes in the `x-goog-api-key` header of requests
@@ -179,12 +180,12 @@ struct GeminiClient: LanguageModel {
         http.httpMethod = "POST"
         http.setValue("application/json", forHTTPHeaderField: "Content-Type")
         http.setValue(key, forHTTPHeaderField: "x-goog-api-key")
-        http.httpBody = try? JSONEncoder().encode(Self.body(request))
+        http.httpBody = Logger.agent.attempt("The request to Gemini couldn't be written") { try JSONEncoder().encode(Self.body(request)) }
         let answer = try await Self.answer(to: http, session: session, passing: &passing)
         let reply = try Self.reply(from: answer)
-        await usage?.count(input: Int(answer["usageMetadata"]?["promptTokenCount"]?.number ?? 0),
-                           output: Int(answer["usageMetadata"]?["candidatesTokenCount"]?.number ?? 0),
-                           thinking: Int(answer["usageMetadata"]?["thoughtsTokenCount"]?.number ?? 0))
+        await usage?.count(AIUsage.Tokens(input: Int(answer["usageMetadata"]?["promptTokenCount"]?.number ?? 0),
+                                          output: Int(answer["usageMetadata"]?["candidatesTokenCount"]?.number ?? 0),
+                                          thinking: Int(answer["usageMetadata"]?["thoughtsTokenCount"]?.number ?? 0)))
         return reply
     }
 
@@ -196,34 +197,54 @@ struct GeminiClient: LanguageModel {
 
     /// The same; `passing` is set when the failure is one that may be gone a moment later.
     static func answer(to http: URLRequest, session: URLSession, passing: inout Bool) async throws(ModelFailure) -> JSONValue {
-        let data: Data
-        let response: URLResponse
+        let (data, status) = try await fetch(http, session: session, passing: &passing)
+        passing = passingStatuses.contains(status) || status >= firstServerError
+        let answer = Logger.agent.attempt("Gemini's answer (status \(status)) couldn't be read") {
+            try JSONDecoder().decode(JSONValue.self, from: data)
+        }
+        guard HTTPStatus.success.contains(status) else { throw failure(status: status, message: answer?["error"]?["message"]?.string ?? "") }
+        guard let answer else { throw .unreadable }
+        return answer
+    }
+
+    /// Statuses that may be gone a moment later: a timeout, too many requests, a closed connection; and every server error.
+    private static let passingStatuses: Set<Int> = [HTTPStatus.requestTimeout, HTTPStatus.tooManyRequests, HTTPStatus.clientClosed]
+    private static let firstServerError = 500
+
+    /// The HTTP statuses Gemini's answers are told apart by.
+    private enum HTTPStatus {
+        static let success = 200..<300
+        static let badRequest = 400
+        static let unauthorized = 401
+        static let paymentRequired = 402
+        static let forbidden = 403
+        static let requestTimeout = 408
+        static let tooManyRequests = 429
+        /// A connection closed before the answer.
+        static let clientClosed = 499
+    }
+
+    /// The answer's bytes and HTTP status. No answer at all (a timeout, no network) is `.unreachable`.
+    private static func fetch(_ http: URLRequest, session: URLSession, passing: inout Bool) async throws(ModelFailure) -> (Data, Int) {
         do {
-            (data, response) = try await session.data(for: http)
+            let (data, response) = try await session.data(for: http)
+            return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
         } catch {
-            // A timeout or no network: no answer came. A cancelled request is the person's own doing.
+            // A cancelled request is the person's own doing, so it isn't tried again.
             passing = (error as? URLError)?.code != .cancelled
             throw .unreachable
         }
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        passing = [408, 429, 499].contains(status) || status >= 500
-        let answer = try? JSONDecoder().decode(JSONValue.self, from: data)
-        let message = answer?["error"]?["message"]?.string ?? ""
+    }
+
+    /// A status outside 2xx as the app names it.
+    private static func failure(status: Int, message: String) -> ModelFailure {
         switch status {
-        case 200..<300:
-            guard let answer else { throw .unreadable }
-            return answer
-        case 401, 403:
-            throw .keyRefused
-        case 400 where message.localizedCaseInsensitiveContains("API key"):
-            // A key the API doesn't know comes back as an invalid request.
-            throw .keyRefused
-        case 402, 429:
-            throw .limited
-        case 408, 499, 500...:
-            throw .unavailable
-        default:
-            throw .invalid(message.isEmpty ? "The request was refused (\(status))." : message)
+        case HTTPStatus.unauthorized, HTTPStatus.forbidden: .keyRefused
+        // A key the API doesn't know comes back as an invalid request.
+        case HTTPStatus.badRequest where message.localizedCaseInsensitiveContains("API key"): .keyRefused
+        case HTTPStatus.paymentRequired, HTTPStatus.tooManyRequests: .limited
+        case HTTPStatus.requestTimeout, HTTPStatus.clientClosed, firstServerError...: .unavailable
+        default: .invalid(message.isEmpty ? "The request was refused (\(status))." : message)
         }
     }
 

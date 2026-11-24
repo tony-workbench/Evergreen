@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import os
 
 /// The planned week, kept so the AI is asked once and not at every launch.
 /// A week is planned again only when its key changes: another local day,
@@ -10,16 +11,27 @@ struct WeekCache: Codable, Equatable, Sendable {
     var week: PlanAgent.Week
 
     static let storeKey = "planned_week"
+    /// Bytes of the digest kept in a key: enough to tell weeks apart, short enough to read in the log.
+    static let digestBytes = 8
+
+    /// What a week depends on: the day, what is remembered, the busy times, and the rules' text ("" without rules).
+    struct Basis {
+        var day: String
+        var rows: [MemoryRow]
+        var busy: [Busy]
+        var rules = ""
+    }
 
     /// What a week depends on, as one short string.
-    static func key(day: String, rows: [MemoryRow], busy: [Busy], rules: String = "") -> String {
-        let memory = rows.map { "\($0.key)|\($0.state)|\($0.statement)|\($0.data.text)" }.sorted().joined(separator: "\n")
-        let calendar = busy.map { "\(Int($0.start.timeIntervalSince1970))-\(Int($0.end.timeIntervalSince1970))" }.sorted().joined(separator: ",")
+    static func key(_ basis: Basis) -> String {
+        let memory = basis.rows.map { "\($0.key)|\($0.state)|\($0.statement)|\($0.data.text)" }.sorted().joined(separator: "\n")
+        let calendar = basis.busy.map { "\(Int($0.start.timeIntervalSince1970))-\(Int($0.end.timeIntervalSince1970))" }
+            .sorted().joined(separator: ",")
         // The rules and each day's kind: a changed rule or a day that became a day out plans the week again.
         // Without rules this adds nothing, so a week kept before rules existed still matches.
-        let text = rules.isEmpty ? "\(memory)\n#\n\(calendar)" : "\(memory)\n#\n\(calendar)\n#\n\(rules)"
+        let text = basis.rules.isEmpty ? "\(memory)\n#\n\(calendar)" : "\(memory)\n#\n\(calendar)\n#\n\(basis.rules)"
         let digest = SHA256.hash(data: Data(text.utf8))
-        return day + ":" + digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+        return basis.day + ":" + digest.prefix(digestBytes).map { String(format: "%02x", $0) }.joined()
     }
 
     /// The busy times that can change a week planned now: those in the eight days from today, between
@@ -37,10 +49,12 @@ struct WeekCache: Codable, Equatable, Sendable {
     }
 
     static func load(from defaults: UserDefaults?) -> WeekCache? {
-        defaults?.data(forKey: storeKey).flatMap { try? JSONDecoder().decode(WeekCache.self, from: $0) }
+        defaults?.data(forKey: storeKey).flatMap { data in
+            Logger.model.attempt("The kept week couldn't be read; it is planned again") { try JSONDecoder().decode(WeekCache.self, from: data) }
+        }
     }
 
     func save(to defaults: UserDefaults?) {
-        defaults?.set(try? JSONEncoder().encode(self), forKey: Self.storeKey)
+        defaults?.set(Logger.model.attempt("The planned week couldn't be kept") { try JSONEncoder().encode(self) }, forKey: Self.storeKey)
     }
 }

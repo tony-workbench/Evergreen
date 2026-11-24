@@ -16,6 +16,7 @@ import { PLACE_KIND, PLACE_STATEMENT } from './place.mjs';
 import { factEvidence, outcomeEvidence, extraEvidence, allowedNumbers, numbersNotIn, addDays, isDay } from './evidence.mjs';
 
 const REFS_KEPT = 40;
+const REVIEW_ID_DIGITS = 4;    // rev_0001
 const FORGET_REACH = 34;       // an aggregate computed up to this many days after a day may contain that day
 
 export const freshState = (user) => ({ v: 1, user, seq: 0, off: false, evidence: {}, outcomes: {}, extras: {}, processed: {}, memories: [], reviews: [], events: [], stopped: {} });
@@ -187,96 +188,170 @@ export function applyDaily(state, { day, proposals, at, sha256 }) {
   if (state.processed[day] === hash) return { ok: true, day, alreadyDone: true, applied: [], rejected: [], review: [] };
   const list = Array.isArray(proposals) ? proposals : isObj(proposals) ? proposals.proposals : null;
   if (!Array.isArray(list)) return fail('bad_proposals');
-  const ctx = { day, at };
+  const run = startRun(state, { day, at }, all);
+  list.forEach((p, index) => applyProposal(run, p, index));
+  state.processed[day] = hash;
+  for (const d of Object.keys(state.processed)) if (d <= addDays(day, -EVIDENCE_KEPT)) delete state.processed[d];
+  return { ok: true, day, alreadyDone: false, applied: run.applied, rejected: run.rejected, review: reviewQueue(state).filter((r) => run.asked.includes(r.memoryId)) };
+}
+
+// One day's run: the swept state, the day's evidence by id, the memories the model was shown, and what it did so far.
+function startRun(state, ctx, all) {
   sweep(state, ctx);
   const evidence = Object.fromEntries(all.map((i) => [i.id, i]));
   const neighbors = new Set(neighborsFor(state, shown(state, all)).map((n) => n.memoryId));
-  const seen = new Set();
-  const applied = [];
-  const rejected = [];
-  const asked = [];
+  return { state, ctx, evidence, neighbors, seen: new Set(), applied: [], rejected: [], asked: [] };
+}
 
-  list.forEach((p, index) => {
-    const drop = (code) => { rejected.push({ index, code, text: CODE_TEXT[code] }); log(state, { day, at, actor: 'system', op: 'DROP', slot: isObj(p) && typeof p.slot === 'string' && SLOT_RE.test(p.slot) ? p.slot : null, code }); };
-    if (index >= MAX_PROPOSALS) return drop('too_many');
-    if (!shapeOk(p)) return drop('bad_shape');
-    if (!SLOT_RE.test(p.slot)) return drop('bad_slot');
-    const group = groupOf(p.slot);
-    if (!GROUPS.includes(group)) return drop('slot_family');
-    if (seen.has(p.slot)) return drop('duplicate_slot');
-    seen.add(p.slot);
-    if (state.stopped[p.slot]) return drop('slot_stopped');
-    const cited = p.evidenceIds.map((id) => evidence[id]);
-    if (cited.some((c) => c === undefined)) return drop('unknown_evidence');
-    const supporting = cited.filter((c) => c.slots.some((s) => s.slot === p.slot));
-    if (supporting.length === 0) return drop('slot_not_supported');
-    const support = (supporting.find((c) => c.window !== 'day') ?? supporting[0]).slots.find((s) => s.slot === p.slot);
-    if (support.kind !== p.kind) return drop('kind_mismatch');
-    const allowed = allowedNumbers(cited);
-    if (numbersNotIn(p.statement, allowed).length > 0 || Object.values(p.numbers ?? {}).some((v) => v < 0 || !allowed.numbers.has(String(v)))) return drop('number_not_in_evidence');
-    // A goal may have no date, so its sentence may have no number; everything else the fact lint asks still holds.
-    // Where the person trains has one fixed sentence, written by code (place.mjs); any other wording is dropped.
-    if (p.kind === PLACE_KIND ? p.statement !== PLACE_STATEMENT : lintWords(p.statement).filter((x) => !(group === 'goal' && /number/.test(x))).length > 0) return drop('not_a_fact');
-    if (group !== 'response' && supporting.every((c) => c.window === 'day')) return drop('raw_reading');
-    if (inSlot(state, p.slot).some((m) => m.state === REJECTED && norm(current(m).statement) === norm(p.statement))) return drop('rejected_before');
+// One proposal: dropped with a code, or executed (perhaps as a REVIEW) and recorded as applied.
+function applyProposal(run, p, index) {
+  const drop = slotDrop(run, p, index);
+  if (drop) return dropProposal(run, p, { index, code: drop });
+  const group = groupOf(p.slot);
+  const cited = evidenceCheck(run, p, group);
+  if (cited.drop) return dropProposal(run, p, { index, code: cited.drop });
+  const aimed = targetCheck(run, p);
+  if (aimed.drop) return dropProposal(run, p, { index, code: aimed.drop });
+  const c = { group, support: cited.support, ...aimed };
+  const g = guardOf(run, p, c);
+  const m = execute(run, c, g);
+  run.applied.push({ index, op: g.op, slot: m.slot, memoryId: m.id, version: current(m).n, ...(g.guard ? { guard: g.guard } : {}) });
+}
 
-    const usable = usableIn(state, p.slot);
-    const candidate = candidateIn(state, p.slot);
-    let target = null;
-    if (typeof p.targetMemoryId === 'string') {
-      target = byId(state, p.targetMemoryId);
-      if (!neighbors.has(p.targetMemoryId) || target === null || target.slot !== p.slot) return drop('target_not_neighbor');
-      if (!OPEN.includes(target.state)) return drop('target_not_open');
-    } else if (p.op === 'NOOP' || p.op === 'MERGE' || p.op === 'SUPERSEDE') return drop('target_missing');
-    if (p.op === 'ADD' && (usable || candidate)) return drop('slot_occupied');
+function dropProposal(run, p, { index, code }) {
+  const { day, at } = run.ctx;
+  run.rejected.push({ index, code, text: CODE_TEXT[code] });
+  log(run.state, { day, at, actor: 'system', op: 'DROP', slot: isObj(p) && typeof p.slot === 'string' && SLOT_RE.test(p.slot) ? p.slot : null, code });
+}
 
-    // Guards that ask the person instead of writing.
-    const days = supportDays(state, p.slot, day);
-    p = { ...p, confidence: confidenceOf(p.kind, support.data, days) };          // code's number, not the model's
-    const strong = (need) => (p.kind === 'usual_slot' ? support.data.weeksSeen >= SLOT_WEEKS : days >= need[group]);
-    let op = p.op;
-    let guard = null;
-    if (op === 'ADD' || ((op === 'MERGE' || op === 'SUPERSEDE') && target.state !== CANDIDATE)) {
-      if (p.confidence < MIN_CONFIDENCE) guard = 'low_confidence';
-      else if (!strong(op === 'ADD' ? ADD_DAYS : STRONG_DAYS)) guard = 'weak_evidence';
-      else if (op !== 'ADD' && target.updated > day) guard = 'older_evidence';
-      if (guard) op = 'REVIEW';
-    }
+// The first checks: the proposal's place in the list, its shape and its slot. A drop code, or null.
+function slotDrop(run, p, index) {
+  if (index >= MAX_PROPOSALS) return 'too_many';
+  if (!shapeOk(p)) return 'bad_shape';
+  if (!SLOT_RE.test(p.slot)) return 'bad_slot';
+  if (!GROUPS.includes(groupOf(p.slot))) return 'slot_family';
+  if (run.seen.has(p.slot)) return 'duplicate_slot';
+  run.seen.add(p.slot);
+  if (run.state.stopped[p.slot]) return 'slot_stopped';
+  return null;
+}
 
-    let m;
-    if (op === 'ADD') {
-      m = newMemory(state, p, support, SAVED, ctx);
-      log(state, { day, at, actor: 'system', op: 'ADD', memoryId: m.id, slot: m.slot, from: null, to: SAVED, version: 1 });
-    } else if (op === 'NOOP') {
-      m = target;
-      addRef(m, p, ctx);
-      current(m).confidence = p.confidence;
-      log(state, { day, at, actor: 'system', op: 'CORROBORATE', memoryId: m.id, slot: m.slot, from: m.state, to: m.state, version: current(m).n });
-    } else if (op === 'MERGE' || (op === 'SUPERSEDE' && target.state === CANDIDATE)) {
-      m = target;                                               // the same memory, a new version; its state stays
-      newVersion(m, p, support, ctx);
-      log(state, { day, at, actor: 'system', op: 'MERGE', memoryId: m.id, slot: m.slot, from: m.state, to: m.state, version: current(m).n });
-    } else if (op === 'SUPERSEDE') {
-      m = newMemory(state, p, support, SAVED, ctx, target.id);   // saved even when the old one was confirmed: the person confirmed the old wording
-      log(state, { day, at, actor: 'system', op: 'ADD', memoryId: m.id, slot: m.slot, from: null, to: SAVED, version: 1 });
-      move(state, target, SUPERSEDED, 'system', ctx, 'SUPERSEDE');
-      target.supersededBy = m.id;
-      for (const r of state.reviews) if (r.targetMemoryId === target.id) r.targetMemoryId = m.id;
-    } else {
-      // REVIEW: a candidate the table never shows, and a question for the person. The memory in use is not touched.
-      if (candidate) { m = candidate; if (norm(current(m).statement) === norm(p.statement)) addRef(m, p, ctx); else newVersion(m, p, support, ctx); } else m = newMemory(state, p, support, CANDIDATE, ctx);
-      const reason = guard ?? 'model_unsure';
-      const open = state.reviews.find((r) => r.memoryId === m.id);
-      if (open) Object.assign(open, { reason, day, targetMemoryId: usable?.id ?? null });
-      else { state.seq += 1; state.reviews.push({ id: `rev_${String(state.seq).padStart(4, '0')}`, memoryId: m.id, targetMemoryId: usable?.id ?? null, reason, day }); }
-      log(state, { day, at, actor: 'system', op: 'REVIEW', memoryId: m.id, slot: m.slot, from: null, to: CANDIDATE, version: current(m).n, code: guard });
-      asked.push(m.id);
-    }
-    applied.push({ index, op, slot: m.slot, memoryId: m.id, version: current(m).n, ...(guard ? { guard } : {}) });
-  });
-  state.processed[day] = hash;
-  for (const d of Object.keys(state.processed)) if (d <= addDays(day, -EVIDENCE_KEPT)) delete state.processed[d];
-  return { ok: true, day, alreadyDone: false, applied, rejected, review: reviewQueue(state).filter((r) => asked.includes(r.memoryId)) };
+// What the proposal cites: ids in the day's evidence, an item backing its slot and kind, numbers and words from it.
+// { drop } or { support }: the slot entry of the item that backs it.
+function evidenceCheck(run, p, group) {
+  const cited = p.evidenceIds.map((id) => run.evidence[id]);
+  if (cited.some((c) => c === undefined)) return { drop: 'unknown_evidence' };
+  const supporting = cited.filter((c) => c.slots.some((s) => s.slot === p.slot));
+  if (supporting.length === 0) return { drop: 'slot_not_supported' };
+  const support = (supporting.find((c) => c.window !== 'day') ?? supporting[0]).slots.find((s) => s.slot === p.slot);
+  if (support.kind !== p.kind) return { drop: 'kind_mismatch' };
+  const drop = statementDrop(p, cited, group);
+  if (drop) return { drop };
+  if (group !== 'response' && supporting.every((c) => c.window === 'day')) return { drop: 'raw_reading' };
+  if (inSlot(run.state, p.slot).some((m) => m.state === REJECTED && norm(current(m).statement) === norm(p.statement))) return { drop: 'rejected_before' };
+  return { support };
+}
+
+function statementDrop(p, cited, group) {
+  const allowed = allowedNumbers(cited);
+  if (numbersNotIn(p.statement, allowed).length > 0 || Object.values(p.numbers ?? {}).some((v) => v < 0 || !allowed.numbers.has(String(v)))) return 'number_not_in_evidence';
+  // A goal may have no date, so its sentence may have no number; everything else the fact lint asks still holds.
+  // Where the person trains has one fixed sentence, written by code (place.mjs); any other wording is dropped.
+  if (p.kind === PLACE_KIND ? p.statement !== PLACE_STATEMENT : lintWords(p.statement).filter((x) => !(group === 'goal' && /number/.test(x))).length > 0) return 'not_a_fact';
+  return null;
+}
+
+// The memory the proposal acts on: a target must be a neighbor the model was shown, in the slot, and still open.
+// { drop } or { usable, candidate, target }.
+function targetCheck(run, p) {
+  const usable = usableIn(run.state, p.slot);
+  const candidate = candidateIn(run.state, p.slot);
+  let target = null;
+  if (typeof p.targetMemoryId === 'string') {
+    target = byId(run.state, p.targetMemoryId);
+    if (!run.neighbors.has(p.targetMemoryId) || target === null || target.slot !== p.slot) return { drop: 'target_not_neighbor' };
+    if (!OPEN.includes(target.state)) return { drop: 'target_not_open' };
+  } else if (p.op === 'NOOP' || p.op === 'MERGE' || p.op === 'SUPERSEDE') return { drop: 'target_missing' };
+  if (p.op === 'ADD' && (usable || candidate)) return { drop: 'slot_occupied' };
+  return { usable, candidate, target };
+}
+
+// Guards that ask the person instead of writing: { p (with code's confidence), op, guard }; a guard makes the op a REVIEW.
+function guardOf(run, proposal, c) {
+  const days = supportDays(run.state, proposal.slot, run.ctx.day);
+  const p = { ...proposal, confidence: confidenceOf(proposal.kind, c.support.data, days) };          // code's number, not the model's
+  const strong = (need) => (p.kind === 'usual_slot' ? c.support.data.weeksSeen >= SLOT_WEEKS : days >= need[c.group]);
+  let guard = null;
+  if (p.op === 'ADD' || ((p.op === 'MERGE' || p.op === 'SUPERSEDE') && c.target.state !== CANDIDATE)) {
+    if (p.confidence < MIN_CONFIDENCE) guard = 'low_confidence';
+    else if (!strong(p.op === 'ADD' ? ADD_DAYS : STRONG_DAYS)) guard = 'weak_evidence';
+    else if (p.op !== 'ADD' && c.target.updated > run.ctx.day) guard = 'older_evidence';
+  }
+  return { p, op: guard ? 'REVIEW' : p.op, guard };
+}
+
+// Carries out the op and returns the memory it wrote.
+function execute(run, c, g) {
+  const { op, p } = g;
+  if (op === 'ADD') return addMemory(run, p, c.support);
+  if (op === 'NOOP') return corroborate(run, p, c.target);
+  if (op === 'MERGE' || (op === 'SUPERSEDE' && c.target.state === CANDIDATE)) return merge(run, p, c);
+  if (op === 'SUPERSEDE') return supersede(run, p, c);
+  return review(run, g, c);
+}
+
+function addMemory(run, p, support) {
+  const m = newMemory(run.state, p, support, SAVED, run.ctx);
+  log(run.state, { day: run.ctx.day, at: run.ctx.at, actor: 'system', op: 'ADD', memoryId: m.id, slot: m.slot, from: null, to: SAVED, version: 1 });
+  return m;
+}
+
+function corroborate(run, p, m) {
+  addRef(m, p, run.ctx);
+  current(m).confidence = p.confidence;
+  log(run.state, { day: run.ctx.day, at: run.ctx.at, actor: 'system', op: 'CORROBORATE', memoryId: m.id, slot: m.slot, from: m.state, to: m.state, version: current(m).n });
+  return m;
+}
+
+// The same memory, a new version; its state stays.
+function merge(run, p, c) {
+  const m = c.target;
+  newVersion(m, p, c.support, run.ctx);
+  log(run.state, { day: run.ctx.day, at: run.ctx.at, actor: 'system', op: 'MERGE', memoryId: m.id, slot: m.slot, from: m.state, to: m.state, version: current(m).n });
+  return m;
+}
+
+// A new saved memory in place of the target, even when the old one was confirmed: the person confirmed the old wording.
+function supersede(run, p, c) {
+  const { state, ctx } = run;
+  const { target } = c;
+  const m = newMemory(state, p, c.support, SAVED, ctx, target.id);
+  log(state, { day: ctx.day, at: ctx.at, actor: 'system', op: 'ADD', memoryId: m.id, slot: m.slot, from: null, to: SAVED, version: 1 });
+  move(state, target, SUPERSEDED, 'system', ctx, 'SUPERSEDE');
+  target.supersededBy = m.id;
+  for (const r of state.reviews) if (r.targetMemoryId === target.id) r.targetMemoryId = m.id;
+  return m;
+}
+
+// REVIEW: a candidate the table never shows, and a question for the person. The memory in use is not touched.
+function review(run, g, c) {
+  const { state, ctx } = run;
+  const m = reviewCandidate(run, g.p, c);
+  const reason = g.guard ?? 'model_unsure';
+  const open = state.reviews.find((r) => r.memoryId === m.id);
+  if (open) Object.assign(open, { reason, day: ctx.day, targetMemoryId: c.usable?.id ?? null });
+  else { state.seq += 1; state.reviews.push({ id: `rev_${String(state.seq).padStart(REVIEW_ID_DIGITS, '0')}`, memoryId: m.id, targetMemoryId: c.usable?.id ?? null, reason, day: ctx.day }); }
+  log(state, { day: ctx.day, at: ctx.at, actor: 'system', op: 'REVIEW', memoryId: m.id, slot: m.slot, from: null, to: CANDIDATE, version: current(m).n, code: g.guard });
+  run.asked.push(m.id);
+  return m;
+}
+
+// The slot's open candidate, with this wording as a new reference or a new version, or a new candidate.
+function reviewCandidate(run, p, c) {
+  const m = c.candidate;
+  if (!m) return newMemory(run.state, p, c.support, CANDIDATE, run.ctx);
+  if (norm(current(m).statement) === norm(p.statement)) addRef(m, p, run.ctx); else newVersion(m, p, c.support, run.ctx);
+  return m;
 }
 
 // ---------- what the person can do ----------

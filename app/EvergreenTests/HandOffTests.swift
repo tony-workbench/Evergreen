@@ -51,6 +51,10 @@ struct HandOffTests {
         #expect(try !Self.load("preview-block", as: [PreviewBlock].self).isEmpty)
         #expect(try !Self.load("session", as: [PlanSession].self).isEmpty)
         #expect(try !Self.load("handoffs", as: [HandOffs].self).isEmpty)
+        #expect(try Self.load("workout-content", as: [WorkoutContent].self).allSatisfy { !$0.items.isEmpty && $0.items.allSatisfy { ($0.reps == nil) != ($0.seconds == nil) } })
+    }
+
+    @Test func theHomeDaysFixtureNamesOnlyDayKindsAndFocusesThePhoneKnows() throws {
         // What the app sends beside the rules: each day kind is one the phone knows, and carry and queue are focus names.
         let focus: Set<String> = ["full", "lower", "upper", "full_lower", "full_upper"]
         for value in try Self.load("home-days", as: [JSONValue].self) {
@@ -58,7 +62,9 @@ struct HandOffTests {
             let named = (value["queue"]?.object ?? [:]).values.compactMap(\.string) + (value["carry"]?.array ?? []).compactMap(\.string)
             #expect(kinds.allSatisfy { DayKind(rawValue: $0) != nil } && named.allSatisfy(focus.contains))
         }
-        #expect(try Self.load("workout-content", as: [WorkoutContent].self).allSatisfy { !$0.items.isEmpty && $0.items.allSatisfy { ($0.reps == nil) != ($0.seconds == nil) } })
+    }
+
+    @Test func everyRulesFixtureImportsAsAProfile() throws {
         // The rules the engine takes are what a profile file holds, so each one imports.
         let rules = try FileManager.default.contents(atPath: Self.fixtures.appending(path: "user-rules.json").path).flatMap { try JSONSerialization.jsonObject(with: $0) as? [Any] } ?? []
         #expect(rules.count >= 3)

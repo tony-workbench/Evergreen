@@ -18,9 +18,12 @@ extension AppModel {
         }
     }
 
+    /// The activity list in Settings keeps this many lines, newest first.
+    static let activityLines = 5
+
     /// Adds a line to the activity list in Settings: "07:02 Memory updated".
     func log(_ line: String) {
-        activity = Array((["\(Date().formatted(date: .omitted, time: .shortened)) \(line)"] + activity).prefix(5))
+        activity = Array((["\(now.formatted(date: .omitted, time: .shortened)) \(line)"] + activity).prefix(Self.activityLines))
     }
 
     /// A failure in words for the person. Never anything about the key itself.

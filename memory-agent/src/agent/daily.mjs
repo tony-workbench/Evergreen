@@ -62,13 +62,15 @@ export function slotsOfBriefKey(key) {
 }
 const isOff = (store) => DERIVED_KINDS.some((k) => store.kindSuppressed(k));
 
-function record(ctx, state, snapshot, now, day, trim = true) {
+// `entry` is { snapshot, now, day, trim? }: the export, the moment of the roll, the completed day and whether to trim.
+function record(ctx, state, entry) {
+  const { snapshot, now, day, trim = true } = entry;
   const sup = suppressedTypes(ctx.store);
   if (sup.days.includes(day)) return false;
   const facts = computeFacts(snapshot, midnightOf(now), { suppressed: engineSuppression(sup), forgottenDays: sup.days, dayMode: 'completed' });
   recordFacts(state, day, facts, sup.types, trim);
   // Where the person trains, from the kinds of workouts over 8 weeks; a gym workout retires the memory that says home.
-  const place = placeEvidence(snapshot, day, parseTimestamp(midnightOf(now)).ms, sup.days);
+  const place = placeEvidence(snapshot, { day, nowMs: parseTimestamp(midnightOf(now)).ms, forgottenDays: sup.days });
   state.evidence[day].push(...place.items);
   if (place.gym) retireSlot(state, PLACE_SLOT, { day, at: now });
   const stopped = new Set(sup.keys.flatMap((k) => storeKeySlots(k.type, k.key)));
@@ -84,7 +86,7 @@ export function recordDay(ctx, { snapshot, now }) {
   return run(ctx, (state) => {
     if (isOff(ctx.store)) { if (!state.off) { wipe(state); state.off = true; } return fail('memory_off'); }
     state.off = false;
-    if (!record(ctx, state, snapshot, now, day)) return fail('day_forgotten');
+    if (!record(ctx, state, { snapshot, now, day })) return fail('day_forgotten');
     return { ok: true, day, items: state.evidence[day].length };
   });
 }
@@ -110,7 +112,7 @@ export function dailyRequest(ctx, { now, outcomes, snapshot, extras } = {}) {
     if (gone.includes(day)) return fail('day_forgotten');
     recordOutcomes(state, clean.filter((o) => !gone.includes(o.day)), day);
     recordExtras(state, more, day);
-    if (!Object.hasOwn(state.evidence, day) && snapshot !== undefined) record(ctx, state, snapshot, now, day);
+    if (!Object.hasOwn(state.evidence, day) && snapshot !== undefined) record(ctx, state, { snapshot, now, day });
     const r = dailyEvidence(state, day, ctx.io.sha256);
     if (!r.ok) return r;
     return { ok: true, day, alreadyDone: r.alreadyDone, system: SYSTEM, user: userMessage(r), schema: PROPOSALS_SCHEMA, evidence: r.evidence, neighbors: r.neighbors };
@@ -155,13 +157,15 @@ export function rollTime(ctx, snapshot) {
   });
 }
 // Forget a day. With the snapshot, every later evidence day is computed again without the day and the memories follow the new evidence.
-function forgetOne(ctx, state, day, snapshot) {
+// `forget` is { day, snapshot? }.
+function forgetOne(ctx, state, forget) {
+  const { day, snapshot } = forget;
   const offset = OFFSET.exec(snapshot?.exportDate ?? '');
   if (!offset) return forgetDay(state, day);
   const days = Object.keys(state.evidence).filter((d) => d > day).sort();
   for (const d of days) {
     const now = `${addDays(d, 1)}T00:00:00${offset[1]}`;
-    record(ctx, state, { ...snapshot, exportDate: now }, now, d, false);
+    record(ctx, state, { snapshot: { ...snapshot, exportDate: now }, now, day: d, trim: false });
   }
   return forgetDayRecomputed(state, day, days);
 }
@@ -169,7 +173,7 @@ function forgetOne(ctx, state, day, snapshot) {
 /** What the agent does when the person forgets through memoryForget: a day and "everything" are deleted, a stopped line is rejected. true when done. */
 export function onForget(ctx, a) {
   return run(ctx, (state) => {
-    if (a.what === 'day') return forgetOne(ctx, state, a.date ?? a.day, a.snapshot);
+    if (a.what === 'day') return forgetOne(ctx, state, { day: a.date ?? a.day, snapshot: a.snapshot });
     if (a.what === 'key' && a.type === 'daily') return forgetDay(state, a.key);
     if (a.what === 'key') return stopSlots(state, storeKeySlots(a.type, a.key), stamp(state, a)) || true;
     if (a.what === 'type') return TYPE_SLOTS[a.type] ? forgetSlots(state, TYPE_SLOTS[a.type]) : true;

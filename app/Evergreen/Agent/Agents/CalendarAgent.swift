@@ -111,7 +111,7 @@ struct CalendarAgent: Sendable {
     func intent(for sentence: String) async -> (intent: CalendarIntent?, source: Source, more: Bool) {
         var messages: [JSONValue] = [["role": "user", "content": .string(sentence)]]
         for repair in 0...Self.maxRepairs {
-            guard let reply = try? await model.reply(to: ModelRequest(model: modelId, system: system, messages: messages, answerSchema: askSchema, timeout: Router.quick, effort: "low")),
+            guard let reply = await model.replyIfPossible(to: ModelRequest(model: modelId, system: system, messages: messages, answerSchema: askSchema, timeout: Router.quick, effort: "low")),
                   reply.stopReason == "end_turn"
             else { break }
             let (intent, shape) = self.read(reply.text, sentence: sentence)

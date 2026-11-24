@@ -13,7 +13,10 @@ struct TourPhone<Content: View>: View {
     var layoutWidth: CGFloat = 393
     @ViewBuilder let content: () -> Content
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
     @State private var shown = false
 
     /// The frame's height for its width: what the tallest scene (the moved workout) fills.

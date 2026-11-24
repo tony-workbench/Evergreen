@@ -1,4 +1,5 @@
 import Foundation
+import os
 import JavaScriptCore
 
 /// Runs one of the engine bundles (memory, plan rules, calendar) in
@@ -28,7 +29,8 @@ actor JSBundle {
     /// A fresh context with the bundle's script evaluated; nil when the script is missing or throws.
     private func load() -> JSContext? {
         guard let url = bundle.url(forResource: resource, withExtension: "js"),
-              let script = try? String(contentsOf: url, encoding: .utf8), let context = JSContext()
+              let script = Logger.agent.attempt("The \(resource) engine couldn't be read", { try String(contentsOf: url, encoding: .utf8) }),
+              let context = JSContext()
         else { return nil }
         prepare(context)
         context.evaluateScript(script)
@@ -50,11 +52,19 @@ extension JSONValue {
 
     /// Any Codable value as JSON.
     static func from(_ value: some Encodable) -> JSONValue {
-        (try? JSONEncoder().encode(value)).flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) } ?? .null
+        Logger.agent.attempt("A value couldn't be turned into JSON") {
+            try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
+        } ?? .null
     }
 
-    /// This JSON as a Codable value; nil when it doesn't fit.
+    /// This JSON as a Codable value; nil when it doesn't fit, which callers use to tell shapes apart, so it is noted at
+    /// debug level only.
     func decoded<T: Decodable>(_ type: T.Type = T.self) -> T? {
-        (try? JSONEncoder().encode(self)).flatMap { try? JSONDecoder().decode(T.self, from: $0) }
+        do {
+            return try JSONDecoder().decode(T.self, from: JSONEncoder().encode(self))
+        } catch {
+            Logger.agent.debug("JSON didn't fit \(String(describing: T.self), privacy: .public): \(String(describing: error), privacy: .public)")
+            return nil
+        }
     }
 }

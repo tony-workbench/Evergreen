@@ -823,19 +823,25 @@
   var DAY_KINDS = ["home", "out", "rest"];
   var MOVEMENT_STATES = ["untried", "can", "cannot"];
   var MIN_LENGTH = 10;
+  var MINUTES_PER_HOUR = 60;
+  var LAST_HOUR = 23;
+  var LAST_MINUTE = 59;
+  var SUNDAY = 6;
+  var WEEK_DAYS = 7;
+  var CLOCK_DIGITS = 2;
   var MAX_LENGTH = 90;
   var ID = /^[a-z0-9_]{1,48}$/;
   var bad = () => new InputError("bad_rules");
   var whole = (v, fallback) => v === void 0 || v === null ? fallback : v;
   function minutesOf(text) {
     const m = typeof text === "string" ? /^(\d\d):(\d\d)$/.exec(text) : null;
-    if (!m || +m[1] > 23 || +m[2] > 59) return null;
-    return +m[1] * 60 + +m[2];
+    if (!m || +m[1] > LAST_HOUR || +m[2] > LAST_MINUTE) return null;
+    return +m[1] * MINUTES_PER_HOUR + +m[2];
   }
-  var clockText = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  var clockText = (minutes) => `${String(Math.floor(minutes / MINUTES_PER_HOUR)).padStart(CLOCK_DIGITS, "0")}:${String(minutes % MINUTES_PER_HOUR).padStart(CLOCK_DIGITS, "0")}`;
   function readWeekdays(list) {
     const days = whole(list, REST_WEEKDAYS);
-    if (!Array.isArray(days) || !days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) throw bad();
+    if (!Array.isArray(days) || !days.every((d) => Number.isInteger(d) && d >= 0 && d <= SUNDAY)) throw bad();
     return [...new Set(days)].sort((a, b) => a - b);
   }
   function readLength(length) {
@@ -907,7 +913,7 @@
     if (rules.restWeekdays.includes(weekdayOf(day))) return "rest";
     return given.get(day) ?? "home";
   }
-  var dayKindsView = (rules, given, firstDay, days) => Array.from({ length: days }, (_, i) => ({ day: dayISO(firstDay + i), kind: kindOf(rules, given, firstDay + i) }));
+  var dayKindsView = (rules, given, { firstDay, days }) => Array.from({ length: days }, (_, i) => ({ day: dayISO(firstDay + i), kind: kindOf(rules, given, firstDay + i) }));
 
   // src/homeweek.mjs
   var LEAD_MIN = 60;
@@ -916,6 +922,8 @@
   var MAX_FALLBACKS = 2;
   var ROUND_MIN = 5;
   var SPLIT_DAYS = 4;
+  var TURNS = 2;
+  var LEAN_DAYS = 3;
   var FOCUS = ["full", "lower", "upper", "full_lower", "full_upper"];
   var FOCUS_WORDS = { full: "full-body", lower: "lower-body", upper: "upper-body", full_lower: "full-body, more legs", full_upper: "full-body, more upper body" };
   var OFFSET = /^([+-])(\d{2}):(\d{2})$/;
@@ -926,8 +934,8 @@
     if (typeof raw !== "object" || Array.isArray(raw)) throw new InputError("bad_day_offsets");
     for (const [iso, text] of Object.entries(raw)) {
       const m = typeof text === "string" ? OFFSET.exec(text) : null;
-      const minutes = m ? (m[1] === "-" ? -1 : 1) * (+m[2] * 60 + +m[3]) : NaN;
-      if (!m || +m[3] > 59 || Math.abs(minutes) > MAX_OFFSET_MIN) throw new InputError("bad_day_offsets");
+      const minutes = m ? (m[1] === "-" ? -1 : 1) * (+m[2] * MINUTES_PER_HOUR + +m[3]) : NaN;
+      if (!m || +m[3] > LAST_MINUTE || Math.abs(minutes) > MAX_OFFSET_MIN) throw new InputError("bad_day_offsets");
       try {
         out.set(parseDay(iso), minutes);
       } catch {
@@ -937,7 +945,7 @@
     return out;
   }
   var offOf = (h, day) => h.offsets.get(day) ?? h.off;
-  var weekLength = (today) => weekdayOf(today) === 6 ? 8 : 7 - weekdayOf(today);
+  var weekLength = (today) => weekdayOf(today) === SUNDAY ? WEEK_DAYS + 1 : WEEK_DAYS - weekdayOf(today);
   function homeContext({ now, calendar, rules, dayKinds, carry = [], queue = /* @__PURE__ */ new Map(), doneToday = false, offsets = /* @__PURE__ */ new Map() }) {
     return {
       now,
@@ -952,17 +960,26 @@
       offsets
     };
   }
+  function homeContextOf(raw, { now, calendar, rules, dayKinds }) {
+    const carry = Array.isArray(raw.carry) ? raw.carry.filter((f) => FOCUS.includes(f)) : [];
+    return homeContext({ now, calendar, rules, dayKinds, carry, queue: readQueue(raw.queue), doneToday: raw.doneToday === true, offsets: readDayOffsets(raw.dayOffsets) });
+  }
   function readQueue(raw) {
     const out = /* @__PURE__ */ new Map();
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
     for (const [iso, focus] of Object.entries(raw)) {
-      try {
-        if (FOCUS.includes(focus)) out.set(parseDay(iso), focus);
-      } catch {
-      }
+      const day = FOCUS.includes(focus) ? dayOrNull(iso) : null;
+      if (day !== null) out.set(day, focus);
     }
     return out;
   }
+  var dayOrNull = (iso) => {
+    try {
+      return parseDay(iso);
+    } catch {
+      return null;
+    }
+  };
   function stretchesOn(h, day) {
     if (kindOf(h.rules, h.given, day) !== "home") return [];
     const isToday = day === h.today;
@@ -984,7 +1001,8 @@
     return out;
   }
   var roundUp = (mic) => Math.ceil(mic / (ROUND_MIN * US_MIN)) * ROUND_MIN * US_MIN;
-  function nextStart(h, day, stretches, after) {
+  function nextStart(h, open, after) {
+    const { day, stretches } = open;
     const length = h.rules.session.max * US_MIN;
     const latest = atDay(day, offOf(h, day), 0, h.rules.window.to).mic;
     let best = null;
@@ -995,13 +1013,13 @@
     return best;
   }
   function startsOn(h, day) {
-    const stretches = stretchesOn(h, day);
-    const first = nextStart(h, day, stretches, -Infinity);
+    const open = { day, stretches: stretchesOn(h, day) };
+    const first = nextStart(h, open, -Infinity);
     if (first === null) return { first: null, fallbacks: [] };
     const fallbacks = [];
     let previous = first;
     while (fallbacks.length < MAX_FALLBACKS) {
-      const t = nextStart(h, day, stretches, previous + FALLBACK_GAP_MIN * US_MIN);
+      const t = nextStart(h, open, previous + FALLBACK_GAP_MIN * US_MIN);
       if (t === null) break;
       fallbacks.push(t);
       previous = t;
@@ -1009,9 +1027,9 @@
     return { first, fallbacks };
   }
   function splitOf(days) {
-    if (days.length >= SPLIT_DAYS) return days.map((_, i) => i % 2 === 0 ? "lower" : "upper");
+    if (days.length >= SPLIT_DAYS) return days.map((_, i) => i % TURNS === 0 ? "lower" : "upper");
     const focus = days.map(() => "full");
-    if (days.length !== 3) return focus;
+    if (days.length !== LEAN_DAYS) return focus;
     for (let i = 0; i + 1 < days.length; i += 1) {
       if (days[i + 1] === days[i] + 1 && focus[i] === "full" && focus[i + 1] === "full") {
         focus[i] = "full_lower";
@@ -1024,9 +1042,9 @@
   function withCarry(days, focus, carry) {
     const missed = carry.filter((f) => FOCUS.includes(f));
     if (!missed.length) return focus;
-    if (["lower", "upper"].includes(missed[0]) && days.length >= 2) {
+    if (["lower", "upper"].includes(missed[0]) && days.length >= TURNS) {
       const other = missed[0] === "lower" ? "upper" : "lower";
-      return days.map((_, i) => i % 2 === 0 ? missed[0] : other);
+      return days.map((_, i) => i % TURNS === 0 ? missed[0] : other);
     }
     return [...missed, ...focus].slice(0, days.length);
   }
@@ -1048,9 +1066,10 @@
       row += 1;
     }
   }
-  function nextWeekFocus(h, rows, monday, last) {
+  function nextWeekFocus(h, rows, span) {
+    const { monday, last } = span;
     if (!rows.length) return;
-    const days = Array.from({ length: 7 }, (_, i) => monday + i).filter((d) => d <= last ? rows.some((r) => r.day === d) : kindOf(h.rules, h.given, d) === "home");
+    const days = Array.from({ length: WEEK_DAYS }, (_, i) => monday + i).filter((d) => d <= last ? rows.some((r) => r.day === d) : kindOf(h.rules, h.given, d) === "home");
     const focus = splitOf(days);
     for (const r of rows) r.focus = focus[days.indexOf(r.day)];
   }
@@ -1061,11 +1080,11 @@
       const kind = kindOf(h.rules, h.given, day);
       rows.push({ day, kind, focus: null, ...kind === "home" ? startsOn(h, day) : { first: null, fallbacks: [] } });
     }
-    const sunday = h.today + 6 - weekdayOf(h.today);
+    const sunday = h.today + SUNDAY - weekdayOf(h.today);
     const training = rows.filter((r) => r.first !== null);
     const thisWeek = training.filter((r) => r.day <= sunday);
     thisWeekFocus(h, thisWeek, sunday);
-    nextWeekFocus(h, training.filter((r) => r.day > sunday), sunday + 1, h.today + days - 1);
+    nextWeekFocus(h, training.filter((r) => r.day > sunday), { monday: sunday + 1, last: h.today + days - 1 });
     const homeDays = rows.filter((r) => r.kind === "home").length;
     let note = null;
     if (training.length === 0) note = "There is no day at home with time to train this week, so nothing is planned.";
@@ -1103,6 +1122,18 @@
   var LONG_RUN_MIN = 60;
   var HARD_EFFORT = 6;
   var EASY_EFFORT = 4;
+  var TAPER_SHARE = 0.8;
+  var TAPER_LONG_SHARE = 0.6;
+  var DAY_BEFORE_RACE = 1;
+  var TOMORROW = 1;
+  var EASE_SHARE = 0.8;
+  var BREAK_IN_RUNS = 2;
+  var RACE_HOUR = 8;
+  var MAX_TRIM_SHARE = 0.5;
+  var LATE_HOUR = 21;
+  var ACTION_POINTS = 10;
+  var LIGHT_LOAD_RATIO = 0.9;
+  var HEAVY_LOAD_RATIO = 1.1;
   var NOUN = {
     Running: "run",
     Cycling: "bike ride",
@@ -1167,10 +1198,10 @@
     const week = /* @__PURE__ */ new Map();
     for (const [wd, rows] of byDay) {
       if (new Set(rows.map((r) => dayOf(r.start))).size < 2) continue;
-      const counts = /* @__PURE__ */ new Map();
-      for (const r of rows) counts.set(r.activityType, (counts.get(r.activityType) ?? 0) + 1);
+      const counts2 = /* @__PURE__ */ new Map();
+      for (const r of rows) counts2.set(r.activityType, (counts2.get(r.activityType) ?? 0) + 1);
       let act = null;
-      for (const [a, n] of counts) if (act === null || n > counts.get(act)) act = a;
+      for (const [a, n] of counts2) if (act === null || n > counts2.get(act)) act = a;
       const same = rows.filter((r) => r.activityType === act);
       week.set(wd, {
         activityType: act,
@@ -1223,7 +1254,8 @@
     const shoes = a.shoes ? { boughtOn: day(a.shoes.boughtOn), startMiles: Number(a.shoes.startMiles ?? 0) } : null;
     if (shoes && (shoes.boughtOn === null || !Number.isFinite(shoes.startMiles))) throw new InputError("bad_shoes");
     const busy = (a.busy ?? a.calendar ?? []).map((b) => ({ start: parseDT(b.start), end: parseDT(b.end), title: typeof b.title === "string" ? b.title : null }));
-    const carry = Array.isArray(a.carry) ? a.carry.filter((f) => FOCUS.includes(f)) : [];
+    const rules = readRules(a.rules);
+    const dayKinds = readDayKinds(a.dayKinds);
     return {
       now,
       shoes,
@@ -1233,15 +1265,14 @@
       memory: a.memory ?? null,
       history: a.history ?? null,
       stopped: a.stopped ?? null,
-      rules: readRules(a.rules),
-      dayKinds: readDayKinds(a.dayKinds),
-      carry,
-      offsets: readDayOffsets(a.dayOffsets)
+      rules,
+      dayKinds,
+      home: rules ? homeContextOf(a, { now, calendar: busy, rules, dayKinds }) : null
     };
   }
   var HOME_EFFORT = 5;
   function homeBuild(req, base) {
-    const h = homeContext({ now: req.now, calendar: req.busy, rules: req.rules, dayKinds: req.dayKinds, carry: req.carry, offsets: req.offsets });
+    const h = req.home;
     const week = homeWeek(h);
     const minutes = req.rules.session.max;
     const sessions = week.days.filter((d) => d.focus !== null).map((d) => {
@@ -1263,166 +1294,204 @@
     return { ...base, sessions, signals: base.sig, home: homeWeekView(h, week) };
   }
   function build(req, firstDay = 0) {
+    const k = buildContext(req);
+    if (req.rules) return homeBuild(req, { sig: k.sig, condition: k.cond, memory: k.mem, memorySource: k.mem.given ? "phone" : null, historySource: k.historySource, week: k.week, long: k.long });
+    const sessions = weekSessions(req, k, firstDay);
+    if (firstDay === 0) keepToLimit(sessions, k);
+    trimInProportion(sessions, k.sig);
+    trimToLoadCap(sessions, k.sig);
+    if (firstDay === 0) trimToMinutes(sessions, k);
+    k.sig.plannedLoad = pyRound(sessionLoad(sessions));
+    for (const s of sessions) placeSession(s, req);
+    dropStopped(sessions, k);
+    dropTooLate(sessions, k);
+    return { sessions, signals: k.sig, condition: k.cond, memory: k.mem, memorySource: k.mem.given ? "phone" : null, historySource: k.historySource, week: k.week, long: k.long };
+  }
+  function buildContext(req) {
     const { now } = req;
     const [ws, days] = readHistory(req.history, now);
-    const historySource = "phone";
     const sig = signals(ws, days, now);
     const mem = readMemory(req.memory);
     const stopped = readStopped(req.stopped, mem);
     const week = usualWeek(ws, now);
     const cond = req.shoes ? condition(ws, req.shoes, now) : null;
-    const worn = Boolean(cond && cond.status === "replace");
-    const long = longDay(week);
-    const hasBike = ws.some((w) => w.activityType === "Cycling");
-    const tired = tiredSignals(sig);
-    if (req.rules) return homeBuild(req, { sig, condition: cond, memory: mem, memorySource: mem.given ? "phone" : null, historySource, week, long });
-    let eased = false;
-    let brokenIn = 0;
+    return {
+      now,
+      ws,
+      sig,
+      mem,
+      stopped,
+      week,
+      cond,
+      worn: Boolean(cond && cond.status === "replace"),
+      long: longDay(week),
+      hasBike: ws.some((w) => w.activityType === "Cycling"),
+      tired: tiredSignals(sig),
+      historySource: "phone"
+    };
+  }
+  function weekSessions(req, k, firstDay) {
+    const w = { req, k, firstDay, eased: false, brokenIn: 0 };
     const sessions = [];
     for (let i = firstDay; i < firstDay + DAYS; i += 1) {
-      const day = dayOf(now) + i;
-      const wd = weekdayOf(day);
-      if (req.raceDate !== null && day === req.raceDate) {
-        sessions.push({ date: day, activityType: "Running", usualActivity: "Running", minutes: 0, hour: 8, tags: [{ code: "race_day" }], race: true });
-        continue;
-      }
-      if (req.raceDate !== null && day === req.raceDate - 1) continue;
-      const usual = week.get(wd);
-      if (!usual) continue;
-      const slot = slotFor(mem, wd, usual.activityType);
-      if (i === 0 && atDay(day, now.off, slot ? slot.hour : usual.hour).mic < now.mic + TODAY_LEAD_MIN * US_MIN) continue;
-      if (isStopped(stopped, activityOf(usual.activityType), wd, slot ? slot.hour : usual.hour)) continue;
-      const s = {
-        date: day,
-        activityType: usual.activityType,
-        usualActivity: usual.activityType,
-        minutes: usual.minutes,
-        effort: usual.effort,
-        hour: slot ? slot.hour : usual.hour,
-        tags: [],
-        usual: usual.label,
-        label: slot ? slot.label : null
-      };
-      if (slot) {
-        s.basedOn = [slot.key];
-        s.tags.push({ code: "memory_slot", hour: s.hour });
-      }
-      if (wd === long) s.tags.push({ code: "long_run" });
-      const daysToRace = req.raceDate !== null ? req.raceDate - day : null;
-      if (daysToRace !== null && daysToRace > 0 && daysToRace <= TAPER_DAYS && s.activityType === "Running") {
-        s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes * (wd === long ? 0.6 : 0.8)));
-        s.tags.push({ code: "taper", daysToRace });
-      }
-      if (sig.readiness !== "normal" && (!eased || firstDay === 0 && i <= 1) && s.effort >= HARD_EFFORT) {
-        s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes * 0.8));
-        s.effort = Math.min(s.effort, EASY_EFFORT);
-        s.tags.push({ code: "ease_off", signals: tired });
-        eased = true;
-      }
-      if (s.activityType === "Running") {
-        const arrived = req.newPairArrives !== null && day > req.newPairArrives;
-        if (worn && !arrived && s.minutes > WORN_RUN_MAX_MIN) {
-          s.activityType = hasBike ? "Cycling" : "Elliptical";
-          s.tags.push({ code: "worn_shoes_swap", percentLife: cond.percentLife, to: s.activityType });
-        } else if (arrived && brokenIn < 2) {
-          s.minutes = Math.min(s.minutes, BREAK_IN_MIN);
-          s.effort = Math.min(s.effort, EASY_EFFORT);
-          s.tags.push({ code: "break_in" });
-          brokenIn += 1;
-        }
-      }
-      sessions.push(s);
+      const s = sessionOn(w, i);
+      if (s) sessions.push(s);
     }
-    if (firstDay === 0) {
-      const limit = sessionLimit(ws, week, now, mem);
-      let kept = 0;
-      for (let i = 0; i < sessions.length; i += 1) {
-        if (sessions[i].race) continue;
-        kept += 1;
-        if (kept > limit) {
-          sessions.splice(i, 1);
-          i -= 1;
-        }
-      }
+    return sessions;
+  }
+  function sessionOn(w, i) {
+    const { req, k } = w;
+    const day = dayOf(k.now) + i;
+    const wd = weekdayOf(day);
+    if (req.raceDate !== null && day === req.raceDate) return { date: day, activityType: "Running", usualActivity: "Running", minutes: 0, hour: RACE_HOUR, tags: [{ code: "race_day" }], race: true };
+    if (req.raceDate !== null && day === req.raceDate - DAY_BEFORE_RACE) return null;
+    const usual = k.week.get(wd);
+    if (!usual) return null;
+    const slot = slotFor(k.mem, wd, usual.activityType);
+    if (i === 0 && atDay(day, k.now.off, slot ? slot.hour : usual.hour).mic < k.now.mic + TODAY_LEAD_MIN * US_MIN) return null;
+    if (isStopped(k.stopped, activityOf(usual.activityType), wd, slot ? slot.hour : usual.hour)) return null;
+    const s = usualSession(day, usual, slot);
+    if (wd === k.long) s.tags.push({ code: "long_run" });
+    taperSession(s, req, wd === k.long);
+    easeSession(s, w, i);
+    shoeSession(s, w);
+    return s;
+  }
+  function usualSession(day, usual, slot) {
+    const s = {
+      date: day,
+      activityType: usual.activityType,
+      usualActivity: usual.activityType,
+      minutes: usual.minutes,
+      effort: usual.effort,
+      hour: slot ? slot.hour : usual.hour,
+      tags: [],
+      usual: usual.label,
+      label: slot ? slot.label : null
+    };
+    if (slot) {
+      s.basedOn = [slot.key];
+      s.tags.push({ code: "memory_slot", hour: s.hour });
     }
-    const load = (rows) => pySum(rows.filter((s) => !s.race).map((s) => s.effort * s.minutes));
-    const planned = load(sessions);
-    if (planned > sig.loadCap && sig.loadCap > 0) {
-      const flex = sessions.filter((s) => !s.race && !s.tags.some((t) => t.code === "long_run"));
-      const excess = planned - sig.loadCap;
-      const flexLoad = load(flex) || 1;
-      for (const s of flex) {
-        const cut = s.minutes * Math.min(0.5, excess / flexLoad);
-        if (cut >= 1) {
-          s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes - cut));
-          s.tags.push({ code: "load_trim" });
-        }
-      }
+    return s;
+  }
+  function taperSession(s, req, isLong) {
+    const daysToRace = req.raceDate !== null ? req.raceDate - s.date : null;
+    if (daysToRace !== null && daysToRace > 0 && daysToRace <= TAPER_DAYS && s.activityType === "Running") {
+      s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes * (isLong ? TAPER_LONG_SHARE : TAPER_SHARE)));
+      s.tags.push({ code: "taper", daysToRace });
     }
-    if (sig.loadCap > 0) {
-      for (; ; ) {
-        if (load(sessions) <= sig.loadCap) break;
-        const open = sessions.filter((s) => !s.race && s.minutes > MIN_SESSION);
-        const flex = open.filter((s) => !s.tags.some((t) => t.code === "long_run"));
-        const pool = flex.length ? flex : open;
-        if (!pool.length) break;
-        let longest = pool[0];
-        for (const s of pool) if (s.minutes > longest.minutes) longest = s;
-        longest.minutes -= 1;
-        if (!longest.tags.some((t) => t.code === "load_trim")) longest.tags.push({ code: "load_trim" });
+  }
+  function easeSession(s, w, i) {
+    if (w.k.sig.readiness !== "normal" && (!w.eased || w.firstDay === 0 && i <= TOMORROW) && s.effort >= HARD_EFFORT) {
+      s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes * EASE_SHARE));
+      s.effort = Math.min(s.effort, EASY_EFFORT);
+      s.tags.push({ code: "ease_off", signals: w.k.tired });
+      w.eased = true;
+    }
+  }
+  function shoeSession(s, w) {
+    if (s.activityType !== "Running") return;
+    const arrived = w.req.newPairArrives !== null && s.date > w.req.newPairArrives;
+    if (w.k.worn && !arrived && s.minutes > WORN_RUN_MAX_MIN) {
+      s.activityType = w.k.hasBike ? "Cycling" : "Elliptical";
+      s.tags.push({ code: "worn_shoes_swap", percentLife: w.k.cond.percentLife, to: s.activityType });
+    } else if (arrived && w.brokenIn < BREAK_IN_RUNS) {
+      s.minutes = Math.min(s.minutes, BREAK_IN_MIN);
+      s.effort = Math.min(s.effort, EASY_EFFORT);
+      s.tags.push({ code: "break_in" });
+      w.brokenIn += 1;
+    }
+  }
+  function keepToLimit(sessions, k) {
+    const limit = sessionLimit(k.ws, k.week, k.now, k.mem);
+    let kept = 0;
+    for (let i = 0; i < sessions.length; i += 1) {
+      if (sessions[i].race) continue;
+      kept += 1;
+      if (kept > limit) {
+        sessions.splice(i, 1);
+        i -= 1;
       }
     }
-    if (firstDay === 0) {
-      const { limit } = minutesBudget(ws, now, mem, week);
-      const total = () => sessions.reduce((sum, s) => sum + (s.race ? 0 : s.minutes), 0);
-      while (limit !== null && total() > limit) {
-        const open = sessions.filter((s) => !s.race && s.minutes > MIN_SESSION);
-        const flex = open.filter((s) => !s.tags.some((t) => t.code === "long_run"));
-        const pool = flex.length ? flex : open;
-        if (pool.length) {
-          let longest = pool[0];
-          for (const s of pool) if (s.minutes > longest.minutes) longest = s;
-          longest.minutes -= 1;
-          if (!longest.tags.some((t) => t.code === "load_trim")) longest.tags.push({ code: "load_trim" });
-        } else {
-          const booked = sessions.filter((s) => !s.race);
-          if (booked.length <= 1) break;
-          const last = sessions.lastIndexOf(booked[booked.length - 1]);
-          sessions.splice(last, 1);
-        }
+  }
+  var sessionLoad = (rows) => pySum(rows.filter((s) => !s.race).map((s) => s.effort * s.minutes));
+  var isLongRun = (s) => s.tags.some((t) => t.code === "long_run");
+  function trimInProportion(sessions, sig) {
+    const planned = sessionLoad(sessions);
+    if (!(planned > sig.loadCap && sig.loadCap > 0)) return;
+    const flex = sessions.filter((s) => !s.race && !isLongRun(s));
+    const excess = planned - sig.loadCap;
+    const flexLoad = sessionLoad(flex) || 1;
+    for (const s of flex) {
+      const cut = s.minutes * Math.min(MAX_TRIM_SHARE, excess / flexLoad);
+      if (cut >= 1) {
+        s.minutes = Math.max(MIN_SESSION, pyRound(s.minutes - cut));
+        s.tags.push({ code: "load_trim" });
       }
     }
-    sig.plannedLoad = pyRound(load(sessions));
-    for (const s of sessions) {
-      const length = Math.max(s.minutes, 1) * US_MIN;
-      let start = atDay(s.date, now.off, s.hour);
-      let end = addUs(start, length);
-      for (const b of req.busy) {
-        if (b.start.mic < end.mic && start.mic < b.end.mic) {
-          start = { mic: b.end.mic, off: now.off };
-          end = addUs(start, length);
-          s.tags.push({ code: "calendar_moved", to: clock(hourOf(start), minuteOf(start)) });
-        }
-      }
-      if (hourOf(end) >= 21 && !s.race) s.tags.push({ code: "no_free_slot" });
-      s.start = start;
-      s.end = end;
+  }
+  function trimToLoadCap(sessions, sig) {
+    if (!(sig.loadCap > 0)) return;
+    for (; ; ) {
+      if (sessionLoad(sessions) <= sig.loadCap) break;
+      if (!trimLongest(sessions)) break;
     }
+  }
+  function trimLongest(sessions) {
+    const open = sessions.filter((s) => !s.race && s.minutes > MIN_SESSION);
+    const flex = open.filter((s) => !isLongRun(s));
+    const pool = flex.length ? flex : open;
+    if (!pool.length) return false;
+    let longest = pool[0];
+    for (const s of pool) if (s.minutes > longest.minutes) longest = s;
+    longest.minutes -= 1;
+    if (!longest.tags.some((t) => t.code === "load_trim")) longest.tags.push({ code: "load_trim" });
+    return true;
+  }
+  function trimToMinutes(sessions, k) {
+    const { limit } = minutesBudget(k.ws, k.now, k.mem, k.week);
+    const total = () => sessions.reduce((sum, s) => sum + (s.race ? 0 : s.minutes), 0);
+    while (limit !== null && total() > limit) {
+      if (trimLongest(sessions)) continue;
+      const booked = sessions.filter((s) => !s.race);
+      if (booked.length <= 1) break;
+      sessions.splice(sessions.lastIndexOf(booked[booked.length - 1]), 1);
+    }
+  }
+  function placeSession(s, req) {
+    const { now } = req;
+    const length = Math.max(s.minutes, 1) * US_MIN;
+    let start = atDay(s.date, now.off, s.hour);
+    let end = addUs(start, length);
+    for (const b of req.busy) {
+      if (b.start.mic < end.mic && start.mic < b.end.mic) {
+        start = { mic: b.end.mic, off: now.off };
+        end = addUs(start, length);
+        s.tags.push({ code: "calendar_moved", to: clock(hourOf(start), minuteOf(start)) });
+      }
+    }
+    if (hourOf(end) >= LATE_HOUR && !s.race) s.tags.push({ code: "no_free_slot" });
+    s.start = start;
+    s.end = end;
+  }
+  function dropStopped(sessions, k) {
     const before = sessions.length;
     for (let i = sessions.length - 1; i >= 0; i -= 1) {
       const s = sessions[i];
-      if (!s.race && isStopped(stopped, activityOf(s.activityType), weekdayOf(s.date), hourOf(s.start))) sessions.splice(i, 1);
+      if (!s.race && isStopped(k.stopped, activityOf(s.activityType), weekdayOf(s.date), hourOf(s.start))) sessions.splice(i, 1);
     }
-    if (sessions.length !== before) sig.plannedLoad = pyRound(load(sessions));
-    const tooLate = sessions.findIndex((s) => !s.race && s.date === dayOf(now) && s.end.mic > atDay(s.date, now.off, TODAY_END_HOUR2).mic);
-    if (tooLate >= 0) {
-      sessions.splice(tooLate, 1);
-      sig.plannedLoad = pyRound(load(sessions));
-    }
-    return { sessions, signals: sig, condition: cond, memory: mem, memorySource: mem.given ? "phone" : null, historySource, week, long };
+    if (sessions.length !== before) k.sig.plannedLoad = pyRound(sessionLoad(sessions));
+  }
+  function dropTooLate(sessions, k) {
+    const tooLate = sessions.findIndex((s) => !s.race && s.date === dayOf(k.now) && s.end.mic > atDay(s.date, k.now.off, TODAY_END_HOUR2).mic);
+    if (tooLate < 0) return;
+    sessions.splice(tooLate, 1);
+    k.sig.plannedLoad = pyRound(sessionLoad(sessions));
   }
   var TIRED_WORDS = { sleep: "you have been sleeping less than usual", resting_hr: "your resting heart rate is higher than usual" };
   var tiredWords = (list) => list.map((k) => TIRED_WORDS[k]).filter(Boolean).join(" and ") || "your body needs a lighter day";
+  var withArticle = (words) => `${/^[aeiou]/i.test(words) ? "an" : "a"} ${words}`;
   function wording(tag, s) {
     const weekday = WEEKDAY_NAMES[weekdayOf(s.date)];
     const noun = wordOf(s);
@@ -1451,7 +1520,7 @@
       case "race_day":
         return { whole: "Race day. Rest and fuel." };
       case "home_day":
-        return { whole: `${weekday} is a day at home, so it has a ${FOCUS_WORDS[tag.focus] ?? "full-body"} strength session.` };
+        return { whole: `${weekday} is a day at home, so it has ${withArticle(FOCUS_WORDS[tag.focus] ?? "full-body")} strength session.` };
       default:
         return { whole: "" };
     }
@@ -1547,24 +1616,27 @@
   }
   function summaryReasons(plan) {
     const sig = plan.signals;
-    const out = [];
     if (plan.home) {
       const n = plan.home.trainingDays;
-      out.push({ code: "home_week", text: plan.home.note ?? `This week has ${plural(n, "day")} at home with time to train, so ${plural(n, "strength session")}.` });
-      return out;
+      return [{ code: "home_week", text: plan.home.note ?? `This week has ${plural(n, "day")} at home with time to train, so ${plural(n, "strength session")}.` }];
     }
-    if (!plan.sessions.length) out.push({ code: "no_history", text: "Nothing is planned yet because there is not enough recent history to see your usual week." });
-    else if (sig.loadRatio === null) out.push({ code: "load_unknown", text: "This week follows your usual pattern." });
-    else if (sig.loadRatio < 0.9) {
-      const trimmed = plan.sessions.some((s) => s.tags.some((t) => t.code === "load_trim"));
-      out.push({ code: "load_light", text: trimmed ? "Last week was lighter than usual, so this week builds back up gently." : "A lighter week than usual, so there is room to build." });
-    } else if (sig.loadRatio > 1.1) out.push({ code: "load_heavy", text: "A heavier week than usual, so this week stays close to your normal." });
-    else out.push({ code: "load_normal", text: "Last week was close to your normal, so this week keeps your usual pattern." });
+    const out = [loadReason(plan)];
     const tired = tiredSignals(sig);
     if (tired.length) out.push({ code: "readiness_ease", text: `Take it easier for now, because ${tiredWords(tired)}.` });
     const swaps = plan.sessions.filter((s) => s.tags.some((t) => t.code === "worn_shoes_swap")).length;
     if (swaps) out.push({ code: "worn_shoes", text: `${swaps === 1 ? "One long run moves" : `${COUNT[swaps] ?? "Several"} long runs move`} off the road while your shoes are worn out.` });
     return out;
+  }
+  function loadReason(plan) {
+    const sig = plan.signals;
+    if (!plan.sessions.length) return { code: "no_history", text: "Nothing is planned yet because there is not enough recent history to see your usual week." };
+    if (sig.loadRatio === null) return { code: "load_unknown", text: "This week follows your usual pattern." };
+    if (sig.loadRatio < LIGHT_LOAD_RATIO) {
+      const trimmed = plan.sessions.some((s) => s.tags.some((t) => t.code === "load_trim"));
+      return { code: "load_light", text: trimmed ? "Last week was lighter than usual, so this week builds back up gently." : "A lighter week than usual, so there is room to build." };
+    }
+    if (sig.loadRatio > HEAVY_LOAD_RATIO) return { code: "load_heavy", text: "A heavier week than usual, so this week stays close to your normal." };
+    return { code: "load_normal", text: "Last week was close to your normal, so this week keeps your usual pattern." };
   }
   var actionId = (s) => `wk-${dayISO(s.date)}-${s.activityType.toLowerCase()}`;
   var p22 = (n) => String(n).padStart(2, "0");
@@ -1588,52 +1660,50 @@
     const req = parseRequest(args);
     const plan = build(req, firstDay);
     const ids = plan.sessions.map(actionId);
-    const createdAt = isoDT(req.now);
-    const sessions = [];
-    const reasonsById = {};
-    const notes = [];
-    const actions = plan.sessions.map((s, i) => {
-      const reasons = sessionReasons(s);
-      const session = toSession(s, reasons);
-      if (session) {
-        sessions.push(session);
-        reasonsById[session.id] = reasons;
-      }
-      if (s.race) notes.push({ day: dayISO(s.date), code: "race_day", text: reasons[0].text });
-      return {
-        id: ids[i],
-        kind: s.race ? "note" : "addWorkout",
-        sessionId: session ? session.id : null,
-        title: s.race ? "Race day" : `Planned a ${s.minutes}-minute ${nounOf(s.activityType)}`,
-        planItemId: ids[i],
-        after: s.race ? null : { start: isoDT(s.start), end: isoDT(s.end), activityType: s.activityType },
-        reason: sentence(reasons),
-        reasons,
-        points: s.race ? null : 10,
-        createdAt,
-        rules: s.tags.map((t) => t.code),
-        basedOn: s.basedOn ?? [],
-        intensity: s.race ? null : intensityOf(s.effort),
-        evidence: citations(s)
-      };
-    });
+    const week = { createdAt: isoDT(req.now), sessions: [], reasonsById: {}, notes: [] };
+    const actions = plan.sessions.map((s, i) => weekAction(s, ids[i], week));
     const summary = summaryReasons(plan);
     return {
-      sessions,
-      reasons: reasonsById,
-      notes,
+      sessions: week.sessions,
+      reasons: week.reasonsById,
+      notes: week.notes,
       summary: sentence(summary),
       summaryReasons: summary,
       signals: plan.signals,
       actions,
       suggestions: suggestions(req, plan, ids, firstDay),
-      memoryUsed: [...new Set(sessions.flatMap((x) => x.basedOn))],
+      memoryUsed: [...new Set(week.sessions.flatMap((x) => x.basedOn))],
       memorySource: plan.memorySource,
       historySource: plan.historySource,
       live: false,
       source: "rules",
       condition: plan.condition,
       ...plan.home ? { homeWeek: plan.home } : {}
+    };
+  }
+  function weekAction(s, id, week) {
+    const reasons = sessionReasons(s);
+    const session = toSession(s, reasons);
+    if (session) {
+      week.sessions.push(session);
+      week.reasonsById[session.id] = reasons;
+    }
+    if (s.race) week.notes.push({ day: dayISO(s.date), code: "race_day", text: reasons[0].text });
+    return {
+      id,
+      kind: s.race ? "note" : "addWorkout",
+      sessionId: session ? session.id : null,
+      title: s.race ? "Race day" : `Planned a ${s.minutes}-minute ${nounOf(s.activityType)}`,
+      planItemId: id,
+      after: s.race ? null : { start: isoDT(s.start), end: isoDT(s.end), activityType: s.activityType },
+      reason: sentence(reasons),
+      reasons,
+      points: s.race ? null : ACTION_POINTS,
+      createdAt: week.createdAt,
+      rules: s.tags.map((t) => t.code),
+      basedOn: s.basedOn ?? [],
+      intensity: s.race ? null : intensityOf(s.effort),
+      evidence: citations(s)
     };
   }
 
@@ -1649,6 +1719,21 @@
   var TIRED_WORDS2 = { sleep: "you have been sleeping less than usual", resting_hr: "your resting heart rate is higher than usual" };
   var RACE_GOAL = /race|marathon|\b\d+ ?k\b|triathlon/i;
   var finite2 = (v) => Number.isFinite(v) ? v : null;
+  var MINUTES_PER_HOUR2 = 60;
+  var PERCENT = 100;
+  var WEEK_LENGTH = 7;
+  var MIN_STREAK = 3;
+  var DEFAULT_STREAK = 6;
+  var DAILY_PER_WEEK = 6;
+  var LAST_HOUR2 = 23;
+  var LAST_MINUTE2 = 59;
+  var BREAK_IN_RUNS2 = 2;
+  var BOTH_TIRED = 2;
+  var WEEK_ORDER = 1e9;
+  var CLOCK_HOURS = [0, 2];
+  var CLOCK_MINUTES = [3, 5];
+  var DATE_LENGTH = 10;
+  var LAST_DAY_OFFSET = 1;
   function longestStreak(weekdays) {
     const on = new Set(weekdays);
     if (on.size >= 7) return 7;
@@ -1662,18 +1747,14 @@
   }
   function situation(ctx) {
     if (!ctx || typeof ctx !== "object") throw new InputError("bad_context");
-    let now = parseDT(ctx.now);
-    const tz = typeof ctx.tz === "string" && /^[+-]\d\d:?\d\d$/.test(ctx.tz) ? parseDT(`2000-01-01T00:00:00${ctx.tz}`).off : null;
-    if (tz !== null) now = { mic: now.mic, off: tz };
-    const today = dayOf(now);
-    const day = (v) => v === void 0 || v === null ? null : parseDay(String(v).slice(0, 10));
+    const now = nowOf(ctx);
     const mem = readMemory(ctx.memory);
-    const calendar = (ctx.calendar ?? ctx.busy ?? []).map((b) => ({ start: parseDT(b.start), end: parseDT(b.end), title: typeof b.title === "string" ? b.title : null }));
+    const calendar = readCalendar(ctx);
     const stopped = readStopped(ctx.stopped, mem);
-    const stoppedKeys = [.../* @__PURE__ */ new Set([...mem.stoppedKeys, ...stopped.map((x) => x.key).filter(Boolean), ...Array.isArray(ctx.stoppedKeys) ? ctx.stoppedKeys.filter((k) => typeof k === "string") : []])];
+    const stoppedKeys = stoppedKeysOf(ctx, mem, stopped);
     const s = {
       now,
-      today,
+      today: dayOf(now),
       mem,
       calendar,
       stopped,
@@ -1686,77 +1767,93 @@
       offOf: () => now.off
     };
     const slots = mem.slots.filter((x) => !stoppedKeys.includes(x.key));
-    if (ctx.history) {
-      const [ws, days] = readHistory(ctx.history, now);
-      const sig = signals(ws, days, now);
-      const week = usualWeek(ws, now);
-      s.ws = ws;
-      s.long = longDay(week);
-      for (const [wd, u] of week) {
-        const act = activityOf(u.activityType);
-        const slot = [...slots].reverse().find((x) => x.weekday === wd && slotMatches(x, u.activityType));
-        s.week.set(wd, { activity: act, minutes: u.minutes, hour: slot ? slot.hour : u.hour, effort: u.effort, key: slot ? slot.key : null, label: act === "other" ? slot && slot.label || labelOf(u.activityType) : null });
-      }
-      Object.assign(s, { unit: "effort-minutes", load7: sig.load7, loadUsual: sig.loadWeeklyAvg28, loadCap: sig.loadCap > 0 ? sig.loadCap : null, tired: tiredSignals(sig) });
-      s.usualDays = s.week.size;
-      s.streak = s.week.size ? Math.max(3, longestStreak([...s.week.keys()])) : 6;
-      s.maxSessions = sessionLimit(ws, week, now, mem);
-      s.minutes = minutesBudget(ws, now, mem, week);
-    } else {
-      for (const x of slots) s.week.set(x.weekday, { activity: x.activity, minutes: x.minutes, hour: x.hour, effort: null, key: x.key, label: x.label });
-      const runs2 = [...s.week].filter(([, u]) => u.activity === "run" && u.minutes !== null);
-      for (const [wd, u] of runs2) if (s.long === null || u.minutes > s.week.get(s.long).minutes) s.long = wd;
-      const load = mem.first("load")?.data;
-      const volume = mem.first("weekly_volume")?.data;
-      const sleep = mem.first("sleep")?.data;
-      const rhr = mem.first("resting_hr")?.data;
-      const load7 = finite2(load?.minutes7d);
-      const usual = load7 !== null && load?.ratioToUsual > 0 ? load7 / load.ratioToUsual : finite2(volume?.minutesPerWeek);
-      s.tired = [];
-      if (finite2(sleep?.hours7d) !== null && finite2(sleep?.hours28d) !== null && sleep.hours7d * 60 < sleep.hours28d * 60 - SLEEP_DROP_MIN) s.tired.push("sleep");
-      if (finite2(rhr?.bpm7d) !== null && finite2(rhr?.bpm28d) !== null && rhr.bpm7d > rhr.bpm28d + RHR_RISE) s.tired.push("resting_hr");
-      const cap = usual !== null && usual > 0 ? pyRound(Math.min(LOAD_GROWTH * Math.max(load7 ?? 0, usual), ACWR_MAX * usual)) : null;
-      Object.assign(s, { unit: "minutes", load7: load7 === null ? null : pyRound(load7), loadUsual: usual === null ? null : pyRound(usual), loadCap: cap });
-      const perWeek = finite2(volume?.workoutsPerWeek);
-      s.usualDays = perWeek !== null ? Math.ceil(perWeek) : s.week.size || null;
-      s.streak = perWeek !== null && perWeek > 6 ? 7 : 6;
-      s.maxSessions = sessionLimit([], s.week, now, mem);
-      s.minutes = minutesBudget([], now, mem, s.week);
-    }
+    if (ctx.history) usualFromHistory(s, ctx.history, slots);
+    else usualFromMemory(s, slots);
     s.shoe = null;
-    const gear = mem.rows.find((r) => r.kind === "gear" && r.data && /shoe/i.test(String(r.data.item ?? "")) && Number.isFinite(r.data.km));
-    let shoe = null;
-    if (ctx.shoes && typeof ctx.shoes === "object" && s.ws && ctx.shoes.boughtOn) {
-      const c = condition(s.ws, { boughtOn: day(ctx.shoes.boughtOn), startMiles: Number(ctx.shoes.startMiles ?? 0) }, now);
-      shoe = { status: c.status, percentLife: c.percentLife, miles: c.miles };
-    } else {
-      const miles = ctx.shoes && Number.isFinite(Number(ctx.shoes.miles ?? ctx.shoes.startMiles)) ? Number(ctx.shoes.miles ?? ctx.shoes.startMiles) : gear ? gear.data.km / KM_PER_MILE : null;
-      if (miles !== null) {
-        const share = miles * KM_PER_MILE / DEFAULT_LIFE_KM;
-        shoe = { status: share >= REPLACE_AT ? "replace" : share >= WORN_AT ? "worn" : "fresh", percentLife: pyRound(share * 100), miles: pyRound(miles) };
-      }
-    }
+    const shoe = shoeOf(ctx, s);
     if (shoe) s.shoe = { ...shoe, longestRunMin: shoe.status === "replace" ? WORN_RUN_MAX_MIN : null };
-    s.newPairArrives = day(ctx.newPairArrives ?? ctx.shoes?.newPairArrives);
-    const goal = mem.rows.find((r) => r.kind === "goal" && r.data && RACE_GOAL.test(String(r.data.what ?? "")) && /^\d{4}-\d\d-\d\d/.test(String(r.data.date ?? "")));
-    s.raceDate = day(ctx.raceDate ?? (goal ? goal.data.date : null));
+    s.newPairArrives = dayOrNull2(ctx.newPairArrives ?? ctx.shoes?.newPairArrives);
+    s.raceDate = dayOrNull2(ctx.raceDate ?? raceGoalDate(mem));
     applyRules(s, ctx);
     return s;
+  }
+  var dayOrNull2 = (v) => v === void 0 || v === null ? null : parseDay(String(v).slice(0, DATE_LENGTH));
+  var readCalendar = (ctx) => (ctx.calendar ?? ctx.busy ?? []).map((b) => ({ start: parseDT(b.start), end: parseDT(b.end), title: typeof b.title === "string" ? b.title : null }));
+  function nowOf(ctx) {
+    const now = parseDT(ctx.now);
+    const tz = typeof ctx.tz === "string" && /^[+-]\d\d:?\d\d$/.test(ctx.tz) ? parseDT(`2000-01-01T00:00:00${ctx.tz}`).off : null;
+    return tz !== null ? { mic: now.mic, off: tz } : now;
+  }
+  function stoppedKeysOf(ctx, mem, stopped) {
+    const given = Array.isArray(ctx.stoppedKeys) ? ctx.stoppedKeys.filter((k) => typeof k === "string") : [];
+    return [.../* @__PURE__ */ new Set([...mem.stoppedKeys, ...stopped.map((x) => x.key).filter(Boolean), ...given])];
+  }
+  function raceGoalDate(mem) {
+    const goal = mem.rows.find((r) => r.kind === "goal" && r.data && RACE_GOAL.test(String(r.data.what ?? "")) && /^\d{4}-\d\d-\d\d/.test(String(r.data.date ?? "")));
+    return goal ? goal.data.date : null;
+  }
+  function usualFromHistory(s, history, slots) {
+    const [ws, days] = readHistory(history, s.now);
+    const sig = signals(ws, days, s.now);
+    const week = usualWeek(ws, s.now);
+    s.ws = ws;
+    s.long = longDay(week);
+    for (const [wd, u] of week) s.week.set(wd, usualDay(u, wd, slots));
+    Object.assign(s, { unit: "effort-minutes", load7: sig.load7, loadUsual: sig.loadWeeklyAvg28, loadCap: sig.loadCap > 0 ? sig.loadCap : null, tired: tiredSignals(sig) });
+    s.usualDays = s.week.size;
+    s.streak = s.week.size ? Math.max(MIN_STREAK, longestStreak([...s.week.keys()])) : DEFAULT_STREAK;
+    s.maxSessions = sessionLimit(ws, week, s.now, s.mem);
+    s.minutes = minutesBudget(ws, s.now, s.mem, week);
+  }
+  function usualDay(u, wd, slots) {
+    const act = activityOf(u.activityType);
+    const slot = [...slots].reverse().find((x) => x.weekday === wd && slotMatches(x, u.activityType));
+    return { activity: act, minutes: u.minutes, hour: slot ? slot.hour : u.hour, effort: u.effort, key: slot ? slot.key : null, label: act === "other" ? slot && slot.label || labelOf(u.activityType) : null };
+  }
+  function usualFromMemory(s, slots) {
+    for (const x of slots) s.week.set(x.weekday, { activity: x.activity, minutes: x.minutes, hour: x.hour, effort: null, key: x.key, label: x.label });
+    const runs2 = [...s.week].filter(([, u]) => u.activity === "run" && u.minutes !== null);
+    for (const [wd, u] of runs2) if (s.long === null || u.minutes > s.week.get(s.long).minutes) s.long = wd;
+    const volume = s.mem.first("weekly_volume")?.data;
+    s.tired = tiredFromMemory(s.mem);
+    Object.assign(s, loadFromMemory(s.mem, volume));
+    const perWeek = finite2(volume?.workoutsPerWeek);
+    s.usualDays = perWeek !== null ? Math.ceil(perWeek) : s.week.size || null;
+    s.streak = perWeek !== null && perWeek > DAILY_PER_WEEK ? WEEK_LENGTH : DEFAULT_STREAK;
+    s.maxSessions = sessionLimit([], s.week, s.now, s.mem);
+    s.minutes = minutesBudget([], s.now, s.mem, s.week);
+  }
+  function tiredFromMemory(mem) {
+    const sleep = mem.first("sleep")?.data;
+    const rhr = mem.first("resting_hr")?.data;
+    const tired = [];
+    if (finite2(sleep?.hours7d) !== null && finite2(sleep?.hours28d) !== null && sleep.hours7d * MINUTES_PER_HOUR2 < sleep.hours28d * MINUTES_PER_HOUR2 - SLEEP_DROP_MIN) tired.push("sleep");
+    if (finite2(rhr?.bpm7d) !== null && finite2(rhr?.bpm28d) !== null && rhr.bpm7d > rhr.bpm28d + RHR_RISE) tired.push("resting_hr");
+    return tired;
+  }
+  function loadFromMemory(mem, volume) {
+    const load = mem.first("load")?.data;
+    const load7 = finite2(load?.minutes7d);
+    const usual = load7 !== null && load?.ratioToUsual > 0 ? load7 / load.ratioToUsual : finite2(volume?.minutesPerWeek);
+    const cap = usual !== null && usual > 0 ? pyRound(Math.min(LOAD_GROWTH * Math.max(load7 ?? 0, usual), ACWR_MAX * usual)) : null;
+    return { unit: "minutes", load7: load7 === null ? null : pyRound(load7), loadUsual: usual === null ? null : pyRound(usual), loadCap: cap };
+  }
+  function shoeOf(ctx, s) {
+    if (ctx.shoes && typeof ctx.shoes === "object" && s.ws && ctx.shoes.boughtOn) {
+      const c = condition(s.ws, { boughtOn: dayOrNull2(ctx.shoes.boughtOn), startMiles: Number(ctx.shoes.startMiles ?? 0) }, s.now);
+      return { status: c.status, percentLife: c.percentLife, miles: c.miles };
+    }
+    const gear = s.mem.rows.find((r) => r.kind === "gear" && r.data && /shoe/i.test(String(r.data.item ?? "")) && Number.isFinite(r.data.km));
+    const miles = ctx.shoes && Number.isFinite(Number(ctx.shoes.miles ?? ctx.shoes.startMiles)) ? Number(ctx.shoes.miles ?? ctx.shoes.startMiles) : gear ? gear.data.km / KM_PER_MILE : null;
+    if (miles === null) return null;
+    const share = miles * KM_PER_MILE / DEFAULT_LIFE_KM;
+    return { status: share >= REPLACE_AT ? "replace" : share >= WORN_AT ? "worn" : "fresh", percentLife: pyRound(share * PERCENT), miles: pyRound(miles) };
   }
   function applyRules(s, ctx) {
     s.rules = readRules(ctx.rules);
     if (!s.rules) return;
     s.dayKinds = readDayKinds(ctx.dayKinds);
-    s.home = homeContext({
-      now: s.now,
-      calendar: s.calendar,
-      rules: s.rules,
-      dayKinds: s.dayKinds,
-      carry: Array.isArray(ctx.carry) ? ctx.carry : [],
-      queue: readQueue(ctx.queue),
-      doneToday: ctx.doneToday === true,
-      offsets: readDayOffsets(ctx.dayOffsets)
-    });
+    s.home = homeContextOf(ctx, { now: s.now, calendar: s.calendar, rules: s.rules, dayKinds: s.dayKinds });
     s.homeWeek = homeWeek(s.home);
     s.days = s.homeWeek.days.length;
     s.offOf = (day) => offOf(s.home, day);
@@ -1787,37 +1884,15 @@
   var readinessText = (tired) => tired.length ? `Take it easier for now, because ${tired.map((k) => TIRED_WORDS2[k]).join(" and ")}.` : "Sleep and resting heart rate look normal.";
   function planContext(ctx) {
     const s = situation(ctx);
-    const usual = [...s.week].filter(([, u]) => u.activity !== null).sort((a, b) => a[0] - b[0]).map(([wd, u]) => ({
-      weekday: wd,
-      weekdayName: WEEKDAYS[wd],
-      activity: u.activity === "run" && wd === s.long && u.minutes >= LONG_RUN_MIN ? "long_run" : u.activity,
-      minutes: u.minutes,
-      hour: u.hour,
-      intensity: u.effort === null ? u.activity === "other" ? "steady" : null : intensityOf(u.effort),
-      basedOn: u.key ? [u.key] : [],
-      ...u.activity === "other" ? { label: u.label ?? null } : {}
-    }));
-    const freeSlots = [];
-    for (let i = 0; i < s.days; i += 1) freeSlots.push(...freeOn(s, s.today + i));
-    const daysAway = s.raceDate !== null ? s.raceDate - s.today : null;
     return {
       now: isoDT(s.now),
-      window: { from: dayISO(s.today), to: dayISO(s.today + s.days - 1), earliestStart: isoDT({ mic: s.now.mic + TODAY_LEAD_MIN * US_MIN, off: s.now.off }) },
-      usualWeek: usual,
-      usualDaysPerWeek: s.usualDays,
-      maxSessions: s.maxSessions,
-      mostDaysInARow: s.streak,
-      usualMinutes: s.minutes.usual,
-      minutesRatio: s.minutes.ratio,
-      maxMinutes: s.minutes.limit,
-      loadUnit: s.unit,
-      loadThisWeek: s.load7,
-      loadUsual: s.loadUsual,
-      loadCap: s.loadCap,
+      window: windowView(s),
+      usualWeek: usualWeekView(s),
+      ...weekNumbers(s),
       readiness: { status: s.tired.length ? "ease_off" : "normal", signals: s.tired, text: readinessText(s.tired) },
-      freeSlots,
+      freeSlots: freeSlotsOf(s),
       shoe: s.shoe ? { ...s.shoe, newPairArrives: s.newPairArrives !== null ? dayISO(s.newPairArrives) : null } : null,
-      race: s.raceDate !== null ? { date: dayISO(s.raceDate), daysAway, taper: daysAway > 0 && daysAway <= TAPER_DAYS + DAYS, restDay: dayISO(s.raceDate - 1) } : null,
+      race: raceView(s),
       newPairArrives: s.newPairArrives !== null ? dayISO(s.newPairArrives) : null,
       stoppedKeys: s.stoppedKeys,
       memoryKeys: s.memoryKeys,
@@ -1826,13 +1901,47 @@
       activities: ACTIVITIES,
       intensities: INTENSITIES,
       limits: { minMinutes: MIN_MINUTES, maxMinutes: MAX_MINUTES, shortestSession: MIN_SESSION, wornShoeRunMin: WORN_RUN_MAX_MIN, breakInRunMin: BREAK_IN_MIN },
-      ...s.rules ? {
-        rules: rulesView(s.rules),
-        days: dayKindsView(s.rules, s.dayKinds, s.today, s.days),
-        homeWeek: homeWeekView(s.home, s.homeWeek)
-      } : {}
+      ...rulesContext(s)
     };
   }
+  var windowView = (s) => ({ from: dayISO(s.today), to: dayISO(s.today + s.days - 1), earliestStart: isoDT({ mic: s.now.mic + TODAY_LEAD_MIN * US_MIN, off: s.now.off }) });
+  var weekNumbers = (s) => ({
+    usualDaysPerWeek: s.usualDays,
+    maxSessions: s.maxSessions,
+    mostDaysInARow: s.streak,
+    usualMinutes: s.minutes.usual,
+    minutesRatio: s.minutes.ratio,
+    maxMinutes: s.minutes.limit,
+    loadUnit: s.unit,
+    loadThisWeek: s.load7,
+    loadUsual: s.loadUsual,
+    loadCap: s.loadCap
+  });
+  function freeSlotsOf(s) {
+    const freeSlots = [];
+    for (let i = 0; i < s.days; i += 1) freeSlots.push(...freeOn(s, s.today + i));
+    return freeSlots;
+  }
+  var usualWeekView = (s) => [...s.week].filter(([, u]) => u.activity !== null).sort((a, b) => a[0] - b[0]).map(([wd, u]) => ({
+    weekday: wd,
+    weekdayName: WEEKDAYS[wd],
+    activity: u.activity === "run" && wd === s.long && u.minutes >= LONG_RUN_MIN ? "long_run" : u.activity,
+    minutes: u.minutes,
+    hour: u.hour,
+    intensity: u.effort === null ? u.activity === "other" ? "steady" : null : intensityOf(u.effort),
+    basedOn: u.key ? [u.key] : [],
+    ...u.activity === "other" ? { label: u.label ?? null } : {}
+  }));
+  function raceView(s) {
+    if (s.raceDate === null) return null;
+    const daysAway = s.raceDate - s.today;
+    return { date: dayISO(s.raceDate), daysAway, taper: daysAway > 0 && daysAway <= TAPER_DAYS + DAYS, restDay: dayISO(s.raceDate - DAY_BEFORE_RACE) };
+  }
+  var rulesContext = (s) => s.rules ? {
+    rules: rulesView(s.rules),
+    days: dayKindsView(s.rules, s.dayKinds, { firstDay: s.today, days: s.days }),
+    homeWeek: homeWeekView(s.home, s.homeWeek)
+  } : {};
   var ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
   var dayWords = (iso) => `${WEEKDAY_NAMES[weekdayOf(parseDay(iso))]} the ${ordinal(Number(iso.slice(8, 10)))}`;
   var timeWords = (iso) => clock(Number(iso.slice(11, 13)), Number(iso.slice(14, 16)));
@@ -1841,10 +1950,25 @@
   function planBrief(args) {
     const c = planContext(args?.context ?? args);
     const lines = [];
-    const today = c.window.from;
-    lines.push(`Plan from today, ${dayWords(today)}, through ${dayWords(c.window.to)}; today nothing starts before ${timeWords(c.window.earliestStart)} or ends after ${clock(TODAY_END_HOUR2)}.`);
+    windowLines(c, lines);
+    usualLines(c, lines);
+    limitLines(c, lines);
+    lines.push(readinessLine(c.readiness.signals));
+    raceLines(c, lines);
+    shoeLines(c, lines);
+    if (c.rules) rulesBrief(c, lines);
+    dayLines(c, lines);
+    lines.push("Say a session comes from a habit only when that habit is in the memory you were given.");
+    for (const x of c.stoppedSlots) lines.push(`Do not plan ${x.activity === "other" ? x.label || "sessions" : PLURAL[x.activity]} on ${WEEKDAY_NAMES[x.weekday]} at ${clock(x.hour)}.`);
+    if (c.stoppedKeys.length) lines.push("Do not bring back any habit that was stopped.");
+    return { lines };
+  }
+  function windowLines(c, lines) {
+    lines.push(`Plan from today, ${dayWords(c.window.from)}, through ${dayWords(c.window.to)}; today nothing starts before ${timeWords(c.window.earliestStart)} or ends after ${clock(TODAY_END_HOUR2)}.`);
     lines.push("Use only activities the app knows, and give each session a day, a start time and a length.");
     lines.push(`Every session lasts between ${MIN_MINUTES} and ${MAX_MINUTES} minutes, and no two sessions overlap.`);
+  }
+  function usualLines(c, lines) {
     const groups = /* @__PURE__ */ new Map();
     for (const u of c.usualWeek) {
       const id = `${nameOf(u)}|${u.hour}|${u.minutes}|${u.intensity}`;
@@ -1855,6 +1979,8 @@
       lines.push(`Usual: ${nameOf(u)} ${days.join(", ")} at ${clock(u.hour)}${u.minutes ? `, ${u.minutes} minutes` : ""}${u.intensity ? `, ${u.intensity}` : ""}.`);
     }
     if (!groups.size) lines.push("No usual week is known yet, so keep this one light.");
+  }
+  function limitLines(c, lines) {
     lines.push(`${c.usualDaysPerWeek ? `Usually ${c.usualDaysPerWeek} training ${c.usualDaysPerWeek === 1 ? "day" : "days"} a week; at` : "At"} most ${c.mostDaysInARow} training days in a row before a rest day.`);
     if (c.loadCap !== null) {
       lines.push(c.loadUnit === "minutes" ? `The whole week can hold about ${c.loadCap} minutes of training.` : `The whole week can hold about ${Math.floor(c.loadCap / EFFORT_OF.steady)} minutes at a steady effort; hard minutes count for more, easy ones for less.`);
@@ -1863,44 +1989,42 @@
     if (c.maxMinutes !== null) lines.push(`At most ${c.maxMinutes} minutes of training this week${c.minutesRatio !== null && c.minutesRatio > HIGH_LOAD_RATIO ? ", because the last 7 days were heavier than usual" : ""}.`);
     const hard = c.usuallyHardDays.map((wd) => WEEKDAY_NAMES[wd]);
     lines.push(`Hard days go back to back only on days that are both usually hard${hard.length ? ` (usually hard: ${hard.join(", ")})` : ""}.`);
-    const tired = c.readiness.signals;
-    if (tired.length) {
-      const cause = tired.length === 2 ? "Sleep has been short and resting heart rate is up" : tired[0] === "sleep" ? "Sleep has been short lately" : "Resting heart rate is up";
-      lines.push(`${cause}: nothing hard today or tomorrow.`);
-    } else lines.push("Sleep and resting heart rate look normal.");
-    if (c.race && c.race.daysAway >= 0) {
-      const last = parseDay(c.window.to);
-      const raceDay = parseDay(c.race.date);
-      if (raceDay - 1 <= last) lines.push(`Race ${dayWords(c.race.date)}: nothing else that day${c.race.daysAway >= 1 ? `, and rest on ${dayWords(c.race.restDay)}` : ""}.`);
-      if (c.race.daysAway > 1 && raceDay - parseDay(today) <= TAPER_DAYS + DAYS - 1) {
-        lines.push(`With the race ${c.race.daysAway} days away, runs in the ${TAPER_DAYS} days before it stay at about four fifths of their usual length, the longest run at three fifths.`);
-      }
+  }
+  function readinessLine(tired) {
+    if (!tired.length) return "Sleep and resting heart rate look normal.";
+    const cause = tired.length === BOTH_TIRED ? "Sleep has been short and resting heart rate is up" : tired[0] === "sleep" ? "Sleep has been short lately" : "Resting heart rate is up";
+    return `${cause}: nothing hard today or tomorrow.`;
+  }
+  function raceLines(c, lines) {
+    if (!(c.race && c.race.daysAway >= 0)) return;
+    const last = parseDay(c.window.to);
+    const raceDay = parseDay(c.race.date);
+    if (raceDay - DAY_BEFORE_RACE <= last) lines.push(`Race ${dayWords(c.race.date)}: nothing else that day${c.race.daysAway >= DAY_BEFORE_RACE ? `, and rest on ${dayWords(c.race.restDay)}` : ""}.`);
+    if (c.race.daysAway > DAY_BEFORE_RACE && raceDay - parseDay(c.window.from) <= TAPER_DAYS + DAYS - LAST_DAY_OFFSET) {
+      lines.push(`With the race ${c.race.daysAway} days away, runs in the ${TAPER_DAYS} days before it stay at about four fifths of their usual length, the longest run at three fifths.`);
     }
+  }
+  function shoeLines(c, lines) {
     const arrives = c.newPairArrives;
     if (c.shoe && c.shoe.status === "replace") lines.push(`The running shoes are nearly worn out: no run longer than ${WORN_RUN_MAX_MIN} minutes${arrives ? ` until the new pair arrives on ${dayWords(arrives)}` : ""}.`);
     if (arrives) lines.push(`The first two runs after the new pair arrives on ${dayWords(arrives)} are easy and at most ${BREAK_IN_MIN} minutes.`);
-    if (c.rules) rulesBrief(c, lines);
+  }
+  function dayLines(c, lines) {
     const byDay = /* @__PURE__ */ new Map();
     for (const f of c.freeSlots) {
       if (!byDay.has(f.day)) byDay.set(f.day, []);
       byDay.get(f.day).push(`${timeWords(f.start)} to ${timeWords(f.end)}`);
     }
-    for (let d = parseDay(today); d <= parseDay(c.window.to); d += 1) {
-      const free = byDay.get(dayISO(d));
-      const kind = c.days?.find((x) => x.day === dayISO(d))?.kind;
-      if (kind === "rest" || kind === "out") {
-        lines.push(`${dayWords(dayISO(d))} is ${kind === "rest" ? "a rest day by the person's rules" : "a day out"}: plan nothing.`);
-        continue;
-      }
-      lines.push(free ? `Free on ${dayWords(dayISO(d))}: ${free.join(", ")}.` : `Nothing is free on ${dayWords(dayISO(d))}.`);
-    }
-    lines.push("Say a session comes from a habit only when that habit is in the memory you were given.");
-    for (const x of c.stoppedSlots) lines.push(`Do not plan ${x.activity === "other" ? x.label || "sessions" : PLURAL[x.activity]} on ${WEEKDAY_NAMES[x.weekday]} at ${clock(x.hour)}.`);
-    if (c.stoppedKeys.length) lines.push("Do not bring back any habit that was stopped.");
-    return { lines };
+    for (let d = parseDay(c.window.from); d <= parseDay(c.window.to); d += 1) lines.push(dayLine(c, byDay, d));
+  }
+  function dayLine(c, byDay, d) {
+    const free = byDay.get(dayISO(d));
+    const kind = c.days?.find((x) => x.day === dayISO(d))?.kind;
+    if (kind === "rest" || kind === "out") return `${dayWords(dayISO(d))} is ${kind === "rest" ? "a rest day by the person's rules" : "a day out"}: plan nothing.`;
+    return free ? `Free on ${dayWords(dayISO(d))}: ${free.join(", ")}.` : `Nothing is free on ${dayWords(dayISO(d))}.`;
   }
   var listWords = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} or ${xs[xs.length - 1]}`;
-  var ruleClock = (text) => clock(Number(text.slice(0, 2)), Number(text.slice(3, 5)));
+  var ruleClock = (text) => clock(Number(text.slice(...CLOCK_HOURS)), Number(text.slice(...CLOCK_MINUTES)));
   function rulesBrief(c, lines) {
     const r = c.rules;
     const never = r.restWeekdays.map((wd) => WEEKDAY_NAMES[wd]);
@@ -1914,40 +2038,43 @@
   function readSession(a, index, s) {
     if (!a || typeof a !== "object") return { index, error: "invalid_session" };
     try {
-      const basedOn = Array.isArray(a.basedOn) ? a.basedOn.filter((k) => typeof k === "string") : [];
-      let start;
-      let minutes;
-      let raw;
-      let activity;
-      if (a.after && typeof a.after === "object") {
-        start = parseDT(a.after.start);
-        minutes = (parseDT(a.after.end).mic - start.mic) / US_MIN;
-        raw = a.after.activityType;
-        activity = activityOf(raw);
-      } else {
-        raw = a.activity;
-        activity = ACTIVITIES.includes(raw) ? raw : null;
-        minutes = Number(a.minutes);
-        const t = typeof a.start === "string" ? /^(\d{1,2}):(\d\d)$/.exec(a.start.trim()) : null;
-        if (t) {
-          if (+t[1] > 23 || +t[2] > 59) return { index, error: "invalid_session" };
-          start = atDay(parseDay(a.day), s.offOf?.(parseDay(a.day)) ?? s.now.off, +t[1], +t[2]);
-        } else start = parseDT(a.start);
-        if (!t && a.day !== void 0 && a.day !== null && parseDay(a.day) !== dayOf(start)) return { index, error: "invalid_session" };
-      }
-      if (!Number.isFinite(minutes) || minutes < 0) return { index, error: "invalid_session" };
-      start = { mic: start.mic, off: s.offOf?.(dayOf({ mic: start.mic, off: s.now.off })) ?? s.now.off };
-      const intensity = a.intensity === "moderate" ? "steady" : a.intensity ?? null;
-      if (intensity !== null && !INTENSITIES.includes(intensity)) return { index, error: "invalid_session" };
-      const day = dayOf(start);
-      const usual = s.week.get(weekdayOf(day));
-      const usualEffort = usual && usual.effort !== null ? usual.effort : null;
-      const effort2 = intensity === null ? activity === "other" ? EFFORT_OF.steady : usualEffort ?? EFFORT_OF.steady : usualEffort !== null && intensityOf(usualEffort) === intensity ? usualEffort : EFFORT_OF[intensity];
-      return { index, id: typeof a.id === "string" ? a.id : null, start, end: addUs(start, minutes * US_MIN), day, minutes, activity, raw, effort: effort2, basedOn };
+      return sessionOf(a, index, s) ?? { index, error: "invalid_session" };
     } catch (e) {
       if (e instanceof InputError) return { index, error: "invalid_session" };
       throw e;
     }
+  }
+  function sessionOf(a, index, s) {
+    const basedOn = Array.isArray(a.basedOn) ? a.basedOn.filter((k) => typeof k === "string") : [];
+    const read = a.after && typeof a.after === "object" ? readCalendarAction(a.after) : readOwnSession(a, s);
+    if (read === null || !Number.isFinite(read.minutes) || read.minutes < 0) return null;
+    const { minutes, activity, raw } = read;
+    const start = { mic: read.start.mic, off: s.offOf?.(dayOf({ mic: read.start.mic, off: s.now.off })) ?? s.now.off };
+    const intensity = a.intensity === "moderate" ? "steady" : a.intensity ?? null;
+    if (intensity !== null && !INTENSITIES.includes(intensity)) return null;
+    const day = dayOf(start);
+    const effort2 = effortOf(s, { day, intensity, activity });
+    return { index, id: typeof a.id === "string" ? a.id : null, start, end: addUs(start, minutes * US_MIN), day, minutes, activity, raw, effort: effort2, basedOn };
+  }
+  function readCalendarAction(after) {
+    const start = parseDT(after.start);
+    return { start, minutes: (parseDT(after.end).mic - start.mic) / US_MIN, raw: after.activityType, activity: activityOf(after.activityType) };
+  }
+  function readOwnSession(a, s) {
+    const raw = a.activity;
+    const activity = ACTIVITIES.includes(raw) ? raw : null;
+    const minutes = Number(a.minutes);
+    const t = typeof a.start === "string" ? /^(\d{1,2}):(\d\d)$/.exec(a.start.trim()) : null;
+    if (t && (+t[1] > LAST_HOUR2 || +t[2] > LAST_MINUTE2)) return null;
+    const start = t ? atDay(parseDay(a.day), s.offOf?.(parseDay(a.day)) ?? s.now.off, +t[1], +t[2]) : parseDT(a.start);
+    if (!t && a.day !== void 0 && a.day !== null && parseDay(a.day) !== dayOf(start)) return null;
+    return { start, minutes, raw, activity };
+  }
+  function effortOf(s, { day, intensity, activity }) {
+    const usual = s.week.get(weekdayOf(day));
+    const usualEffort = usual && usual.effort !== null ? usual.effort : null;
+    if (intensity === null) return activity === "other" ? EFFORT_OF.steady : usualEffort ?? EFFORT_OF.steady;
+    return usualEffort !== null && intensityOf(usualEffort) === intensity ? usualEffort : EFFORT_OF[intensity];
   }
   var dayName = (day) => WEEKDAY_NAMES[weekdayOf(day)];
   var what = (x) => `${dayName(x.day)}'s ${NOUN2[x.activity] ?? "session"}`;
@@ -1957,93 +2084,138 @@
     const list = listOf(args);
     if (!Array.isArray(list)) throw new InputError("bad_plan");
     const found = [];
-    const add = (code, x, text, fix) => found.push({ code, text, fix, action: x ? x.index : null, sessionId: x && x.id ? x.id : null });
+    const add = (code, x, [text, fix]) => found.push({ code, text, fix, action: x ? x.index : null, sessionId: x && x.id ? x.id : null });
+    const items = readItems(s, list, add);
+    checkTimes(s, items, add);
+    checkOverlaps(items, add);
+    const planned = checkLoad(s, items, add);
+    checkTired(s, items, add);
+    checkRace(s, items, add);
+    checkShoes(s, items, add);
+    checkCounts(s, items, add);
+    checkStreak(s, items, add);
+    checkHardDays(s, items, add);
+    if (s.rules) checkRules(s, items, add);
+    return verdict(s, found, planned);
+  }
+  function readItems(s, list, add) {
     const items = [];
     list.forEach((a, index) => {
       if (a && a.kind === "note" && !a.after) return;
       const x = readSession(a, index, s);
-      if (x.error) add(x.error, { index, id: typeof a?.id === "string" ? a.id : null }, "This session could not be read: it needs a day, a start time, an activity and minutes.", "send day (YYYY-MM-DD), start (ISO 8601 with offset), activity, minutes");
-      else if (x.activity === null) add("unknown_activity", x, `"${String(x.raw)}" is not an activity this app knows.`, `use one of: ${ACTIVITIES.join(", ")}`);
+      if (x.error) add(x.error, { index, id: typeof a?.id === "string" ? a.id : null }, ["This session could not be read: it needs a day, a start time, an activity and minutes.", "send day (YYYY-MM-DD), start (ISO 8601 with offset), activity, minutes"]);
+      else if (x.activity === null) add("unknown_activity", x, [`"${String(x.raw)}" is not an activity this app knows.`, `use one of: ${ACTIVITIES.join(", ")}`]);
       else if (x.activity !== "rest") items.push(x);
     });
-    items.sort((a, b) => a.start.mic - b.start.mic || a.index - b.index);
-    const windowEnd = atDay(s.today + s.days, s.offOf(s.today + s.days)).mic;
-    const earliest = s.now.mic + TODAY_LEAD_MIN * US_MIN;
-    const todayEnd = atDay(s.today, s.now.off, TODAY_END_HOUR2).mic;
+    return items.sort((a, b) => a.start.mic - b.start.mic || a.index - b.index);
+  }
+  function checkTimes(s, items, add) {
+    const w = { end: atDay(s.today + s.days, s.offOf(s.today + s.days)).mic, earliest: s.now.mic + TODAY_LEAD_MIN * US_MIN, todayEnd: atDay(s.today, s.now.off, TODAY_END_HOUR2).mic };
     for (const x of items) {
-      if (x.minutes < MIN_MINUTES) add("bad_duration", x, `${what(x)} is shorter than ${MIN_MINUTES} minutes.`, `lengthen to \u2265${MIN_MINUTES} min`);
-      else if (x.minutes > MAX_MINUTES) add("bad_duration", x, `${what(x)} is longer than ${MAX_MINUTES} minutes.`, `shorten to \u2264${MAX_MINUTES} min`);
-      if (x.start.mic < s.now.mic) add("outside_window", x, `${what(x)} is in the past.`, `move to ${hhmm({ mic: earliest, off: s.now.off })} or later`);
-      else if (x.start.mic >= windowEnd) add("outside_window", x, `${what(x)} is outside the ${s.days} days that start today.`, `move to ${dayISO(s.today + s.days - 1)} or earlier`);
-      else if (x.start.mic < earliest) add("outside_window", x, `${what(x)} starts too soon to get ready for.`, `move to ${hhmm({ mic: earliest, off: s.now.off })} or later`);
-      else if (x.day === s.today && x.end.mic > todayEnd) add("outside_window", x, `${what(x)} would end too late tonight.`, `end by ${TODAY_END_HOUR2}:00 or move to tomorrow`);
-      const busy = s.calendar.find((b) => b.start.mic < x.end.mic && x.start.mic < b.end.mic);
-      if (busy) add("calendar_conflict", x, `${what(x)} overlaps ${busy.title ? `"${busy.title}"` : "something"} on your calendar.`, `move after ${hhmm({ mic: busy.end.mic, off: s.now.off })}`);
-      if (isStopped(s.stopped, x.activity, weekdayOf(x.day), hourOf(x.start))) {
-        const hit = s.stopped.find((y) => y.activity === (x.activity === "long_run" ? "run" : x.activity) && y.weekday === weekdayOf(x.day) && y.hour === hourOf(x.start));
-        add("stopped_slot", x, `You asked me not to plan ${dayName(x.day)} ${clock(hit.hour)} ${hit.activity === "other" ? hit.label || "sessions" : PLURAL[hit.activity]}.`, "move to another hour or remove this session");
-      }
-      for (const key of x.basedOn) {
-        if (s.stoppedKeys.includes(key)) add("stopped_memory_key", x, `${what(x)} leans on a habit you asked to stop.`, "remove this session");
-        else if (!s.memoryKeys.includes(key)) add("unknown_memory_key", x, `${what(x)} cites a memory that is not there.`, "remove that key from basedOn");
-      }
+      checkDuration(x, add);
+      checkWindow({ s, w, x }, add);
+      checkBusy(s, x, add);
+      checkStopped(s, x, add);
+      checkKeys(s, x, add);
     }
+  }
+  function checkDuration(x, add) {
+    if (x.minutes < MIN_MINUTES) add("bad_duration", x, [`${what(x)} is shorter than ${MIN_MINUTES} minutes.`, `lengthen to \u2265${MIN_MINUTES} min`]);
+    else if (x.minutes > MAX_MINUTES) add("bad_duration", x, [`${what(x)} is longer than ${MAX_MINUTES} minutes.`, `shorten to \u2264${MAX_MINUTES} min`]);
+  }
+  function checkWindow({ s, w, x }, add) {
+    if (x.start.mic < s.now.mic) add("outside_window", x, [`${what(x)} is in the past.`, `move to ${hhmm({ mic: w.earliest, off: s.now.off })} or later`]);
+    else if (x.start.mic >= w.end) add("outside_window", x, [`${what(x)} is outside the ${s.days} days that start today.`, `move to ${dayISO(s.today + s.days - 1)} or earlier`]);
+    else if (x.start.mic < w.earliest) add("outside_window", x, [`${what(x)} starts too soon to get ready for.`, `move to ${hhmm({ mic: w.earliest, off: s.now.off })} or later`]);
+    else if (x.day === s.today && x.end.mic > w.todayEnd) add("outside_window", x, [`${what(x)} would end too late tonight.`, `end by ${TODAY_END_HOUR2}:00 or move to tomorrow`]);
+  }
+  function checkBusy(s, x, add) {
+    const busy = s.calendar.find((b) => b.start.mic < x.end.mic && x.start.mic < b.end.mic);
+    if (busy) add("calendar_conflict", x, [`${what(x)} overlaps ${busy.title ? `"${busy.title}"` : "something"} on your calendar.`, `move after ${hhmm({ mic: busy.end.mic, off: s.now.off })}`]);
+  }
+  function checkStopped(s, x, add) {
+    if (!isStopped(s.stopped, x.activity, weekdayOf(x.day), hourOf(x.start))) return;
+    const hit = s.stopped.find((y) => y.activity === (x.activity === "long_run" ? "run" : x.activity) && y.weekday === weekdayOf(x.day) && y.hour === hourOf(x.start));
+    add("stopped_slot", x, [`You asked me not to plan ${dayName(x.day)} ${clock(hit.hour)} ${hit.activity === "other" ? hit.label || "sessions" : PLURAL[hit.activity]}.`, "move to another hour or remove this session"]);
+  }
+  function checkKeys(s, x, add) {
+    for (const key of x.basedOn) {
+      if (s.stoppedKeys.includes(key)) add("stopped_memory_key", x, [`${what(x)} leans on a habit you asked to stop.`, "remove this session"]);
+      else if (!s.memoryKeys.includes(key)) add("unknown_memory_key", x, [`${what(x)} cites a memory that is not there.`, "remove that key from basedOn"]);
+    }
+  }
+  function checkOverlaps(items, add) {
     items.forEach((x, i) => {
       const next = items[i + 1];
-      if (next && next.start.mic < x.end.mic) add("overlap", next, `${what(next)} starts before ${what(x)} ends.`, `move after ${hhmm(x.end)}`);
+      if (next && next.start.mic < x.end.mic) add("overlap", next, [`${what(next)} starts before ${what(x)} ends.`, `move after ${hhmm(x.end)}`]);
     });
-    const loadOf = (x) => s.unit === "minutes" ? x.minutes : x.effort * x.minutes;
-    const planned = pySum(items.map(loadOf));
+  }
+  function checkLoad(s, items, add) {
+    const planned = pySum(items.map((x) => s.unit === "minutes" ? x.minutes : x.effort * x.minutes));
     if (s.loadCap !== null && planned > s.loadCap * LOAD_SLACK && items.some((x) => x.minutes > MIN_SESSION)) {
       const perMinute = s.unit === "minutes" ? 1 : planned / Math.max(1, pySum(items.map((x) => x.minutes)));
-      add("load_over_cap", null, "This week adds up to more than your body is used to.", `shorten the week by ${Math.ceil((planned - s.loadCap) / perMinute)} min in total`);
+      add("load_over_cap", null, ["This week adds up to more than your body is used to.", `shorten the week by ${Math.ceil((planned - s.loadCap) / perMinute)} min in total`]);
     }
-    if (s.tired.length) {
-      for (const x of items) {
-        if (x.day <= s.today + 1 && x.effort >= HARD_EFFORT) add("hard_when_tired", x, `${what(x)} is a hard one, and ${s.tired.map((k) => TIRED_WORDS2[k]).join(" and ")}.`, "make it easy");
-      }
-    }
-    if (s.raceDate !== null) {
-      const runMinutes = [...s.week.values()].filter((u) => u.activity === "run" && u.minutes !== null).map((u) => u.minutes);
-      for (const x of items) {
-        const toRace = s.raceDate - x.day;
-        if (toRace === 0) add("race_day_session", x, "Race day is for the race alone.", "remove this session");
-        else if (toRace === 1) add("no_rest_before_race", x, "The day before your race is a rest day.", "remove this session");
-        else if (toRace > 0 && toRace <= TAPER_DAYS && isRun(x.activity)) {
-          const wd = weekdayOf(x.day);
-          const usual = s.week.get(wd);
-          const base = usual && usual.activity === "run" && usual.minutes !== null ? usual.minutes * (wd === s.long ? 0.6 : 0.8) : runMinutes.length ? pyMedian(runMinutes) * 0.8 : null;
-          const limit = base === null ? TAPER_RUN_MAX_MIN : Math.max(MIN_SESSION, pyRound(base));
-          if (x.minutes > limit) add("taper_too_long", x, `${what(x)} is too long this close to your race.`, `shorten to \u2264${limit} min`);
-        }
-      }
-    }
-    let brokenIn = 0;
+    return planned;
+  }
+  function checkTired(s, items, add) {
+    if (!s.tired.length) return;
     for (const x of items) {
-      if (!isRun(x.activity)) continue;
+      if (x.day <= s.today + TOMORROW && x.effort >= HARD_EFFORT) add("hard_when_tired", x, [`${what(x)} is a hard one, and ${s.tired.map((k) => TIRED_WORDS2[k]).join(" and ")}.`, "make it easy"]);
+    }
+  }
+  function checkRace(s, items, add) {
+    if (s.raceDate === null) return;
+    for (const x of items) {
+      const toRace = s.raceDate - x.day;
+      if (toRace === 0) add("race_day_session", x, ["Race day is for the race alone.", "remove this session"]);
+      else if (toRace === DAY_BEFORE_RACE) add("no_rest_before_race", x, ["The day before your race is a rest day.", "remove this session"]);
+      else if (toRace > 0 && toRace <= TAPER_DAYS && isRun(x.activity)) checkTaper(s, x, add);
+    }
+  }
+  function checkTaper(s, x, add) {
+    const runMinutes = [...s.week.values()].filter((u) => u.activity === "run" && u.minutes !== null).map((u) => u.minutes);
+    const wd = weekdayOf(x.day);
+    const usual = s.week.get(wd);
+    const base = usual && usual.activity === "run" && usual.minutes !== null ? usual.minutes * (wd === s.long ? TAPER_LONG_SHARE : TAPER_SHARE) : runMinutes.length ? pyMedian(runMinutes) * TAPER_SHARE : null;
+    const limit = base === null ? TAPER_RUN_MAX_MIN : Math.max(MIN_SESSION, pyRound(base));
+    if (x.minutes > limit) add("taper_too_long", x, [`${what(x)} is too long this close to your race.`, `shorten to \u2264${limit} min`]);
+  }
+  function checkShoes(s, items, add) {
+    let brokenIn = 0;
+    for (const x of items.filter((y) => isRun(y.activity))) {
       const arrived = s.newPairArrives !== null && x.day > s.newPairArrives;
       if (s.shoe && s.shoe.status === "replace" && !arrived && x.minutes > WORN_RUN_MAX_MIN) {
-        add("worn_shoes_long_run", x, `${what(x)} is too long for shoes this worn.`, `shorten to \u2264${WORN_RUN_MAX_MIN} min or switch to ride`);
-      } else if (arrived && brokenIn < 2) {
-        if (x.minutes > BREAK_IN_MIN) add("break_in_too_long", x, `${what(x)} is too long for a first run in new shoes.`, `shorten to \u2264${BREAK_IN_MIN} min`);
-        if (x.effort > EASY_EFFORT) add("break_in_not_easy", x, `${what(x)} should be easy while your new shoes break in.`, "make it easy");
+        add("worn_shoes_long_run", x, [`${what(x)} is too long for shoes this worn.`, `shorten to \u2264${WORN_RUN_MAX_MIN} min or switch to ride`]);
+      } else if (arrived && brokenIn < BREAK_IN_RUNS2) {
+        checkBreakIn(x, add);
         brokenIn += 1;
       }
     }
+  }
+  function checkBreakIn(x, add) {
+    if (x.minutes > BREAK_IN_MIN) add("break_in_too_long", x, [`${what(x)} is too long for a first run in new shoes.`, `shorten to \u2264${BREAK_IN_MIN} min`]);
+    if (x.effort > EASY_EFFORT) add("break_in_not_easy", x, [`${what(x)} should be easy while your new shoes break in.`, "make it easy"]);
+  }
+  function checkCounts(s, items, add) {
     if (items.length > s.maxSessions) {
       const extra = items.length - s.maxSessions;
-      add("too_many_sessions", null, `This week has ${items.length} sessions, and ${s.maxSessions} is the most that fits you for now.`, `remove ${extra} ${extra === 1 ? "session" : "sessions"}`);
+      add("too_many_sessions", null, [`This week has ${items.length} sessions, and ${s.maxSessions} is the most that fits you for now.`, `remove ${extra} ${extra === 1 ? "session" : "sessions"}`]);
     }
     const totalMinutes = items.reduce((sum, x) => sum + x.minutes, 0);
     if (s.minutes.limit !== null && totalMinutes > s.minutes.limit) {
-      add("too_many_minutes", null, `This week adds up to ${pyRound(totalMinutes)} minutes, and ${s.minutes.limit} is the most that fits you for now.`, `shorten the week by ${Math.ceil(totalMinutes - s.minutes.limit)} min in total`);
+      add("too_many_minutes", null, [`This week adds up to ${pyRound(totalMinutes)} minutes, and ${s.minutes.limit} is the most that fits you for now.`, `shorten the week by ${Math.ceil(totalMinutes - s.minutes.limit)} min in total`]);
     }
+  }
+  function checkStreak(s, items, add) {
     const days = [...new Set(items.map((x) => x.day))].sort((a, b) => a - b);
     let run = 0;
     days.forEach((d, i) => {
       run = i && d === days[i - 1] + 1 ? run + 1 : 1;
-      if (run === s.streak + 1) add("too_many_days_in_a_row", items.find((it) => it.day === d), `${dayName(d)} would be day ${run} in a row without a rest.`, "remove this session or move it after a rest day");
+      if (run === s.streak + 1) add("too_many_days_in_a_row", items.find((it) => it.day === d), [`${dayName(d)} would be day ${run} in a row without a rest.`, "remove this session or move it after a rest day"]);
     });
+  }
+  function checkHardDays(s, items, add) {
     const hardDays = /* @__PURE__ */ new Map();
     for (const x of items) if (x.effort >= HARD_EFFORT && !hardDays.has(x.day)) hardDays.set(x.day, x);
     const usuallyHard = (d) => {
@@ -2051,10 +2223,11 @@
       return Boolean(u && u.effort !== null && u.effort >= HARD_EFFORT);
     };
     for (const [d, x] of hardDays) {
-      if (hardDays.has(d - 1) && !(usuallyHard(d) && usuallyHard(d - 1))) add("back_to_back_hard", x, `${what(x)} is hard and so is the day before.`, "make it easy or move it a day later");
+      if (hardDays.has(d - 1) && !(usuallyHard(d) && usuallyHard(d - 1))) add("back_to_back_hard", x, [`${what(x)} is hard and so is the day before.`, "make it easy or move it a day later"]);
     }
-    if (s.rules) checkRules(s, items, add);
-    found.sort((a, b) => (a.action ?? 1e9) - (b.action ?? 1e9));
+  }
+  function verdict(s, found, planned) {
+    found.sort((a, b) => (a.action ?? WEEK_ORDER) - (b.action ?? WEEK_ORDER));
     const where = (v) => ({ ...v.action === null ? {} : { action: v.action }, ...v.sessionId ? { sessionId: v.sessionId } : {} });
     return {
       pass: found.length === 0,
@@ -2064,28 +2237,28 @@
     };
   }
   function checkRules(s, items, add) {
-    const r = s.rules;
-    const at = (minutes) => clock(Math.floor(minutes / 60), minutes % 60);
-    for (const x of items) {
-      const kind = kindOf(r, s.dayKinds, x.day);
-      if (kind === "rest") add("rest_day_rule", x, `${dayName(x.day)} is a day you never train.`, "remove this session");
-      else if (kind === "out") add("out_day_rule", x, `You are out on ${dayName(x.day)}, so nothing is planned that day.`, "remove this session");
-      else if (x.activity === "strength") {
-        const minute = (x.start.mic - atDay(x.day, s.offOf(x.day)).mic) / US_MIN;
-        if (minute < r.window.from || minute > r.window.to) add("outside_rule_hours", x, `${what(x)} starts outside the hours you allow.`, `start between ${at(r.window.from)} and ${at(r.window.to)}`);
-        if (x.minutes < r.session.min || x.minutes > r.session.max) add("session_length_rule", x, `${what(x)} is not ${r.session.min} to ${r.session.max} minutes long.`, `make it ${r.session.max} min`);
-      }
-    }
+    for (const x of items) checkRuleDay(s, x, add);
     for (const d of s.homeWeek.days) {
       if (d.first === null || items.some((x) => x.day === d.day && x.activity === "strength")) continue;
-      add(
-        "home_day_missing",
-        null,
+      add("home_day_missing", null, [
         `${dayName(d.day)} is a day at home, and every day at home has a workout.`,
-        `add a ${r.session.max}-minute strength session on ${dayISO(d.day)} at ${hhmm({ mic: d.first, off: s.offOf(d.day) })}`
-      );
+        `add a ${s.rules.session.max}-minute strength session on ${dayISO(d.day)} at ${hhmm({ mic: d.first, off: s.offOf(d.day) })}`
+      ]);
     }
   }
+  function checkRuleDay(s, x, add) {
+    const kind = kindOf(s.rules, s.dayKinds, x.day);
+    if (kind === "rest") add("rest_day_rule", x, [`${dayName(x.day)} is a day you never train.`, "remove this session"]);
+    else if (kind === "out") add("out_day_rule", x, [`You are out on ${dayName(x.day)}, so nothing is planned that day.`, "remove this session"]);
+    else if (x.activity === "strength") checkHomeSession(s, x, add);
+  }
+  function checkHomeSession(s, x, add) {
+    const r = s.rules;
+    const minute = (x.start.mic - atDay(x.day, s.offOf(x.day)).mic) / US_MIN;
+    if (minute < r.window.from || minute > r.window.to) add("outside_rule_hours", x, [`${what(x)} starts outside the hours you allow.`, `start between ${ruleTime(r.window.from)} and ${ruleTime(r.window.to)}`]);
+    if (x.minutes < r.session.min || x.minutes > r.session.max) add("session_length_rule", x, [`${what(x)} is not ${r.session.min} to ${r.session.max} minutes long.`, `make it ${r.session.max} min`]);
+  }
+  var ruleTime = (minutes) => clock(Math.floor(minutes / MINUTES_PER_HOUR2), minutes % MINUTES_PER_HOUR2);
   function explainAction(args) {
     const action = args?.action ?? args?.session;
     if (!action || typeof action !== "object") throw new InputError("bad_action");
@@ -3928,9 +4101,19 @@
   var LOAD_MAX_KG = 12;
   var SLOW_EXTRA_SECONDS = 2;
   var MAX_ITEMS = 5;
-  var MIN_ITEMS = 3;
+  var MIN_ITEMS = 4;
   var MAX_SETS = 6;
   var MAX_PROPOSED_ITEMS = 8;
+  var MAX_SETS_ADDED = 24;
+  var IN_A_ROW = 2;
+  var REP_SECONDS = 3;
+  var SECONDS_PER_MINUTE = 60;
+  var START_LOAD_KG = 2;
+  var REQUEST_MIN_MINUTES = 5;
+  var REQUEST_MAX_MINUTES = 120;
+  var PAIN_EASE_AT = 4;
+  var UNCOUNTED_SETS = 99;
+  var RANGE_LENGTH = 2;
   var ID2 = /^[a-z0-9_]{1,48}$/;
   var ROOT = /* @__PURE__ */ new Map();
   for (const m of MOVEMENTS) {
@@ -3967,29 +4150,42 @@
   function readHistory2(raw) {
     if (raw === void 0 || raw === null) return [];
     if (!Array.isArray(raw)) throw new InputError("bad_content");
-    return raw.map((h) => {
-      if (!h || typeof h.movementId !== "string" || !Array.isArray(h.sets) || !h.sets.every((n) => Number.isFinite(n) && n >= 0)) throw new InputError("bad_content");
-      return { movementId: h.movementId, day: String(h.day ?? ""), sets: h.sets, load: Number.isFinite(h.load) ? h.load : null, slow: h.slow === true };
-    }).sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
+    return raw.map(readEntry).sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
+  }
+  function readEntry(h) {
+    if (!h || typeof h.movementId !== "string" || !Array.isArray(h.sets) || !h.sets.every((n) => Number.isFinite(n) && n >= 0)) throw new InputError("bad_content");
+    return { movementId: h.movementId, day: String(h.day ?? ""), sets: h.sets, load: Number.isFinite(h.load) ? h.load : null, slow: h.slow === true, tooHard: h.tooHard === true };
   }
   var owns = (rules, m) => m.equipment.every((e) => rules.equipment.includes(e) || ALWAYS_THERE.includes(e));
   var top = (m) => (m.dose.reps ?? m.dose.seconds)[1];
   var timesOf = (history, id) => history.filter((h) => h.movementId === id);
   var atTop = (m, t) => t.sets.length >= m.dose.sets && t.sets.every((n) => n >= top(m));
-  var toppedLastTime = (history, m) => {
+  var counts = (m, t) => !t.tooHard && atTop(m, t);
+  var lastTwoCount = (m, times) => times.length >= IN_A_ROW && times.slice(-IN_A_ROW).every((t) => counts(m, t));
+  var countedLastTime = (history, m) => {
     const last = timesOf(history, m.id).at(-1);
-    return Boolean(last) && atTop(m, last);
+    return Boolean(last) && counts(m, last);
   };
   function mastered(history, id) {
-    const m = movementOf(id);
-    const times = timesOf(history, id).slice(-2);
-    return times.length === 2 && times.every((t) => atTop(m, t));
+    return lastTwoCount(movementOf(id), timesOf(history, id));
   }
-  var slowStepDone = (history, m) => !m.tempo || timesOf(history, m.id).some((t) => t.slow && atTop(m, t));
+  function slowDoneAt(times, m) {
+    for (let k = 1; k < times.length; k += 1) if (times[k - 1].slow && times[k].slow && counts(m, times[k - 1]) && counts(m, times[k])) return k;
+    return -1;
+  }
+  var slowStepDone = (history, m) => !m.tempo || slowDoneAt(timesOf(history, m.id), m) >= 0;
   function nextIsSlow(history, m) {
     if (slowStepDone(history, m)) return false;
-    const last = timesOf(history, m.id).at(-1);
-    return Boolean(last) && (last.slow || atTop(m, last));
+    const times = timesOf(history, m.id);
+    return times.some((t) => t.slow) || lastTwoCount(m, times);
+  }
+  function heavierStepDone(history, m) {
+    if (!m.equipment.includes("backpack")) return true;
+    const times = timesOf(history, m.id);
+    const k = m.tempo ? slowDoneAt(times, m) : 0;
+    if (k < 0 || !times.length) return false;
+    const base = times[k].load ?? m.load ?? 0;
+    return base >= LOAD_MAX_KG || times.slice(k + 1).some((t) => t.load !== null && t.load > base);
   }
   var doneBefore = (history, id) => history.some((h) => h.movementId === id);
   function blockOf(rules, history, id) {
@@ -4005,49 +4201,51 @@
     if (m.entry || rules.movements[m.id] === "can" || doneBefore(history, m.id)) return true;
     const before = m.easier && movementOf(m.easier);
     if (!before) return true;
+    if (excluded(rules, before)) return false;
     if (!owns(rules, before)) return !m.gated && earned(rules, history, before);
     return passed(history, before);
   }
-  var passed = (history, m) => mastered(history, m.id) && slowStepDone(history, m) && fullyLoaded(history, m);
-  var fullyLoaded = (history, m) => !m.equipment.includes("backpack") || (lastLoad(history, m.id) ?? 0) >= LOAD_MAX_KG;
+  var excluded = (rules, m) => rules.avoid.includes(m.id) || rules.movements[m.id] === "cannot";
+  var passed = (history, m) => mastered(history, m.id) && slowStepDone(history, m) && heavierStepDone(history, m);
   var patternUsable = (rules, history, pattern) => MOVEMENTS.some((m) => m.pattern === pattern && blockOf(rules, history, m.id) === null);
   var isNew = (rules, history, m) => !m.entry && !doneBefore(history, m.id) && rules.movements[m.id] !== "can" && !(m.easier && !owns(rules, movementOf(m.easier)));
-  function pickInChain(rules, history, root, allowNew) {
+  function pickInChain(person, root, allowNew) {
+    const { rules, history } = person;
     let pick = null;
     for (let m = movementOf(root); m; m = m.harder ? movementOf(m.harder) : null) {
       const block = blockOf(rules, history, m.id);
       if (block === "equipment_not_owned") continue;
       if (block === "gated_movement") break;
-      if (block) {
-        if (block === "cannot_do") break;
-        continue;
-      }
+      if (block === "cannot_do") break;
+      if (block) continue;
       if (isNew(rules, history, m) && !allowNew) break;
       pick = m;
       if (isNew(rules, history, m)) break;
     }
     return pick;
   }
-  var repSeconds = (m, slow) => m.tempo ? m.tempo.down + m.tempo.hold + m.tempo.up + (slow ? SLOW_EXTRA_SECONDS : 0) : 3;
-  var middle = ([lo, hi]) => (lo + hi) / 2;
+  var repSeconds = (m, slow) => m.tempo ? m.tempo.down + m.tempo.hold + m.tempo.up + (slow ? SLOW_EXTRA_SECONDS : 0) : REP_SECONDS;
+  var topOf = ([, hi]) => hi;
   function itemSeconds(item) {
     const m = movementOf(item.movementId);
-    const work = item.reps ? middle(item.reps) * repSeconds(m, item.slow === true) : middle(item.seconds);
+    const work = item.reps ? topOf(item.reps) * repSeconds(m, item.slow === true) : topOf(item.seconds);
     return item.sets * work * m.sides + Math.max(0, item.sets - 1) * item.rest + SETUP_SECONDS;
   }
-  var sessionMinutes = (items) => Math.ceil(items.reduce((sum, i) => sum + itemSeconds(i), 0) / 60);
+  var sessionMinutes = (items) => Math.ceil(items.reduce((sum, i) => sum + itemSeconds(i), 0) / SECONDS_PER_MINUTE);
   function lastLoad(history, id) {
     const times = history.filter((h) => h.movementId === id && h.load !== null);
     return times.length ? times[times.length - 1].load : null;
   }
-  var clampLoad = (kg) => Math.min(LOAD_MAX_KG, Math.max(1, kg));
+  var LOAD_MIN_KG = 1;
+  var clampLoad = (kg) => Math.min(LOAD_MAX_KG, Math.max(LOAD_MIN_KG, kg));
   function loadFor(m, history, loads) {
     if (Number.isFinite(loads[m.id])) return clampLoad(loads[m.id]);
     const last = lastLoad(history, m.id);
-    const up = last !== null && toppedLastTime(history, m) && slowStepDone(history, m);
-    return clampLoad((last ?? m.load ?? 2) + (up ? LOAD_STEP_KG : 0));
+    const up = last !== null && countedLastTime(history, m) && slowStepDone(history, m);
+    return clampLoad((last ?? m.load ?? START_LOAD_KG) + (up ? LOAD_STEP_KG : 0));
   }
-  function itemFor(m, history, loads, sets) {
+  function itemFor(req, m, sets) {
+    const { history, loads } = req;
     const item = { movementId: m.id, sets, rest: m.rest, isNew: false };
     if (m.dose.reps) item.reps = [...m.dose.reps];
     else item.seconds = [...m.dose.seconds];
@@ -4061,7 +4259,7 @@
     const focus = a.focus ?? "full";
     if (!FOCUS.includes(focus)) throw new InputError("bad_content");
     const minutes = Number.isInteger(a.minutes) ? a.minutes : rules.session.max;
-    if (minutes < 5 || minutes > 120) throw new InputError("bad_content");
+    if (minutes < REQUEST_MIN_MINUTES || minutes > REQUEST_MAX_MINUTES) throw new InputError("bad_content");
     const loads = a.loads && typeof a.loads === "object" && !Array.isArray(a.loads) ? a.loads : {};
     return {
       rules,
@@ -4070,17 +4268,19 @@
       loads,
       history: readHistory2(a.history),
       turn: Number.isInteger(a.turn) ? a.turn : 0,
-      easeOff: Number.isFinite(a.lastPain) && a.lastPain >= 4,
+      easeOff: Number.isFinite(a.lastPain) && a.lastPain >= PAIN_EASE_AT,
       deload: a.deload === true,
       sessionId: typeof a.sessionId === "string" ? a.sessionId : null
     };
   }
-  var sessionSets = (req, m) => req.easeOff || req.deload ? Math.max(1, m.dose.sets - 1) : m.dose.sets;
-  var sessionItem = (req, m) => ({ ...itemFor(m, req.history, req.loads, sessionSets(req, m)), isNew: isNew(req.rules, req.history, m) });
-  function pickForSlot(req, slot, used, allowNew) {
+  var EASE_SETS = 1;
+  var sessionSets = (req, m) => req.easeOff || req.deload ? Math.max(1, m.dose.sets - EASE_SETS) : m.dose.sets;
+  var sessionItem = (req, m) => ({ ...itemFor(req, m, sessionSets(req, m)), isNew: isNew(req.rules, req.history, m) });
+  function pickForSlot(req, slot, taken) {
+    const { used } = taken;
     for (const root of [slot, ...STAND_INS[slot] ?? []]) {
       if (used.has(root)) continue;
-      const pick = pickInChain(req.rules, req.history, root, allowNew);
+      const pick = pickInChain(req, root, allowsNew(taken.items));
       if (pick) {
         used.add(root);
         return pick;
@@ -4093,21 +4293,39 @@
     const items = [];
     const used = /* @__PURE__ */ new Set();
     for (const slot of slots) {
-      const pick = pickForSlot(req, slot, used, items.filter((i) => i.isNew).length < MAX_NEW);
+      const pick = pickForSlot(req, slot, { used, items });
       if (!pick || items.some((i) => i.movementId === pick.id)) continue;
       items.push(sessionItem(req, pick));
     }
+    fillToFewest(req, items, used);
     fitTime(items, req.minutes);
     return items;
   }
+  var allowsNew = (items) => items.filter((i) => i.isNew).length < MAX_NEW;
+  var chainsFor = (focus) => [...new Set(FOCUS_PATTERNS[focus].flatMap((p) => MOVEMENTS.filter((m) => m.pattern === p).map((m) => chainOf(m.id))))];
+  function fillToFewest(req, items, used) {
+    for (const root of chainsFor(req.focus)) {
+      if (items.length >= MIN_ITEMS) return;
+      if (used.has(root)) continue;
+      const pick = pickInChain(req, root, allowsNew(items));
+      if (!pick) continue;
+      used.add(root);
+      items.push(sessionItem(req, pick));
+    }
+  }
   function fitTime(items, minutes) {
-    while (sessionMinutes(items) > minutes && items.length > MIN_ITEMS) items.pop();
-    while (sessionMinutes(items) > minutes) {
+    dropOver(items, minutes, MIN_ITEMS);
+    for (; ; ) {
+      if (sessionMinutes(items) <= minutes) return;
       const longest = items.filter((i) => i.sets > 1).sort((a, b) => itemSeconds(b) - itemSeconds(a))[0];
       if (!longest) break;
       longest.sets -= 1;
     }
+    dropOver(items, minutes, 1);
   }
+  var dropOver = (items, minutes, fewest) => {
+    while (sessionMinutes(items) > minutes && items.length > fewest) items.pop();
+  };
   var contentOf = (req, items) => ({ sessionId: req.sessionId, focus: req.focus, minutes: sessionMinutes(items), items });
   function workoutContent(a) {
     const req = readSessionRequest(a);
@@ -4115,7 +4333,7 @@
   }
   var setsByPattern = (contents) => {
     const out = Object.fromEntries(MAIN_PATTERNS.map((p) => [p, 0]));
-    for (const c of contents) for (const i of c.items) {
+    for (const i of contents.flatMap((c) => c.items)) {
       const p = movementOf(i.movementId)?.pattern;
       if (p in out) out[p] += i.sets;
     }
@@ -4130,12 +4348,44 @@
     return { contents, setsByPattern: sets, target: WEEK_TARGET_SETS, note: weekNote(contents, reqs, sets) };
   }
   function fillPatterns(contents, reqs) {
-    for (const pattern of MAIN_PATTERNS) if (contents.length > 1 && setsByPattern(contents)[pattern] === 0) addItem(contents, reqs, pattern);
-    for (const pattern of MAIN_PATTERNS) {
-      for (let guard = 0; guard < 8 && setsByPattern(contents)[pattern] < WEEK_FLOOR_SETS; guard += 1) {
-        if (!addSet(contents, reqs, pattern)) break;
-      }
+    const week = { contents, reqs };
+    for (const pattern of MAIN_PATTERNS) if (contents.length > 1 && setsByPattern(contents)[pattern] === 0) addItem(week, pattern);
+    for (const pattern of MAIN_PATTERNS) raiseToFloor(week, pattern);
+    for (const pattern of MAIN_PATTERNS) capPattern(contents, pattern);
+    if (!reqs.some((r) => r.deload)) raiseToTarget(week);
+  }
+  function raiseToFloor(week, pattern) {
+    for (let guard = 0; guard < MAX_SETS_ADDED && setsByPattern(week.contents)[pattern] < WEEK_FLOOR_SETS; guard += 1) {
+      if (!addSet(week, pattern, true)) return;
     }
+  }
+  function raiseToTarget(week) {
+    for (let guard = 0; guard < MAX_SETS_ADDED; guard += 1) {
+      const sets = setsByPattern(week.contents);
+      const short = MAIN_PATTERNS.filter((p) => sets[p] > 0 && sets[p] < WEEK_TARGET_SETS[0]).sort((x, y) => sets[x] - sets[y]);
+      if (!short.some((p) => addSet(week, p, false))) return;
+    }
+  }
+  function capPattern(contents, pattern) {
+    for (let guard = 0; guard < MAX_SETS_ADDED; guard += 1) {
+      const over = setsByPattern(contents)[pattern] - WEEK_TARGET_SETS[1];
+      if (over <= 0 || !(dropItemOf(contents, pattern, over) || dropSetOf(contents, pattern))) return;
+    }
+  }
+  function dropItemOf(contents, pattern, over) {
+    const room = over + WEEK_TARGET_SETS[1] - WEEK_TARGET_SETS[0];
+    const spot = contents.filter((c) => c.items.length > MIN_ITEMS).flatMap((c) => c.items.filter((i) => patternOf(i) === pattern && i.sets <= room).map((i) => ({ c, i }))).sort((x, y) => y.i.sets - x.i.sets)[0];
+    if (!spot) return false;
+    spot.c.items = spot.c.items.filter((i) => i !== spot.i);
+    spot.c.minutes = sessionMinutes(spot.c.items);
+    return true;
+  }
+  function dropSetOf(contents, pattern) {
+    const spot = contents.flatMap((c) => c.items.filter((i) => patternOf(i) === pattern && i.sets > 1).map((i) => ({ c, i }))).sort((x, y) => y.i.sets - x.i.sets || y.c.minutes - x.c.minutes)[0];
+    if (!spot) return false;
+    spot.i.sets -= 1;
+    spot.c.minutes = sessionMinutes(spot.c.items);
+    return true;
   }
   function weekNote(contents, reqs, sets) {
     if (!contents.length) return null;
@@ -4149,19 +4399,20 @@
   var patternOf = (item) => movementOf(item.movementId).pattern;
   var withSets = (items, item, sets) => items.map((x) => x === item ? { ...x, sets } : x);
   var floorOf = (pattern) => MAIN_PATTERNS.includes(pattern) ? WEEK_FLOOR_SETS : 0;
-  function addSet(contents, reqs, pattern) {
-    const spots = contents.flatMap((c, k) => c.items.filter((i) => patternOf(i) === pattern && i.sets < MAX_SETS).map((i) => ({ c, k, i })));
+  function addSet(week, pattern, swap) {
+    const { contents, reqs } = week;
+    const spots = contents.flatMap((c, k) => c.items.filter((i) => patternOf(i) === pattern && i.sets < MAX_SETS).map((i) => ({ c, k, i }))).filter(({ k }) => swap || !reqs[k].easeOff);
     const fits = spots.filter(({ c, k, i }) => sessionMinutes(withSets(c.items, i, i.sets + 1)) <= reqs[k].minutes).sort((x, y) => x.c.minutes - y.c.minutes)[0];
     if (fits) {
       fits.i.sets += 1;
       fits.c.minutes = sessionMinutes(fits.c.items);
       return true;
     }
-    return spots.some((spot) => swapSet(contents, reqs, spot));
+    return swap && spots.some((spot) => swapSet(week, spot));
   }
-  function swapSet(contents, reqs, { c, k, i }) {
+  function swapSet({ contents, reqs }, { c, k, i }) {
     const sets = setsByPattern(contents);
-    const donor = c.items.filter((d) => d !== i && d.sets > 1 && (sets[patternOf(d)] ?? 0) - 1 >= floorOf(patternOf(d))).sort((a, b) => (sets[patternOf(b)] ?? 99) - (sets[patternOf(a)] ?? 99))[0];
+    const donor = c.items.filter((d) => d !== i && d.sets > 1 && (sets[patternOf(d)] ?? 0) - 1 >= floorOf(patternOf(d))).sort((a, b) => (sets[patternOf(b)] ?? UNCOUNTED_SETS) - (sets[patternOf(a)] ?? UNCOUNTED_SETS))[0];
     if (!donor) return false;
     const items = c.items.map((x) => x === i ? { ...x, sets: x.sets + 1 } : x === donor ? { ...x, sets: x.sets - 1 } : x);
     if (sessionMinutes(items) > reqs[k].minutes) return false;
@@ -4176,11 +4427,12 @@
     upper_push: ["wall_push_up", "backpack_press"],
     upper_pull: ["backpack_row", "prone_arm_raise", "backpack_curl"]
   };
-  function addItem(contents, reqs, pattern) {
+  function addItem(week, pattern) {
+    const { contents, reqs } = week;
     const order = contents.map((c, k) => k).sort((x, y) => contents[x].minutes - contents[y].minutes);
     for (const k of order) {
       const item = itemOfPattern(contents[k], reqs[k], pattern);
-      if (item && placeItem(contents, k, reqs[k], item)) return true;
+      if (item && placeItem(week, k, item)) return true;
     }
     return false;
   }
@@ -4189,15 +4441,16 @@
     const taken = new Set(c.items.map((i) => chainOf(i.movementId)));
     for (const root of PATTERN_ROOTS[pattern]) {
       if (taken.has(root)) continue;
-      const pick = pickInChain(req.rules, req.history, root, allowNew);
+      const pick = pickInChain(req, root, allowNew);
       if (pick) return sessionItem(req, pick);
     }
     return null;
   }
-  function placeItem(contents, k, req, item) {
-    const c = contents[k];
-    const counts = setsByPattern(contents);
-    const swaps = c.items.filter((i) => counts[patternOf(i)] === void 0 || counts[patternOf(i)] - i.sets >= WEEK_FLOOR_SETS).sort((a, b) => (counts[patternOf(b)] ?? 99) - (counts[patternOf(a)] ?? 99));
+  function placeItem(week, k, item) {
+    const { contents } = week;
+    const [c, req] = [contents[k], week.reqs[k]];
+    const counts2 = setsByPattern(contents);
+    const swaps = c.items.filter((i) => counts2[patternOf(i)] === void 0 || counts2[patternOf(i)] - i.sets >= WEEK_FLOOR_SETS).sort((a, b) => (counts2[patternOf(b)] ?? UNCOUNTED_SETS) - (counts2[patternOf(a)] ?? UNCOUNTED_SETS));
     const tries = [[...c.items, item], ...swaps.map((out) => c.items.map((i) => i === out ? item : i))];
     for (const items of tries) {
       const fitted = trimToFit(items, item, req.minutes);
@@ -4225,11 +4478,17 @@
     const minutes = Number.isInteger(a.minutes) ? a.minutes : rules.session.max;
     const violations = [];
     const add = (code, text, movementId) => violations.push(movementId ? { code, text, movementId } : { code, text });
-    itemViolations(a.content.items, rules, history, add);
+    const check = { rules, history, add };
+    itemViolations(check, a.content.items);
     const length = sessionMinutes(timedItems(a.content.items));
     if (length > minutes) add("session_too_long", `The session takes about ${length} minutes; the person's sessions are at most ${minutes}.`);
-    if (Array.isArray(a.week)) weekViolations(a.week, rules, history, add, readFloor(a.floor));
+    if (FOCUS.includes(a.focus)) countViolation(readSessionRequest({ ...a, minutes }), a.content.items.length, add);
+    if (Array.isArray(a.week)) weekViolations(check, a.week, readFloor(a.floor));
     return { pass: violations.length === 0, violations };
+  }
+  function countViolation(req, n, add) {
+    const [lo, hi] = [fewestItems(req), MAX_ITEMS];
+    if (n < lo || n > hi) add("item_count", `A session has ${lo} to ${hi} movements; this one has ${n}.`);
   }
   function readFloor(raw) {
     const out = Object.fromEntries(MAIN_PATTERNS.map((p) => [p, WEEK_FLOOR_SETS]));
@@ -4237,7 +4496,8 @@
     for (const p of MAIN_PATTERNS) if (Number.isInteger(raw[p]) && raw[p] >= 0) out[p] = Math.min(WEEK_FLOOR_SETS, raw[p]);
     return out;
   }
-  function itemViolations(items, rules, history, add) {
+  function itemViolations(check, items) {
+    const { rules, history, add } = check;
     let fresh = 0;
     for (const item of items) {
       const id = item && typeof item.movementId === "string" ? item.movementId : null;
@@ -4248,17 +4508,22 @@
       }
       if (!validSets(item.sets)) add("bad_dose", `${m.name} needs between 1 and ${MAX_SETS} sets.`, m.id);
       if (item.slow !== void 0 && typeof item.slow !== "boolean") add("bad_dose", `${m.name} is either slow or not.`, m.id);
-      blockViolation(rules, history, m, add);
+      blockViolation(check, m);
       if (isNew(rules, history, m)) fresh += 1;
     }
     if (fresh > MAX_NEW) add("too_many_new", `The session has ${fresh} movements the person hasn't done yet; at most ${MAX_NEW}.`);
   }
-  function blockViolation(rules, history, m, add) {
+  function blockViolation({ rules, history, add }, m) {
     const block = blockOf(rules, history, m.id);
     const before = m.easier && movementOf(m.easier);
     if (block === "equipment_not_owned") add(block, `${m.name} needs ${m.equipment.join(" and ")}, which the person doesn't have.`, m.id);
     else if (block === "avoided_movement" || block === "cannot_do") add("avoided_movement", `${m.name} is on the person's list to leave out.`, m.id);
-    else if (block === "gated_movement") add(block, `${m.name} comes only after ${before.name} is done at the top of its range twice${before.equipment.includes("backpack") ? `, with ${LOAD_MAX_KG} litres of water in the backpack` : ""}.`, m.id);
+    else if (block === "gated_movement") add(block, gateText(rules, m, before), m.id);
+  }
+  function gateText(rules, m, before) {
+    if (excluded(rules, before)) return `${m.name} comes only with the person's own "I can": ${before.name}, the step before it, is left out.`;
+    const heavier = before.equipment.includes("backpack") ? " and one heavier backpack" : "";
+    return `${m.name} comes only after ${before.name} has every set at the top of its range two sessions in a row, after its slower step${heavier}.`;
   }
   function timedItems(items) {
     return items.filter((i) => movementOf(i?.movementId) && Number.isInteger(i.sets) && i.sets >= 1).map((i) => {
@@ -4266,10 +4531,11 @@
       return { ...i, rest: Number.isFinite(i.rest) ? i.rest : m.rest, reps: i.reps ?? m.dose.reps, seconds: i.seconds ?? m.dose.seconds };
     });
   }
-  function weekViolations(week, rules, history, add, floor) {
+  function weekViolations({ rules, history, add }, week, floor) {
     const sets = setsByPattern(week.filter((c) => c && Array.isArray(c.items)));
     for (const p of MAIN_PATTERNS) {
       if (sets[p] < floor[p] && patternUsable(rules, history, p)) add("sets_below_floor", `The week has ${sets[p]} sets of ${PATTERN_WORDS[p]}; at least ${floor[p]}.`);
+      if (sets[p] > WEEK_TARGET_SETS[1]) add("sets_above_target", `The week has ${sets[p]} sets of ${PATTERN_WORDS[p]}; at most ${WEEK_TARGET_SETS[1]}.`);
     }
   }
   var fewestItems = (req) => Math.max(1, Math.min(MIN_ITEMS, buildSession(req).length));
@@ -4282,10 +4548,10 @@
     const roots = [...new Set(MOVEMENTS.filter((m) => FOCUS_PATTERNS[req.focus].includes(m.pattern)).map((m) => chainOf(m.id)))];
     const out = [];
     for (const root of roots) {
-      const pick = pickInChain(req.rules, req.history, root, true);
+      const pick = pickInChain(req, root, true);
       if (!pick) continue;
       out.push(choiceOf(req, pick));
-      const known = isNew(req.rules, req.history, pick) ? pickInChain(req.rules, req.history, root, false) : null;
+      const known = isNew(req.rules, req.history, pick) ? pickInChain(req, root, false) : null;
       if (known) out.push(choiceOf(req, known));
     }
     return out;
@@ -4297,7 +4563,7 @@
       `The whole session, rests and getting set up included, takes at most ${target.minutes} minutes; code works out the time from the sets and reps.`,
       `At most ${MAX_NEW} of the movements may be one marked new.`,
       `Give each movement 1 to ${MAX_SETS} sets and, if you like, a range of reps or seconds inside its own; code sets the rest, the backpack's weight and the tempo.`,
-      `Across the week every main pattern gets at least ${WEEK_FLOOR_SETS} sets, aiming for ${WEEK_TARGET_SETS[0]} to ${WEEK_TARGET_SETS[1]}.`,
+      `Across the week every main pattern gets at least ${WEEK_FLOOR_SETS} sets, aiming for ${WEEK_TARGET_SETS[0]} to ${WEEK_TARGET_SETS[1]} and never more than ${WEEK_TARGET_SETS[1]}.`,
       "Answer with movement ids and numbers only: every word the person reads about a movement comes from the library."
     ];
     if (req.deload || req.easeOff) lines.push("This session is lighter: the sets listed are already one fewer than usual.");
@@ -4313,11 +4579,12 @@
     if (raw[key === "reps" ? "seconds" : "reps"] !== void 0) return null;
     const range = m.dose[key];
     const v = raw[key] === void 0 ? range : raw[key];
-    const ok = Array.isArray(v) && v.length === 2 && v.every(Number.isInteger) && v[0] <= v[1] && v[0] >= range[0] && v[1] <= range[1];
+    const ok = Array.isArray(v) && v.length === RANGE_LENGTH && v.every(Number.isInteger) && v[0] <= v[1] && v[0] >= range[0] && v[1] <= range[1];
     return ok ? { [key]: [...v] } : null;
   }
   var rangeWords = (m) => `${m.dose[doseKey(m)].join(" to ")} ${doseKey(m)}`;
-  function proposedItem(req, raw, taken, add) {
+  function proposedItem(req, raw, reading) {
+    const { taken, add } = reading;
     const id = raw && typeof raw === "object" && typeof raw.movementId === "string" ? raw.movementId : null;
     const m = movementOf(id);
     if (!m) {
@@ -4346,10 +4613,9 @@
       add("bad_proposal", `The proposal has ${list.length} movements; at most ${MAX_PROPOSED_ITEMS} are read.`);
       return [];
     }
-    const [lo, hi] = [fewestItems(req), MAX_ITEMS];
-    if (list.length < lo || list.length > hi) add("item_count", `A session has ${lo} to ${hi} movements; the proposal has ${list.length}.`);
-    const taken = /* @__PURE__ */ new Set();
-    return list.map((raw) => proposedItem(req, raw, taken, add)).filter(Boolean);
+    countViolation(req, list.length, add);
+    const reading = { taken: /* @__PURE__ */ new Set(), add };
+    return list.map((raw) => proposedItem(req, raw, reading)).filter(Boolean);
   }
   var weekWith = (week, content) => Array.isArray(week) ? [...week.filter((c) => !c || c.sessionId !== content.sessionId || content.sessionId === null), content] : void 0;
   function proposedContent(a) {

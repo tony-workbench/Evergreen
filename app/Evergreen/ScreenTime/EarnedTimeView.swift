@@ -14,48 +14,65 @@ struct EarnedTimeView: View {
 
     private var earned: EarnedTimeModel { model.earnedTime }
 
+    /// The least height of a row that takes a tap.
+    private static let rowHeight: CGFloat = 44
+    /// "Turn on" while no app is picked: shown, but plainly not ready.
+    private static let notReadyOpacity = 0.4
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section { statement }
-                if !earned.isOn { Section { turnOn } }
-                Section {
-                    ForEach(FunGroup.allCases) { appsRow($0) }
-                } header: {
-                    Text("What it locks")
-                } footer: {
-                    Text("Social is for apps like X and Discord. An app goes in one group. A whole category can only be locked in one group.")
-                }
-                Section {
-                    ForEach(FunGroup.allCases) { baseRow($0) }
-                } header: {
-                    Text("Free each day")
-                } footer: {
-                    Text(rulesNote)
-                }
-                Section("Earned for each workout minute") {
-                    ForEach(FunGroup.allCases) { rateRow($0) }
-                }
-                if earned.isOn {
-                    Section {
-                        Button("Turn off", role: .destructive) { confirmingOff = true }
-                            .frame(minHeight: 44)
-                            .confirmationDialog("Turn off earned screen time?", isPresented: $confirmingOff, titleVisibility: .visible) {
-                                Button("Turn off and unlock the apps", role: .destructive) { earned.turnOff() }
-                            } message: {
-                                Text("The apps unlock now. What you’ve earned stays, and you can turn it on again here.")
-                            }
-                    }
-                }
-            }
-            .navigationTitle("Earned screen time")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .familyActivityPicker(isPresented: Binding(get: { picking != nil }, set: { if !$0 { save() } }),
-                                  selection: $selection)
-            .sheet(isPresented: $confirmingOn) { LockConfirmation(earned: earned, turnOn: turnOnNow) }
-            .onAppear { earned.refresh(workouts: model.workouts, now: model.now, calendar: model.calendar) }
+            form
+                .navigationTitle("Earned screen time")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+                .familyActivityPicker(isPresented: Binding(get: { picking != nil }, set: { if !$0 { save() } }),
+                                      selection: $selection)
+                .sheet(isPresented: $confirmingOn) { LockConfirmation(earned: earned, turnOn: turnOnNow) }
+                .onAppear { earned.refresh(workouts: model.workouts, now: model.now, calendar: model.calendar) }
         }
+    }
+
+    private var form: some View {
+        Form {
+            Section { statement }
+            if !earned.isOn { Section { turnOn } }
+            appsSection
+            baseSection
+            Section("Earned for each workout minute") {
+                ForEach(FunGroup.allCases) { rateRow($0) }
+            }
+            if earned.isOn { Section { turnOff } }
+        }
+    }
+
+    private var appsSection: some View {
+        Section {
+            ForEach(FunGroup.allCases) { appsRow($0) }
+        } header: {
+            Text("What it locks")
+        } footer: {
+            Text("Social is for apps like X and Discord. An app goes in one group. A whole category can only be locked in one group.")
+        }
+    }
+
+    private var baseSection: some View {
+        Section {
+            ForEach(FunGroup.allCases) { baseRow($0) }
+        } header: {
+            Text("Free each day")
+        } footer: {
+            Text(rulesNote)
+        }
+    }
+
+    private var turnOff: some View {
+        Button("Turn off", role: .destructive) { confirmingOff = true }
+            .frame(minHeight: Self.rowHeight)
+            .confirmationDialog("Turn off earned screen time?", isPresented: $confirmingOff, titleVisibility: .visible) {
+                Button("Turn off and unlock the apps", role: .destructive) { earned.turnOff() }
+            } message: {
+                Text("The apps unlock now. What you’ve earned stays, and you can turn it on again here.")
+            }
     }
 
     private func turnOnNow() {
@@ -69,21 +86,16 @@ struct EarnedTimeView: View {
     /// The one large thing on the screen: the minutes of social apps, with videos and games beside it.
     private var statement: some View {
         VStack(alignment: .leading, spacing: Theme.sm) {
-            Text("\(usable(.social)) min")
-                .agentFont(56, relativeTo: .largeTitle)
+            Text("\(earned.usable(.social)) min")
+                .agentFont(Theme.statementSize, relativeTo: .largeTitle)
                 .foregroundStyle(Theme.text)
-            Text(earned.isOn ? "of social apps to use today, \(usable(.videos)) min of videos, \(usable(.games)) min of games"
-                             : "of social apps earned this week, or \(usable(.videos)) min of videos, \(usable(.games)) min of games")
+            Text(earned.isOn ? "of social apps to use today, \(earned.usable(.videos)) min of videos, \(earned.usable(.games)) min of games"
+                             : "of social apps earned this week, or \(earned.usable(.videos)) min of videos, \(earned.usable(.games)) min of games")
                 .font(.body)
                 .foregroundStyle(Theme.textMuted)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
-    }
-
-    /// Once on: today's free time left plus what the credit buys. Before that: what this week earned.
-    private func usable(_ group: FunGroup) -> Int {
-        earned.minutes(group) + (earned.isOn ? earned.baseLeft[group] ?? 0 : 0)
     }
 
     private var rulesNote: String {
@@ -92,8 +104,8 @@ struct EarnedTimeView: View {
     }
 
     private func baseRow(_ group: FunGroup) -> some View {
-        LabeledContent(group.title, value: earned.isOn ? "\(earned.baseLeft[group] ?? 0) of \(group.baseMinutes) min left" : "\(group.baseMinutes) min")
-            .frame(minHeight: 44)
+        LabeledContent(group.title, value: earned.isOn ? "\(earned.baseLeftMinutes(group)) of \(group.baseMinutes) min left" : "\(group.baseMinutes) min")
+            .frame(minHeight: Self.rowHeight)
     }
 
     private var turnOn: some View {
@@ -105,7 +117,7 @@ struct EarnedTimeView: View {
             Button(turningOn ? "Turning on" : "Turn on") { confirmingOn = true }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(nothingPicked || turningOn)
-                .opacity(nothingPicked ? 0.4 : 1)
+                .opacity(nothingPicked ? Self.notReadyOpacity : 1)
             if let problem = earned.problem {
                 Text(problem).font(.footnote).foregroundStyle(Theme.warning)
             } else if nothingPicked {
@@ -122,7 +134,7 @@ struct EarnedTimeView: View {
         return Stepper(value: Binding(get: { rate }, set: { earned.setRate($0, for: group) }), in: Self.rates, step: Self.rateStep) {
             LabeledContent(group.title, value: "\(Self.number(rate)) min")
         }
-        .frame(minHeight: 44)
+        .frame(minHeight: Self.rowHeight)
     }
 
     /// What a workout minute can earn, and the step between.
@@ -136,7 +148,7 @@ struct EarnedTimeView: View {
             picking = group
         } label: {
             LabeledContent(group.title, value: count == 0 ? "Pick apps" : count == 1 ? "1 picked" : "\(count) picked")
-                .frame(minHeight: 44)
+                .frame(minHeight: Self.rowHeight)
                 .contentShape(.rect)
         }
         .foregroundStyle(Theme.text)
@@ -147,9 +159,12 @@ struct EarnedTimeView: View {
         picking = nil
     }
 
+    /// A rate is said with this many decimals at most.
+    private nonisolated static let rateDecimals = 2
+
     /// 1, 0.5, 1.25: no trailing zeros.
     nonisolated static func number(_ value: Double) -> String {
-        value.formatted(.number.precision(.fractionLength(0...2)))
+        value.formatted(.number.precision(.fractionLength(0...rateDecimals)))
     }
 }
 
@@ -163,18 +178,7 @@ private struct LockConfirmation: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(FunGroup.allCases.filter { earned.picked($0) > 0 }) { group in
-                    let picked = earned.selections[group] ?? FamilyActivitySelection()
-                    Section {
-                        ForEach(Array(picked.applicationTokens), id: \.self) { Label($0) }
-                        ForEach(Array(picked.categoryTokens), id: \.self) { Label($0) }
-                        ForEach(Array(picked.webDomainTokens), id: \.self) { Label($0) }
-                    } header: {
-                        Text(group.title)
-                    } footer: {
-                        Text("Free for \(group.baseMinutes) min a day, then locked until you earn more with a workout.")
-                    }
-                }
+                ForEach(earned.pickedGroups) { groupSection($0) }
                 Section {
                     Text("The free time starts again at midnight. You can turn this off here at any time.")
                         .font(.footnote).foregroundStyle(Theme.textMuted)
@@ -188,6 +192,20 @@ private struct LockConfirmation: View {
                     Button("Lock them") { turnOn(); dismiss() }
                 }
             }
+        }
+    }
+
+    /// One group: every app, category and site it locks, and its free time a day.
+    private func groupSection(_ group: FunGroup) -> some View {
+        let picked = earned.selections[group] ?? FamilyActivitySelection()
+        return Section {
+            ForEach(Array(picked.applicationTokens), id: \.self) { Label($0) }
+            ForEach(Array(picked.categoryTokens), id: \.self) { Label($0) }
+            ForEach(Array(picked.webDomainTokens), id: \.self) { Label($0) }
+        } header: {
+            Text(group.title)
+        } footer: {
+            Text("Free for \(group.baseMinutes) min a day, then locked until you earn more with a workout.")
         }
     }
 }

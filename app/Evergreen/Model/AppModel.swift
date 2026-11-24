@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 import SwiftData
 
 /// The one model the views read (`@Environment(AppModel.self)`). It keeps the
@@ -58,6 +59,8 @@ final class AppModel {
     @ObservationIgnored var busyCache: [Busy] = []
     /// All-day and free events with a place, read with `busyCache`; they only tell days out from days at home.
     @ObservationIgnored var placedCache: [Busy] = []
+    /// The places found for events, kept for the settings in use (`placeMemory`, AppModel+Rules.swift).
+    @ObservationIgnored var placeMemoryKept: PlaceMemory?
     /// The last few things that happened, newest first, for Settings.
     var activity: [String] = []
     /// Notes already shown in the hero on an earlier launch, and the ones shown on this one.
@@ -81,12 +84,27 @@ final class AppModel {
     var homeWeekNote: String?
     /// The days whose movements the AI chose (and code passed), with its one sentence on why, shown as picked by AI.
     var homeWeekReasons: [String: String] = [:]
+    /// Where the week table's load stands (`loadHomeWeek()`): loading, ready, offline (the AI couldn't be reached,
+    /// so the week stands on the rules' content) or failed (no week could be worked out).
+    var homeWeekLoad: HomeWeekLoad = .loading
+    /// Whether the AI couldn't be reached the last time the week's content was filled in.
+    var homeWeekOffline = false
     /// What the person did on the workout page (Model/WorkoutLog.swift).
     var workoutLog = WorkoutLog()
-    /// Set by "Start" on a reminder: Today opens the workout page and sets it back.
-    var workoutRequested = false
+    /// Set by "Start" on a reminder, or a tap on one (AppModel+Reminders.swift): the root view goes there and sets it back to nil.
+    var workoutRoute: WorkoutRoute?
+    /// Today's session asked for by a reminder, as the screens read it before `workoutRoute`: setting it false clears that route.
+    var workoutRequested: Bool {
+        get { workoutRoute == .session }
+        set {
+            if newValue { workoutRoute = .session } else if workoutRoute == .session { workoutRoute = nil }
+        }
+    }
     /// Every movement's words, read from the engine once (AppModel+Workout.swift).
     var movements: [Movement] = []
+    /// The movements the rules and the log leave closed (no things for it, left out, "can't do", not earned yet), from the
+    /// engine's own check; nil until it was asked. "Swap" offers none of them (AppModel+Workout.swift).
+    var closedMovements: Set<String>?
     /// Whether notifications are allowed.
     private(set) var notificationAccess: NotificationAccess = .notAsked
 
@@ -96,51 +114,96 @@ final class AppModel {
     @ObservationIgnored private var latestTick = 0
     /// Waits for a burst of calendar changes to settle before ticking.
     @ObservationIgnored private var calendarChangeTask: Task<Void, Never>?
+    /// The rule changes the workout page's buttons started, saved one after another (`pageSaved()`, AppModel+WorkoutPage.swift).
+    @ObservationIgnored var pageSave: Task<Void, Never>?
 
-    /// `onDevice: false` makes a model for the tour, which plays scripted steps: the
-    /// real rules and screens, but nothing touches the calendar, notifications,
-    /// Apple Health or the network.
-    init(context: ModelContext, memory: MemoryEngine? = MemoryEngine.standard(),
-         onDevice: Bool = true, aiKey: AIKey = AIKey(), health seeded: HealthHistory? = nil,
-         calendar: Calendar = .autoupdatingCurrent, clock: (@Sendable () -> Date)? = nil,
-         calendarSync: (any PlanCalendar)? = nil, healthReader: any HealthReading = HealthReader()) {
-        self.calendar = calendar
-        self.clock = clock
-        self.healthReader = healthReader
-        aiKeyStore = aiKey
-        self.onDevice = onDevice
-        if onDevice, Storage.startedFresh, !UserDefaults.standard.bool(forKey: "fresh_start_said") { startedFreshNotice = true }
-        self.memory = memory
-        let today = calendar.startOfDay(for: clock?() ?? Date())
-        store = PlanStore(context: context, today: today, calendarSync: calendarSync ?? CalendarSync())
+    /// What a model is made with besides its store: everything outside it, each with the device's own as the default.
+    /// Tests and the tour give their own.
+    struct Setup {
+        /// The memory engine over this phone's memory folder; nil runs without memory.
+        var memory: MemoryEngine? = MemoryEngine.standard()
+        /// False makes a model for the tour, which plays scripted steps: the real rules and screens, but nothing touches
+        /// the calendar, notifications, Apple Health or the network.
+        var onDevice = true
+        var aiKey = AIKey()
+        /// A history to start from instead of this phone's Apple Health.
+        var health: HealthHistory?
+        var calendar: Calendar = .autoupdatingCurrent
+        var clock: (@Sendable () -> Date)?
+        var calendarSync: (any PlanCalendar)?
+        var healthReader: any HealthReading = HealthReader()
+    }
+
+    init(context: ModelContext, setup: Setup = Setup()) {
+        calendar = setup.calendar
+        clock = setup.clock
+        healthReader = setup.healthReader
+        aiKeyStore = setup.aiKey
+        onDevice = setup.onDevice
+        memory = setup.memory
+        let today = calendar.startOfDay(for: setup.clock?() ?? Date())
+        store = PlanStore(context: context, today: today, calendarSync: setup.calendarSync ?? CalendarSync())
         persona = store.run.personaKey
         // Health is the only history. A model off the device (the tour, a seeded launch) never reads this phone's.
-        if let seeded { health = seeded } else if !onDevice { health = HealthHistory() }
-        response = nil
+        if let seeded = setup.health { health = seeded } else if !setup.onDevice { health = HealthHistory() }
+        if setup.onDevice, Storage.startedFresh, !freshStartWasSaid { startedFreshNotice = true }
+        useKeyFromEnvironment()
+        openDay(today)
+        guard onDevice else { return }
+        readWhatThePhoneKeeps()
+        listenToTheDevice()
+    }
+
+    /// The "started fresh" line was already said (`dismissFreshStartNotice`): kept in `settings`, or in the standard
+    /// defaults by a build from before `settings` held it.
+    private var freshStartWasSaid: Bool {
+        settings.bool(forKey: Self.freshStartSaidKey) || UserDefaults.standard.bool(forKey: Self.freshStartSaidKey)
+    }
+
+    /// A model for the tour or a seeded launch: `onDevice: false` keeps it off the device (see `Setup`).
+    convenience init(context: ModelContext, memory: MemoryEngine?, onDevice: Bool) {
+        self.init(context: context, setup: Setup(memory: memory, onDevice: onDevice))
+    }
+
+    /// For checking against the real API without anyone typing a key: a debug build launched with GEMINI_API_KEY in its
+    /// environment uses it for this run, in memory only.
+    private func useKeyFromEnvironment() {
         #if DEBUG
-        // For checking against the real API without anyone typing a key: a debug build
-        // launched with GEMINI_API_KEY in its environment uses it for this run, in memory only.
         if onDevice, let given = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !given.isEmpty {
             asking.sessionKey = given
             asking.aiKeyTail = asking.aiKeyTail ?? ""
         }
         #endif
+    }
+
+    /// Opens on `today`: a new day keeps everything the person added and starts again only what belonged to the day itself;
+    /// the same day picks up its last answer. Then saves.
+    private func openDay(_ today: Date) {
         if run.storyDay != today {
-            // A new day: everything the person added stays; only what belonged to the day itself starts again.
             startDay(today)
         } else {
-            response = run.lastResponse.flatMap { try? JSONDecoder.contract.decode(TickResponse.self, from: $0) }
+            response = run.lastResponse.flatMap { data in
+                Logger.model.attempt("The last answer couldn't be read") { try JSONDecoder.contract.decode(TickResponse.self, from: data) }
+            }
         }
         save()
-        guard onDevice else { return }
+    }
+
+    /// The rules, the workout log and the week, as kept on this phone.
+    private func readWhatThePhoneKeeps() {
         userRules = UserRules.load(from: settings)
         workoutLog = WorkoutLog.load(from: settings)
         homeWeek = HomeWeek.load(from: settings)
-        self.calendarSync.onChange = { [weak self] in self?.calendarChanged() }
+    }
+
+    /// The calendar, the notifications' buttons, Apple Health, earned time and the triggers.
+    private func listenToTheDevice() {
+        calendarSync.onChange = { [weak self] in self?.calendarChanged() }
         notifier.onOpen = { [weak self] in Task { await self?.tick() } }
         notifier.onUndo = { [weak self] id in self?.undoMove(id) }
-        notifier.onWorkoutAction = { [weak self] action, day in Task { await self?.handleWorkoutAction(action, day: day) } }
-        notifier.onPickTime = { [weak self] clock, day in Task { await self?.pickTime(clock, day: day) } }
+        notifier.onWorkoutAction = { [weak self] action, day in await self?.handleWorkoutAction(action, day: day) }
+        notifier.onPickTime = { [weak self] clock, day in await self?.pickTime(clock, day: day) }
+        notifier.onDelivered = { [weak self] in self?.moveMissedHomeTimes() }
         Task { await refreshNotifications() }
         if persona.isReal { Task { await refreshHealth() } }
         watchWorkoutsForEarnedTime()
@@ -222,10 +285,11 @@ final class AppModel {
         // After that the full tick runs on a change (the calendar, coming forward, an answer).
         // Each minute only moves the clock the screen reads, so a passed workout shows as missed.
         while !Task.isCancelled {
-            try? await Task.sleep(for: .seconds(60))
+            try? await Task.sleep(for: .seconds(ClockUnits.secondsPerMinute))
             minute += 1
+            moveMissedHomeTimes()
             // A workout whose time has just passed needs the full tick once.
-            if plan.contains(where: { abs($0.slot.end.addingTimeInterval(StandInAgent.grace).timeIntervalSince(now)) < 60 }) { await tick() }
+            if plan.contains(where: { abs($0.slot.end.addingTimeInterval(StandInAgent.grace).timeIntervalSince(now)) < ClockUnits.minute }) { await tick() }
         }
     }
 
@@ -256,7 +320,7 @@ final class AppModel {
         }
         if let before = self.response, response.completions.count > before.completions.count { celebration += 1 }
         self.response = response
-        run.lastResponse = try? JSONEncoder.contract.encode(response)
+        run.lastResponse = Logger.model.attempt("The answer couldn't be kept") { try JSONEncoder.contract.encode(response) }
         save()
     }
 
@@ -281,11 +345,17 @@ final class AppModel {
         Task { await tick() }
     }
 
-    /// "Pick another time": logged as the person's own move so it shows in the feed.
-    /// With `end`, its length changes too (a resize).
-    func move(_ item: PlanItem, to start: Date, end: Date? = nil, reason: String = "You picked this time.") {
-        let after = Slot(start: start, end: end ?? start.addingTimeInterval(item.slot.end.timeIntervalSince(item.slot.start)),
-                         activityType: item.slot.activityType)
+    /// What a move the person made says in the feed.
+    nonisolated static let pickedReason = "You picked this time."
+
+    /// "Pick another time": logged as the person's own move so it shows in the feed. Its length stays the same.
+    func move(_ item: PlanItem, to start: Date, reason: String = AppModel.pickedReason) {
+        move(item, to: (start, start.addingTimeInterval(item.slot.end.timeIntervalSince(item.slot.start))), reason: reason)
+    }
+
+    /// A move that sets the end too, so its length can change (a resize).
+    func move(_ item: PlanItem, to times: (start: Date, end: Date), reason: String = AppModel.pickedReason) {
+        let after = Slot(start: times.start, end: times.end, activityType: item.slot.activityType)
         record(AgentAction(
             id: "user-move-\(UUID().uuidString)", kind: .move, planItemId: item.id,
             before: item.slot, after: after, reason: reason, createdAt: now
@@ -310,6 +380,8 @@ final class AppModel {
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled else { return }
             await tick()
+            // The week the rules make follows the calendar during the day too, for the days it changes.
+            await checkHomeWeek()
         }
     }
 
@@ -332,11 +404,18 @@ final class AppModel {
         await scheduleNotifications()
     }
 
-    func scheduleNotifications() async {
-        guard onDevice, deviceUnlocked else { return }
+    /// Plans every reminder again. Locked (a button pressed on the lock screen after a background launch), the plan and
+    /// Health in hand may not be the real ones, so only the day-at-home reminders of `day`, the day the button was about,
+    /// are planned again; the rest waits for the phone to be unlocked.
+    func scheduleNotifications(day: String? = nil) async {
+        guard onDevice else { return }
+        guard deviceUnlocked else {
+            if let day { await scheduleHomeNotifications(day: day) }
+            return
+        }
         // A day out has no reminders: the person said they're out, or the phone was far from home when the app opened.
         // A session on a day at home has reminders of its own (AppModel+Reminders.swift), not the one 30 minutes before.
-        await notifier.scheduleReminders(for: otherReminderItems)
+        await notifier.scheduleReminders(for: keptOtherReminders, now: now, calendar: calendar)
         await scheduleHomeNotifications()
         await notifier.scheduleWeekAhead(userRules.isOn)
     }
@@ -361,7 +440,7 @@ final class AppModel {
     func refreshHealth() async {
         guard onDevice, healthReader.isAvailable else { return }
         // A locked phone can't read Health: nothing is replaced by an empty read then, or after any failed one.
-        guard deviceUnlocked, let read = await healthReader.read(now: Date(), calendar: calendar) else { return }
+        guard deviceUnlocked, let read = await healthReader.read(now: now, calendar: calendar) else { return }
         let changed = read.workouts != health.workouts || read.days != health.days
         health = read
         read.saveToCache()
@@ -373,8 +452,8 @@ final class AppModel {
     /// notification, once: "A meeting landed on your run … I moved it to 6:45 PM."
     private func announceMove(_ action: AgentAction) {
         guard onDevice, action.id.hasPrefix("defend-"), let before = action.before, let after = action.after else { return }
-        let copy = NotificationCopy.moved(before: before, after: after, meeting: nil)
-        Task { await triggers.announceMove(id: action.id, copy: copy, now: Date()) }
+        let copy = NotificationCopy.moved(before: before, after: after)
+        Task { await triggers.announceMove(id: action.id, copy: copy, now: now) }
     }
 
     // MARK: Storage
@@ -410,6 +489,7 @@ final class AppModel {
     /// Puts the plan on the calendar, from the device and only while it is unlocked.
     private func syncCalendar() {
         guard onDevice, deviceUnlocked else { return }
-        store.syncCalendar(plan, calendar: calendar, notes: calendarNotes)
+        let marks = CalendarEntry.Marks(notes: calendarNotes, done: userRules.isOn ? Set(workoutLog.doneDays) : [])
+        store.syncCalendar(plan, calendar: calendar, marks: marks)
     }
 }

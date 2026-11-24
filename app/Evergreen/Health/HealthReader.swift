@@ -1,4 +1,5 @@
 import HealthKit
+import os
 
 /// Reads the person's Apple Health history: workouts from the last 60 days
 /// (type, times, average heart rate, distance, indoors) and, for the last 28
@@ -30,9 +31,10 @@ struct HealthReader: Sendable {
         let today = calendar.startOfDay(for: now)
         let workoutsFrom = calendar.date(byAdding: .day, value: -Self.workoutDays, to: today) ?? today
         let daysFrom = calendar.date(byAdding: .day, value: -Self.summaryDays, to: today) ?? today
+        let summary = DateInterval(start: daysFrom, end: max(now, daysFrom))
         async let workouts = workouts(store, from: workoutsFrom, to: now)
-        async let sleep = sleepMinutes(store, from: daysFrom, to: now, calendar: calendar)
-        async let resting = restingHeartRates(store, from: daysFrom, to: now, calendar: calendar)
+        async let sleep = sleepMinutes(store, in: summary, calendar: calendar)
+        async let resting = restingHeartRates(store, in: summary, calendar: calendar)
         let (read, s, r) = await (workouts, sleep, resting)
         guard let w = read else { return nil }
         let days = Set(s.keys).union(r.keys).sorted().map {
@@ -46,8 +48,13 @@ struct HealthReader: Sendable {
     private func workouts(_ store: HKHealthStore, from: Date, to: Date) async -> [Workout]? {
         let predicate = HKQuery.predicateForSamples(withStart: from, end: to)
         let query = HKSampleQueryDescriptor(predicates: [.workout(predicate)], sortDescriptors: [SortDescriptor(\.startDate)])
-        guard let samples = try? await query.result(for: store) else { return nil }
-        return samples.map(Self.workout)
+        do {
+            return try await query.result(for: store).map(Self.workout)
+        } catch {
+            // Locked after a background launch, or Health unavailable: the caller keeps what it had.
+            Logger.health.error("Workouts couldn't be read: \(String(describing: error), privacy: .public)")
+            return nil
+        }
     }
 
     static func workout(_ w: HKWorkout) -> Workout {
@@ -83,32 +90,43 @@ struct HealthReader: Sendable {
     // MARK: Daily summaries
 
     /// Minutes asleep per night, counted on the day the night ended.
-    private func sleepMinutes(_ store: HKHealthStore, from: Date, to: Date, calendar: Calendar) async -> [Date: Double] {
+    private func sleepMinutes(_ store: HKHealthStore, in span: DateInterval, calendar: Calendar) async -> [Date: Double] {
         let asleep = HKCategoryValueSleepAnalysis.allAsleepValues.map(\.rawValue)
-        let predicate = HKQuery.predicateForSamples(withStart: from, end: to)
+        let predicate = HKQuery.predicateForSamples(withStart: span.start, end: span.end)
         let query = HKSampleQueryDescriptor(predicates: [.categorySample(type: HKCategoryType(.sleepAnalysis), predicate: predicate)],
                                             sortDescriptors: [])
-        guard let samples = try? await query.result(for: store) else { return [:] }
+        let samples: [HKCategorySample]
+        do { samples = try await query.result(for: store) } catch {
+            Logger.health.error("Sleep couldn't be read: \(String(describing: error), privacy: .public)")
+            return [:]
+        }
         var minutes: [Date: Double] = [:]
         for sample in samples where asleep.contains(sample.value) {
-            minutes[calendar.startOfDay(for: sample.endDate), default: 0] += sample.endDate.timeIntervalSince(sample.startDate) / 60
+            minutes[calendar.startOfDay(for: sample.endDate), default: 0] += sample.endDate.timeIntervalSince(sample.startDate) / ClockUnits.minute
         }
         return minutes.mapValues { $0.rounded() }
     }
 
+    /// Resting heart rates are kept to a tenth of a beat.
+    private static let tenths = 10.0
+
     /// The day's average resting heart rate.
-    private func restingHeartRates(_ store: HKHealthStore, from: Date, to: Date, calendar: Calendar) async -> [Date: Double] {
-        let predicate = HKQuery.predicateForSamples(withStart: from, end: to)
+    private func restingHeartRates(_ store: HKHealthStore, in span: DateInterval, calendar: Calendar) async -> [Date: Double] {
+        let predicate = HKQuery.predicateForSamples(withStart: span.start, end: span.end)
         let query = HKStatisticsCollectionQueryDescriptor(
             predicate: .quantitySample(type: HKQuantityType(.restingHeartRate), predicate: predicate),
-            options: .discreteAverage, anchorDate: calendar.startOfDay(for: from), intervalComponents: DateComponents(day: 1)
+            options: .discreteAverage, anchorDate: calendar.startOfDay(for: span.start), intervalComponents: DateComponents(day: 1)
         )
-        guard let collection = try? await query.result(for: store) else { return [:] }
+        let collection: HKStatisticsCollection
+        do { collection = try await query.result(for: store) } catch {
+            Logger.health.error("Resting heart rate couldn't be read: \(String(describing: error), privacy: .public)")
+            return [:]
+        }
         let bpm = HKUnit.count().unitDivided(by: .minute())
         var rates: [Date: Double] = [:]
-        collection.enumerateStatistics(from: from, to: to) { stats, _ in
+        collection.enumerateStatistics(from: span.start, to: span.end) { stats, _ in
             if let value = stats.averageQuantity()?.doubleValue(for: bpm) {
-                rates[calendar.startOfDay(for: stats.startDate)] = (value * 10).rounded() / 10
+                rates[calendar.startOfDay(for: stats.startDate)] = (value * Self.tenths).rounded() / Self.tenths
             }
         }
         return rates

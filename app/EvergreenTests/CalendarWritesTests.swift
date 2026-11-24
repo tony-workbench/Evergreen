@@ -81,7 +81,7 @@ struct CalendarWritesTests {
     }
 
     @Test func withCalendarAccessOffThePlanStaysInTheAppAndNothingIsWritten() async throws {
-        let rig = try AppRig(calendarAccess: .off)
+        let rig = try AppRig(.init(calendarAccess: .off))
         let run = try rig.plan(.run, id: "the-run", day: 1, hour: 7)
         #expect(rig.model.plan.map(\.id) == [run.id] && rig.model.calendarAccess == .off)
         #expect(rig.calendar.events.isEmpty && rig.calendar.created.isEmpty)

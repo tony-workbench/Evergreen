@@ -164,25 +164,25 @@ struct EarnedTimeTests {
 
     @Test func anUnlockSpendsTodaysFreeTimeBeforeTheCredit() {
         // Plenty of free time: none of the credit goes.
-        #expect(EarnMath.unlock(baseLeft: 60, credit: 50, rate: 2, block: 15) == .init(minutes: 15, fromBase: 15, cost: 0))
+        #expect(EarnMath.unlock(baseLeft: 60, credit: .init(minutes: 50, rate: 2), block: 15) == .init(minutes: 15, fromBase: 15, cost: 0))
         // 5 free minutes left: the other 10 come from the credit, at the group's rate.
-        #expect(EarnMath.unlock(baseLeft: 5, credit: 50, rate: 2, block: 15) == .init(minutes: 15, fromBase: 5, cost: 5))
+        #expect(EarnMath.unlock(baseLeft: 5, credit: .init(minutes: 50, rate: 2), block: 15) == .init(minutes: 15, fromBase: 5, cost: 5))
         // No free time: all from the credit, as before.
-        #expect(EarnMath.unlock(baseLeft: 0, credit: 50, rate: 0.5, block: 15) == .init(minutes: 15, fromBase: 0, cost: 30))
+        #expect(EarnMath.unlock(baseLeft: 0, credit: .init(minutes: 50, rate: 0.5), block: 15) == .init(minutes: 15, fromBase: 0, cost: 30))
         // A little of each that doesn't fill the block.
-        #expect(EarnMath.unlock(baseLeft: 3, credit: 2, rate: 1, block: 15) == .init(minutes: 5, fromBase: 3, cost: 2))
-        #expect(EarnMath.unlock(baseLeft: 0, credit: 0.4, rate: 1, block: 15) == nil)
+        #expect(EarnMath.unlock(baseLeft: 3, credit: .init(minutes: 2, rate: 1), block: 15) == .init(minutes: 5, fromBase: 3, cost: 2))
+        #expect(EarnMath.unlock(baseLeft: 0, credit: .init(minutes: 0.4, rate: 1), block: 15) == nil)
     }
 
     @Test func freeTimeStartsAgainEachDayAndIsNotCarriedOver() {
         let used = ["2026-11-23": 45, "2026-11-24": 20]
-        #expect(EarnMath.baseLeft(.social, used: used, day: "2026-11-24", comeback: false) == 40)
-        #expect(EarnMath.baseLeft(.social, used: used, day: "2026-11-25", comeback: false) == 60)
+        #expect(EarnMath.baseLeft(.social, used: used, on: .init(key: "2026-11-24", comeback: false)) == 40)
+        #expect(EarnMath.baseLeft(.social, used: used, on: .init(key: "2026-11-25", comeback: false)) == 60)
         // Nothing left over from a quiet day is added to the next.
-        #expect(EarnMath.baseLeft(.games, used: [:], day: "2026-11-25", comeback: false) == 30)
-        #expect(EarnMath.baseLeft(.videos, used: ["2026-11-24": 40], day: "2026-11-24", comeback: false) == 0)
+        #expect(EarnMath.baseLeft(.games, used: [:], on: .init(key: "2026-11-25", comeback: false)) == 30)
+        #expect(EarnMath.baseLeft(.videos, used: ["2026-11-24": 40], on: .init(key: "2026-11-24", comeback: false)) == 0)
         // The comeback day adds 15 to the day's free time.
-        #expect(EarnMath.baseLeft(.videos, used: ["2026-11-24": 30], day: "2026-11-24", comeback: true) == 15)
+        #expect(EarnMath.baseLeft(.videos, used: ["2026-11-24": 30], on: .init(key: "2026-11-24", comeback: true)) == 15)
     }
 
     @Test func theDayChangesAtLocalMidnightAndTheWeekOnMonday() {

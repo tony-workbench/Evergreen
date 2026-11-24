@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Observation
 import SwiftData
 
@@ -32,7 +33,7 @@ final class PlanStore {
     init(context: ModelContext, today: Date, calendarSync: any PlanCalendar) {
         self.context = context
         self.calendarSync = calendarSync
-        let saved = (try? context.fetch(FetchDescriptor<Run>()))?.first
+        let saved = Logger.model.attempt("The saved day couldn't be read; a new one starts") { try context.fetch(FetchDescriptor<Run>()) }?.first
         let run = saved ?? Run(persona: .me, storyDay: today)
         if saved == nil { context.insert(run) }
         self.run = run
@@ -75,6 +76,15 @@ final class PlanStore {
         let record = ActionRecord(action, sequence: next)
         context.insert(record)
         run.actions.append(record)
+    }
+
+    /// Keeps a workout in the store itself, once by its id: a session finished on the workout page that Apple Health
+    /// couldn't take, so it still counts (earned screen time, the week, a missed day).
+    func logWorkout(_ workout: Workout) {
+        guard !run.workouts.contains(where: { $0.workoutId == workout.id }) else { return }
+        let logged = LoggedWorkout(workout)
+        context.insert(logged)
+        run.workouts.append(logged)
     }
 
     /// Adds a workout. One that was added before and taken off again comes
@@ -128,6 +138,7 @@ final class PlanStore {
         do {
             try context.save()
         } catch {
+            Logger.model.error("Couldn't save the run: \(String(describing: error), privacy: .public)")
             assertionFailure("Couldn't save the run: \(error)")
         }
         let records = run.actions.sorted { $0.sequence < $1.sequence }
@@ -145,11 +156,15 @@ final class PlanStore {
     }
 
     /// Puts the plan on the calendar. Without access the plan stays in the app.
-    /// `notes` adds a day's movement list to that day's strength event, so the system calendar shows what to do too.
-    func syncCalendar(_ plan: [PlanItem], calendar: Calendar, notes: [String: String] = [:]) {
+    /// `marks` adds a day's movement list to that day's strength event, so the system calendar shows what to do too, and
+    /// marks the days done.
+    func syncCalendar(_ plan: [PlanItem], calendar: Calendar, marks: CalendarEntry.Marks = CalendarEntry.Marks()) {
         calendarAccess = calendarSync.access
         guard calendarAccess == .on else { return }
-        let entries = CalendarEntry.entries(for: plan, storyDay: run.storyDay, calendar: calendar, notes: notes)
+        // Only from the story day on, the days the sync reads back: an earlier day's event stays as history, and its item
+        // (keyed with today's story day) would otherwise be written again beside it each day.
+        let current = plan.filter { $0.slot.end > run.storyDay }
+        let entries = CalendarEntry.entries(CalendarEntry.Request(plan: current, storyDay: run.storyDay, calendar: calendar, marks: marks))
         calendarSync.sync(entries, from: run.storyDay)
     }
 }

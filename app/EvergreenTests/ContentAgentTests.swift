@@ -17,7 +17,7 @@ struct ContentAgentTests {
     }
 
     func rulesWeek() async throws -> [WorkoutContent] {
-        try #require(await engine.week(days.map { (id: $0.id, focus: $0.focus) }, minutes: 30, rules: rules, log: WorkoutLog())).contents
+        try #require(await engine.week(days.map { (id: $0.id, focus: $0.focus) }, minutes: 30, basis: .init(rules: rules, log: WorkoutLog()))).contents
     }
 
     /// An answer giving each day the rules' own movements, in reverse order, with `reason`.
@@ -32,10 +32,14 @@ struct ContentAgentTests {
 
     func agent(_ model: ScriptedModel) -> ContentAgent { ContentAgent(model: model, modelId: AIModels.standard, engine: engine) }
 
+    func request(_ week: [WorkoutContent]) -> ContentAgent.Request {
+        ContentAgent.Request(days: days, minutes: 30, rules: rules, log: WorkoutLog(), lighter: false, rulesWeek: week)
+    }
+
     @Test func movementsTheAIChoseAreUsedOnceCodePassesThem() async throws {
         let week = try await rulesWeek()
         let model = ScriptedModel([ScriptedModel.text(answer(week))])
-        let picked = try #require(await agent(model).pick(days, minutes: 30, rules: rules, log: WorkoutLog(), lighter: false, rulesWeek: week))
+        let picked = try #require(await agent(model).pick(request(week)).picks)
         #expect(picked.keys.sorted() == days.map(\.day))
         let first = try #require(picked["2026-12-01"])
         #expect(first.content.items.map(\.movementId) == week[0].items.reversed().map(\.movementId))
@@ -50,7 +54,7 @@ struct ContentAgentTests {
     @Test func aMovementThePersonDoesntHaveGoesBackAndIsFixed() async throws {
         let week = try await rulesWeek()
         let model = ScriptedModel([ScriptedModel.text(answer(week, replacing: "backpack_row")), ScriptedModel.text(answer(week))])
-        let picked = try #require(await agent(model).pick(days, minutes: 30, rules: rules, log: WorkoutLog(), lighter: false, rulesWeek: week))
+        let picked = try #require(await agent(model).pick(request(week)).picks)
         #expect(picked.count == 2)
         let requests = await model.requests
         #expect(requests.count == 2)
@@ -62,7 +66,7 @@ struct ContentAgentTests {
         let week = try await rulesWeek()
         let wrong = ScriptedModel.text(answer(week, replacing: "not_a_movement"))
         let model = ScriptedModel([wrong, wrong, wrong])
-        let picked = try #require(await agent(model).pick(days, minutes: 30, rules: rules, log: WorkoutLog(), lighter: false, rulesWeek: week))
+        let picked = try #require(await agent(model).pick(request(week)).picks)
         #expect(picked.isEmpty)
         #expect(await model.requests.count == ContentAgent.maxRevisions + 1)
     }
@@ -70,23 +74,25 @@ struct ContentAgentTests {
     @Test func aReasonThatCantBeShownIsNotShown() async throws {
         let week = try await rulesWeek()
         let bad = ScriptedModel.text(answer(week, reason: "Uses bodyweight_squat first."))
-        let picked = try #require(await agent(ScriptedModel([bad, bad, bad])).pick(days, minutes: 30, rules: rules, log: WorkoutLog(),
-                                                                                    lighter: false, rulesWeek: week))
+        let picked = try #require(await agent(ScriptedModel([bad, bad, bad])).pick(request(week)).picks)
         #expect(picked.isEmpty)
     }
 
     @Test func noAnswerIsNotKeptAsAnAnswer() async throws {
         let week = try await rulesWeek()
-        let picked = await agent(ScriptedModel([.failure(.unreachable)])).pick(days, minutes: 30, rules: rules, log: WorkoutLog(),
-                                                                                lighter: false, rulesWeek: week)
-        #expect(picked == nil)
+        let answer = await agent(ScriptedModel([.failure(.unreachable)])).pick(request(week))
+        #expect(answer == .unanswered(.unreachable))
+        #expect(answer.picks == nil && answer.isOffline, "offline: the week table says so, apart from a failure")
+        let refused = await agent(ScriptedModel([.failure(.keyRefused)])).pick(request(week))
+        #expect(refused == .unanswered(.keyRefused) && !refused.isOffline)
     }
 
     @Test func aChosenSessionIsDosedAgainFromTheLogAsItIsNow() async throws {
         let week = try await rulesWeek()
         let chosen = week[0]
-        let again = try #require(await engine.propose(ContentAgent.proposal(of: chosen), id: chosen.sessionId!, focus: "full", minutes: 30,
-                                                      rules: rules, log: WorkoutLog()))
+        let session = BundleContent.Session(id: chosen.sessionId, focus: "full", minutes: 30)
+        let again = try #require(await engine.propose(.init(proposal: ContentAgent.proposal(of: chosen), session: session),
+                                                      basis: .init(rules: rules, log: WorkoutLog())))
         #expect(again.pass)
         #expect(again.content?.items.map(\.movementId) == chosen.items.map(\.movementId))
     }

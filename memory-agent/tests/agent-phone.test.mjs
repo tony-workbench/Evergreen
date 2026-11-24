@@ -42,20 +42,25 @@ test('the bundle sets the agent\'s globals next to the earlier nine', { skip }, 
   for (const name of ['memoryDailyRequest', 'memoryDailyApply', 'memoryDemoModel', 'memoryTable', 'memoryReviewQueue', 'memoryConfirm', 'memoryReject', 'memoryRestore', 'memoryRoll', 'memoryBrief', 'memoryPlannerText']) assert.equal(typeof context[name], 'function', name);
 });
 
-test('a day through the bundle equals the modules called directly, call by call and file by file', { skip }, () => {
-  const p = phone();
-  const d = direct();
-  const same = (name, args, expected) => { const got = p.call(name, args); assert.deepEqual(got, JSON.parse(JSON.stringify(expected)), name); return got; };
+// A bundle call that must equal the module's result; returns it.
+const sameAs = (p) => (name, args, expected) => { const got = p.call(name, args); assert.deepEqual(got, JSON.parse(JSON.stringify(expected)), name); return got; };
 
+// The day's roll, request, model answer and apply, through the bundle and directly.
+function dayThroughBoth(p, d, same) {
   p.call('memoryRoll', { snapshot, now: NOW });
   rollDay({ store: d.store, snapshot, now: NOW });
   recordDay(d.ctx, { snapshot, now: NOW });
   const request = same('memoryDailyRequest', { now: NOW, outcomes }, dailyRequest(d.ctx, { now: NOW, outcomes }));
-  assert.deepEqual([request.ok, request.day, request.alreadyDone, request.system, request.evidence.length], [true, DAY, false, SYSTEM, 12]);
+  assert.deepEqual([request.ok, request.day, request.alreadyDone, request.system, request.evidence.length], [true, DAY, false, SYSTEM, 13]);
   const answer = JSON.parse(p.context.memoryDemoModel(JSON.stringify(request)));
   assert.deepEqual(answer, demoModel(request));
   const applied = same('memoryDailyApply', { now: NOW, day: DAY, proposals: answer }, dailyApply(d.ctx, { now: NOW, day: DAY, proposals: answer }));
-  assert.deepEqual([applied.applied.length, applied.rejected, applied.review.length], [9, [], 1]);
+  assert.deepEqual([applied.applied.length, applied.rejected, applied.review.length], [10, [], 1]);
+}
+
+// The rest of the day's calls through the bundle and directly: the second request and apply, the queue, confirm, reject,
+// restore and the table; returns the last table.
+function restThroughBoth(d, same) {
   same('memoryDailyRequest', { now: NOW }, dailyRequest(d.ctx, { now: NOW }));
   same('memoryDailyApply', { now: NOW, proposals: [] }, dailyApply(d.ctx, { now: NOW, proposals: [] }));
   const queue = same('memoryReviewQueue', {}, reviews(d.ctx));
@@ -64,8 +69,17 @@ test('a day through the bundle equals the modules called directly, call by call 
   same('memoryTable', { now: NOW }, table(d.ctx, { now: NOW }));
   same('memoryRestore', { now: NOW, key: 'routine.run.sun_08' }, restore(d.ctx, { now: NOW, key: 'routine.run.sun_08' }));
   same('memoryReject', { now: NOW, memoryId: 'mem_0404' }, reject(d.ctx, { now: NOW, memoryId: 'mem_0404' }));
-  const t = same('memoryTable', {}, table(d.ctx));
-  assert.equal(t.rows.length, 9);
+  return same('memoryTable', {}, table(d.ctx));
+}
+
+test('a day through the bundle equals the modules called directly, call by call and file by file', { skip }, () => {
+  const p = phone();
+  const d = direct();
+  const same = sameAs(p);
+
+  dayThroughBoth(p, d, same);
+  const t = restThroughBoth(d, same);
+  assert.equal(t.rows.length, 10);
   assert.deepEqual(p.mem.dump('/mem'), d.mem.dump('/mem'));
 });
 

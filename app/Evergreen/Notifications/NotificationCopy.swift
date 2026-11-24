@@ -9,12 +9,11 @@ enum NotificationCopy {
          "\(item.slot.minutes) minutes. You planned it, now go get it!")
     }
 
-    /// The agent moved a workout off a meeting.
-    static func moved(before: Slot, after: Slot, meeting: (title: String, start: Date)?) -> (title: String, body: String) {
+    /// The agent moved a workout off a meeting. It shows on the lock screen, so it never names the meeting: only its time.
+    static func moved(before: Slot, after: Slot) -> (title: String, body: String) {
         let noun = Activity.noun(before)
-        let what = meeting.map { "\($0.title) at \($0.start.clock)" } ?? "A meeting"
-        return ("\(meeting?.title ?? "A meeting") landed on your \(noun)",
-                "\(what) overlaps your \(before.start.clock) \(noun), so I moved it to \(after.start.clock). Still on track!")
+        return ("A meeting landed on your \(noun)",
+                "A meeting overlaps your \(before.start.clock) \(noun), so I moved it to \(after.start.clock). Still on track!")
     }
 
     /// Sunday evening, for the person who plans by their rules.
@@ -68,4 +67,3 @@ enum NotificationCopy {
 private extension String {
     var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
-

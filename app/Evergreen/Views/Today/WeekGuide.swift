@@ -5,7 +5,9 @@ import SwiftUI
 /// cheers when a workout is done or added. Tapping it opens "What I remember".
 struct WeekGuide: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
     @Environment(\.scenePhase) private var scenePhase
     /// When the buddy started waving; restarted when Today appears.
     @State private var start = Date()
@@ -18,58 +20,76 @@ struct WeekGuide: View {
 
     static let buddyHeight: CGFloat = 104
     static let cheer = 2.2
+    /// How often the buddy is drawn while it moves.
+    private static let framesPerSecond = 30.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.xs) {
             // Today is the first column, so the buddy stands at the leading edge, right on the strip.
             HStack(alignment: .center, spacing: Theme.md) {
-                TimelineView(.animation(minimumInterval: 1 / 30, paused: settled || !onScreen || scenePhase != .active)) { timeline in
-                    Button { showMemory = true } label: {
-                        buddy(at: timeline.date)
-                            .frame(height: Self.buddyHeight)
-                    }
-                    .buttonStyle(RowPressStyle())
-                    .accessibilityLabel("Pine buddy")
-                    .accessibilityHint("Opens What I remember")
-                }
+                buddyButton
                 Text(weekLine)
                     .font(.body)
                     .foregroundStyle(Theme.text)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            // While a calendar preview waits, the week is the hour-by-hour calendar so its dashed block can be dragged; otherwise the picture.
-            if model.placement != nil {
-                WeekCalendar()
-            } else {
-                WeekPicture()
-                if model.aiConnected, model.openSuggestions.count > 1 {
-                    Button(addingAll ? "Adding…" : "Add all \(model.openSuggestions.count)") {
-                        addingAll = true
-                        Task {
-                            await model.acceptAll()
-                            addingAll = false
-                        }
-                    }
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.accent)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
-                    .disabled(addingAll)
-                    .accessibilityHint("Adds every suggestion that fits your calendar as it is")
-                }
-            }
+            weekView
         }
         .padding(.top, Theme.sm)
         .sheet(isPresented: $showMemory) { MemoryView() }
-        .onAppear {
-            onScreen = true
-            start = Date()
-            settle(after: WavingBuddy.greeting)
-        }
+        .onAppear(perform: appeared)
         .onDisappear { onScreen = false }
         .onChange(of: model.celebration) {
             cheeredAt = Date()
             settle(after: Self.cheer)
         }
+    }
+
+    /// The buddy, drawn by the clock only while it moves; tapping it opens "What I remember".
+    private var buddyButton: some View {
+        TimelineView(.animation(minimumInterval: 1 / Self.framesPerSecond, paused: settled || !onScreen || scenePhase != .active)) { timeline in
+            Button { showMemory = true } label: {
+                buddy(at: timeline.date)
+                    .frame(height: Self.buddyHeight)
+            }
+            .buttonStyle(RowPressStyle())
+            .accessibilityLabel("Pine buddy")
+            .accessibilityHint("Opens What I remember")
+            .accessibilityIdentifier("today.buddy")
+        }
+    }
+
+    /// While a calendar preview waits, the week is the hour-by-hour calendar so its dashed block can be dragged;
+    /// otherwise the picture, with "Add all" when there is more than one suggestion.
+    @ViewBuilder private var weekView: some View {
+        if model.placement != nil {
+            WeekCalendar()
+        } else {
+            WeekPicture()
+            if model.offersAddAll { addAllButton }
+        }
+    }
+
+    private var addAllButton: some View {
+        Button(addingAll ? "Adding…" : "Add all \(model.openSuggestions.count)") {
+            addingAll = true
+            Task {
+                await model.acceptAll()
+                addingAll = false
+            }
+        }
+        .font(.body.weight(.semibold))
+        .foregroundStyle(Theme.accent)
+        .frame(maxWidth: .infinity, minHeight: TapTargetButtonStyle.minSide, alignment: .trailing)
+        .disabled(addingAll)
+        .accessibilityHint("Adds every suggestion that fits your calendar as it is")
+        .accessibilityIdentifier("today.addAll")
+    }
+
+    private func appeared() {
+        onScreen = true
+        start = Date()
+        settle(after: WavingBuddy.greeting)
     }
 
     // MARK: The week

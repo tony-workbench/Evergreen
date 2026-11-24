@@ -13,10 +13,11 @@ writeText('src/schemas.mjs', `// Generated from schemas/*.schema.json by scripts
 
 // 2. The three people. Four weeks of Health data before Monday 9 November 2026 (UTC-8), and that week's calendar.
 const OFFSET = '-08:00', FIRST = '2026-10-12';
+const WEEK_DAY = 28;   // Monday 9 November, as a day number from FIRST: four weeks of Health data come before it
 const p2 = (n) => String(n).padStart(2, '0');
 const dayAt = (n) => new Date(Date.parse(`${FIRST}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
 const time = (day, hour, minute = 0) => `${day}T${p2(hour + Math.floor(minute / 60))}:${p2(minute % 60)}:00${OFFSET}`;
-const week = (n, hour, minute) => time(dayAt(28 + n), hour, minute);
+const week = (n, hour, minute) => time(dayAt(WEEK_DAY + n), hour, minute);
 const event = (id, title, weekday, from, to) => ({ id, title, start: week(weekday, ...from), end: week(weekday, ...to), fixed: true });
 // habit: [Health type, weekday (Monday 0), hour, minutes, the week it was skipped or null]
 function person(key, user, name, habits, sleep, heart, events) {
@@ -47,6 +48,12 @@ const { runWeek } = await import('../tests/week-scenario.mjs');
 const { assertValid } = await import('../src/validate.mjs');
 const good = {};
 // The rules each person set: written by hand, since no stand-in bundle makes them. Made-up people, generic answers.
+// The values the invalid fixtures put in place of a good one, each breaking one rule.
+const BAD = {
+  placeWeeks: 8, gymWorkouts: 2, shortWeeks: 4,                 // training_place: 8 weeks looked at; a gym workout; under 8 weeks
+  weekday: 7, sessionMin: 5, sessionMax: 20, fromHour: 12, toHour: 20, latitude: 1, longitude: 2,
+  offsetHours: -8, seconds: [20, 30], reps: 10, load: 20, slowSeconds: 2,
+};
 const RULES = {
   sam: { restWeekdays: [5, 6], sessionMinutes: { min: 15, max: 20 }, window: { from: '10:00', to: '18:00' }, mornings: false, equipment: ['chair', 'wall', 'floor'], avoid: [], movements: {} },
   alex: { restWeekdays: [2, 5, 6], sessionMinutes: { min: 20, max: 25 }, window: { from: '12:00', to: '20:30' }, mornings: false, equipment: ['backpack', 'chair', 'table', 'sofa', 'book', 'step'], avoid: ['jump_squat'], movements: { split_squat: 'can', push_up: 'untried' } },
@@ -54,16 +61,17 @@ const RULES = {
 };
 // What each person's phone tells the plan engine about the days at home that week (Monday 9 November): written by hand.
 const HOME_DAYS = {
-  sam: { dayKinds: { '2026-11-10': 'out' }, carry: [], queue: {}, doneToday: false, dayOffsets: Object.fromEntries(Array.from({ length: 7 }, (_, i) => [dayAt(28 + i), OFFSET])) },
+  sam: { dayKinds: { '2026-11-10': 'out' }, carry: [], queue: {}, doneToday: false, dayOffsets: Object.fromEntries(Array.from({ length: 7 }, (_, i) => [dayAt(WEEK_DAY + i), OFFSET])) },
   alex: { dayKinds: { '2026-11-12': 'home' }, carry: ['lower'], queue: { '2026-11-11': 'upper', '2026-11-13': 'full' }, doneToday: false, dayOffsets: { '2026-11-09': OFFSET, '2026-11-10': OFFSET } },
   jordan: { dayKinds: {}, queue: { '2026-11-09': 'full_lower', '2026-11-11': 'full_upper' }, doneToday: true },
 };
 // A home session of each person's: written by hand with movements from the library, as workoutContent returns them.
-const item = (movementId, sets, dose, rest, extra = {}) => ({ movementId, sets, ...dose, rest, isNew: false, ...extra });
+// `dose` is { reps or seconds, rest, and any of slow, load, isNew }: the keys come out in workoutContent's order.
+const item = (movementId, sets, { reps, seconds, rest, ...extra }) => ({ movementId, sets, ...(reps ? { reps } : { seconds }), rest, isNew: false, ...extra });
 const CONTENT = {
-  sam: { sessionId: null, focus: 'full', minutes: 15, items: [item('sit_to_stand', 3, { reps: [8, 12] }, 60), item('wall_push_up', 3, { reps: [10, 15] }, 60, { slow: true }), item('dead_bug', 2, { reps: [8, 12] }, 45)] },
-  alex: { sessionId: 'w1-wed', focus: 'upper', minutes: 24, items: [item('table_push_up', 3, { reps: [8, 12] }, 60), item('backpack_row', 3, { reps: [10, 15] }, 60, { load: 5 }), item('backpack_press', 3, { reps: [8, 12] }, 60, { load: 2 }), item('forearm_plank', 2, { seconds: [20, 40] }, 45, { isNew: true })] },
-  jordan: { sessionId: 'w1-sat', focus: 'full_lower', minutes: 35, items: [item('reverse_lunge', 3, { reps: [8, 12] }, 60), item('backpack_hip_hinge', 4, { reps: [8, 12] }, 60, { load: 6 }), item('push_up', 3, { reps: [6, 12] }, 60)] },
+  sam: { sessionId: null, focus: 'full', minutes: 16, items: [item('sit_to_stand', 2, { reps: [8, 12], rest: 60 }), item('wall_push_up', 2, { reps: [10, 15], rest: 60, slow: true }), item('prone_arm_raise', 2, { reps: [10, 15], rest: 45 }), item('dead_bug', 2, { reps: [8, 12], rest: 45 })] },
+  alex: { sessionId: 'w1-wed', focus: 'upper', minutes: 24, items: [item('table_push_up', 3, { reps: [8, 12], rest: 60 }), item('backpack_row', 3, { reps: [10, 15], rest: 60, load: 5 }), item('backpack_press', 3, { reps: [8, 12], rest: 60, load: 2 }), item('forearm_plank', 2, { seconds: [20, 40], rest: 45, isNew: true })] },
+  jordan: { sessionId: 'w1-sat', focus: 'full_lower', minutes: 35, items: [item('reverse_lunge', 3, { reps: [8, 12], rest: 60 }), item('backpack_hip_hinge', 4, { reps: [8, 12], rest: 60, load: 6 }), item('push_up', 3, { reps: [6, 12], rest: 60 })] },
 };
 for (const p of PEOPLE) {
   const S = await runWeek(loadBundles(STUBS), p, async (title, needs, fn) => { await fn(); });
@@ -130,9 +138,9 @@ const bad = {
     'state-review': change(g['memory-row'], (v) => { v.state = 'review'; }),
     'since-is-a-time-not-a-day': change(g['memory-row'], (v) => { v.since = '2026-11-08T00:00:00-08:00'; }),
     'extra-field': change(g['memory-row'], (v) => { v.text = v.statement; }),
-    'training-place-at-a-gym': change(g['memory-row'], (v) => { v.kind = 'training_place'; v.data = { place: 'gym', gymWorkouts: 0, weeks: 8 }; }),
-    'training-place-with-gym-workouts': change(g['memory-row'], (v) => { v.kind = 'training_place'; v.data = { place: 'home', gymWorkouts: 2, weeks: 8 }; }),
-    'training-place-under-8-weeks': change(g['memory-row'], (v) => { v.kind = 'training_place'; v.data = { place: 'home', gymWorkouts: 0, weeks: 4 }; }),
+    'training-place-at-a-gym': change(g['memory-row'], (v) => { v.kind = 'training_place'; v.data = { place: 'gym', gymWorkouts: 0, weeks: BAD.placeWeeks }; }),
+    'training-place-with-gym-workouts': change(g['memory-row'], (v) => { v.kind = 'training_place'; v.data = { place: 'home', gymWorkouts: BAD.gymWorkouts, weeks: BAD.placeWeeks }; }),
+    'training-place-under-8-weeks': change(g['memory-row'], (v) => { v.kind = 'training_place'; v.data = { place: 'home', gymWorkouts: 0, weeks: BAD.shortWeeks }; }),
     'training-place-with-usual-slot-data': change(g['memory-row'], (v) => { v.kind = 'training_place'; }),
   },
   'memory-table': {
@@ -221,16 +229,16 @@ const bad = {
     'whole-row-instead-of-its-slot': g['memory-row'],
   },
   'user-rules': {
-    'rest-weekday-7': change(g['user-rules'], (v) => { v.restWeekdays = [7]; }),
+    'rest-weekday-7': change(g['user-rules'], (v) => { v.restWeekdays = [BAD.weekday]; }),
     'rest-weekday-as-name': change(g['user-rules'], (v) => { v.restWeekdays = ['sat']; }),
-    'session-minutes-as-one-number': change(g['user-rules'], (v) => { v.sessionMinutes = 20; }),
-    'session-minutes-below-10': change(g['user-rules'], (v) => { v.sessionMinutes = { min: 5, max: 20 }; }),
-    'window-as-hour-numbers': change(g['user-rules'], (v) => { v.window = { from: 12, to: 20 }; }),
+    'session-minutes-as-one-number': change(g['user-rules'], (v) => { v.sessionMinutes = BAD.sessionMax; }),
+    'session-minutes-below-10': change(g['user-rules'], (v) => { v.sessionMinutes = { min: BAD.sessionMin, max: BAD.sessionMax }; }),
+    'window-as-hour-numbers': change(g['user-rules'], (v) => { v.window = { from: BAD.fromHour, to: BAD.toHour }; }),
     'window-clock-25': change(g['user-rules'], (v) => { v.window = { from: '12:00', to: '25:00' }; }),
     'equipment-not-on-the-list': change(g['user-rules'], (v) => { v.equipment = ['barbell']; }),
     'movement-state-not-on-the-list': change(g['user-rules'], (v) => { v.movements = { squat: 'maybe' }; }),
     'avoid-id-with-a-space': change(g['user-rules'], (v) => { v.avoid = ['jump squat']; }),
-    'home-is-not-a-field': change(g['user-rules'], (v) => { v.home = { latitude: 1, longitude: 2 }; }),
+    'home-is-not-a-field': change(g['user-rules'], (v) => { v.home = { latitude: BAD.latitude, longitude: BAD.longitude }; }),
   },
   'home-days': {
     'day-kind-not-on-the-list': change(g['home-days'], (v) => { v.dayKinds = { '2026-11-10': 'away' }; }),
@@ -239,21 +247,21 @@ const bad = {
     'carry-longer-than-three-days': change(g['home-days'], (v) => { v.carry = ['lower', 'upper', 'full', 'lower']; }),
     'done-today-as-text': change(g['home-days'], (v) => { v.doneToday = 'yes'; }),
     'rules-are-not-a-field': change(g['home-days'], (v) => { v.rules = {}; }),
-    'day-offset-as-hours': change(g['home-days'], (v) => { v.dayOffsets = { '2026-11-09': -8 }; }),
+    'day-offset-as-hours': change(g['home-days'], (v) => { v.dayOffsets = { '2026-11-09': BAD.offsetHours }; }),
     'day-offset-without-sign': change(g['home-days'], (v) => { v.dayOffsets = { '2026-11-09': '08:00' }; }),
     'day-offset-as-zone-name': change(g['home-days'], (v) => { v.dayOffsets = { '2026-11-09': 'America/Los_Angeles' }; }),
   },
   'workout-content': {
     'focus-not-on-the-list': change(g['workout-content'], (v) => { v.focus = 'arms'; }),
     'no-items': change(g['workout-content'], (v) => { v.items = []; }),
-    'reps-and-seconds': change(g['workout-content'], (v) => { v.items[0].seconds = [20, 30]; }),
+    'reps-and-seconds': change(g['workout-content'], (v) => { v.items[0].seconds = BAD.seconds; }),
     'neither-reps-nor-seconds': change(g['workout-content'], (v) => { delete v.items[0].reps; delete v.items[0].seconds; }),
-    'reps-as-one-number': change(g['workout-content'], (v) => { v.items[0].reps = 10; delete v.items[0].seconds; }),
+    'reps-as-one-number': change(g['workout-content'], (v) => { v.items[0].reps = BAD.reps; delete v.items[0].seconds; }),
     'sets-0': change(g['workout-content'], (v) => { v.items[0].sets = 0; }),
-    'load-over-what-a-backpack-holds': change(g['workout-content'], (v) => { v.items[0].load = 20; }),
+    'load-over-what-a-backpack-holds': change(g['workout-content'], (v) => { v.items[0].load = BAD.load; }),
     'movement-name-instead-of-id': change(g['workout-content'], (v) => { v.items[0].movementId = 'Push-up'; }),
     'words-in-the-item': change(g['workout-content'], (v) => { v.items[0].steps = ['Stand tall.']; }),
-    'slow-as-seconds': change(g['workout-content'], (v) => { v.items[1].slow = 2; }),
+    'slow-as-seconds': change(g['workout-content'], (v) => { v.items[1].slow = BAD.slowSeconds; }),
   },
   error: {
     'error-is-a-name-not-an-object': { ok: false, error: 'BadJSON' },

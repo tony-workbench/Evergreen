@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 /// The real triggers behind what Evergreen says on its own: rain due on an
 /// outdoor workout, and distance adding up on the running shoes. Each check
@@ -29,7 +30,10 @@ final class TriggerCenter {
     static let locationAskedKey = "location-asked"
     static let lastPlaceKey = "last-place"
     static let dismissedRainKey = "rain-dismissed"
+    /// How many dismissed rain asks and breaks are remembered, newest kept.
+    static let dismissedRainKept = 50
     static let shoeQuestionSkippedKey = "shoe-question-skipped"
+    private static let log = Logger(subsystem: "com.evergreentraining.app", category: "triggers")
 
     /// Rain asks for the next 48 hours that the person hasn't put away.
     private(set) var rainAsks: [RainAsk] = []
@@ -72,51 +76,90 @@ final class TriggerCenter {
         guard let parts, let cache else { return }
         let homeDays = parts.homeDays()
         guard !RainCheck.outdoorSessions(parts.plan(), now: now).isEmpty || !homeDays.isEmpty else {
-            rainAsks = []
-            rainSnacks = []
+            clearRain()
             return
         }
-        switch parts.location.permission {
-        case .denied:
-            // Off, silently, and never asked for again.
-            rainAsks = []
-            rainSnacks = []
-            return
-        case .notAsked:
-            // Asked once, the first time an outdoor workout is this close.
-            guard mayAsk, parts.store.value(Bool.self, for: Self.locationAskedKey) != true else { return }
-            parts.store.save(true, for: Self.locationAskedKey)
-            guard await parts.location.request() else {
-                rainAsks = []
-                rainSnacks = []
-                return
-            }
-        case .allowed:
-            break
-        }
-        // In the background there may be no fresh fix; the last rounded place will do.
-        let fix = await parts.location.current()?.rounded
-        if let fix { parts.store.save(fix, for: Self.lastPlaceKey) }
-        guard let here = fix ?? parts.store.value(Coordinate.self, for: Self.lastPlaceKey),
-              let forecast = try? await cache.forecast(at: here, now: now) else { return }
-
-        let dismissed = Set(parts.store.value([String].self, for: Self.dismissedRainKey) ?? [])
-        let busy = await parts.busy()
-        var asks = RainCheck.asks(plan: parts.plan(), forecast: forecast, busy: busy, now: now, calendar: parts.calendar)
-            .filter { !dismissed.contains($0.key) }
-        let snacks = RainCheck.snacks(days: homeDays, plan: parts.plan(), forecast: forecast, busy: busy, now: now, calendar: parts.calendar)
-            .filter { !dismissed.contains($0.key) }
-        // An outdoor workout on a rainy day at home offers the breaks as a third answer.
-        for index in asks.indices {
-            asks[index].snacks = snacks.first { parts.calendar.isDate($0.day, inSameDayAs: asks[index].session.slot.start) }
-        }
-        rainSnacks = snacks.filter { day in !asks.contains { $0.snacks?.key == day.key } }
+        guard await mayUseLocation(parts, mayAsk: mayAsk), let here = await place(parts),
+              let forecast = await readForecast(cache, at: here, now: now) else { return }
+        let found = await rainFound(parts, RainLook(forecast: forecast, homeDays: homeDays, now: now))
+        var asks = found.asks
+        rainSnacks = found.snacks.filter { day in !asks.contains { $0.snacks?.key == day.key } }
         if !asks.isEmpty {
             let nearby = IndoorPlace.nearest(await gyms(near: here, now: now), to: here)
             for index in asks.indices { asks[index].places = nearby }
         }
         rainAsks = asks
+        await notifyRain(asks, now: now, parts: parts)
+    }
 
+    /// Nothing about rain to say.
+    private func clearRain() {
+        rainAsks = []
+        rainSnacks = []
+    }
+
+    /// Whether the place may be read. Asked once, the first time an outdoor workout is this close; once denied, off,
+    /// silently, and never asked for again.
+    private func mayUseLocation(_ parts: Parts, mayAsk: Bool) async -> Bool {
+        switch parts.location.permission {
+        case .allowed:
+            return true
+        case .denied:
+            clearRain()
+            return false
+        case .notAsked:
+            guard mayAsk, parts.store.value(Bool.self, for: Self.locationAskedKey) != true else { return false }
+            parts.store.save(true, for: Self.locationAskedKey)
+            guard await parts.location.request() else {
+                clearRain()
+                return false
+            }
+            return true
+        }
+    }
+
+    /// Where the person is, rounded. In the background there may be no fresh fix; the last rounded place will do.
+    private func place(_ parts: Parts) async -> Coordinate? {
+        let fix = await parts.location.current()?.rounded
+        if let fix { parts.store.save(fix, for: Self.lastPlaceKey) }
+        return fix ?? parts.store.value(Coordinate.self, for: Self.lastPlaceKey)
+    }
+
+    /// The forecast for `here`, kept for an hour; nil, with why in the log, when it can't be had (offline, say).
+    private func readForecast(_ cache: ForecastCache, at here: Coordinate, now: Date) async -> Forecast? {
+        do {
+            return try await cache.forecast(at: here, now: now)
+        } catch {
+            Self.log.failed("No forecast for the rain check", error)
+            return nil
+        }
+    }
+
+    /// What a rain check looks at: the forecast, the days at home in it, and when.
+    private struct RainLook {
+        let forecast: Forecast
+        let homeDays: [RainHomeDay]
+        let now: Date
+    }
+
+    /// The rain asks and rainy afternoons' breaks the person hasn't put away. An outdoor workout on a rainy day at home
+    /// offers the breaks as a third answer.
+    private func rainFound(_ parts: Parts, _ look: RainLook) async -> (asks: [RainAsk], snacks: [RainSnacks]) {
+        let dismissed = Set(parts.store.value([String].self, for: Self.dismissedRainKey) ?? [])
+        let busy = await parts.busy()
+        var asks = RainCheck.asks(plan: parts.plan(), forecast: look.forecast, busy: busy, now: look.now, calendar: parts.calendar)
+            .filter { !dismissed.contains($0.key) }
+        let room = RainCheck.SnackRoomBasis(plan: parts.plan(), busy: busy, now: look.now, calendar: parts.calendar)
+        let snacks = RainCheck.snacks(days: look.homeDays, forecast: look.forecast, around: room)
+            .filter { !dismissed.contains($0.key) }
+        for index in asks.indices {
+            asks[index].snacks = snacks.first { parts.calendar.isDate($0.day, inSameDayAs: asks[index].session.slot.start) }
+        }
+        return (asks, snacks)
+    }
+
+    /// Each rain ask, and each rainy afternoon's breaks still offered, notified once.
+    private func notifyRain(_ asks: [RainAsk], now: Date, parts: Parts) async {
         let ledger = NotifiedLedger(store: parts.store)
         for ask in asks where ledger.firstTime(ask.key, now: now) {
             await parts.notify(NotificationCopy.rain(ask, now: now, calendar: parts.calendar), ask.key)
@@ -166,7 +209,7 @@ final class TriggerCenter {
         guard let parts else { return }
         var dismissed = parts.store.value([String].self, for: Self.dismissedRainKey) ?? []
         if !dismissed.contains(ask.key) { dismissed.append(ask.key) }
-        parts.store.save(Array(dismissed.suffix(50)), for: Self.dismissedRainKey)
+        parts.store.save(Array(dismissed.suffix(Self.dismissedRainKept)), for: Self.dismissedRainKey)
         rainAsks.removeAll { $0.key == ask.key }
         if let snacks = ask.snacks { dismiss(snacks) }
     }
@@ -176,7 +219,7 @@ final class TriggerCenter {
         guard let parts else { return }
         var dismissed = parts.store.value([String].self, for: Self.dismissedRainKey) ?? []
         if !dismissed.contains(snacks.key) { dismissed.append(snacks.key) }
-        parts.store.save(Array(dismissed.suffix(50)), for: Self.dismissedRainKey)
+        parts.store.save(Array(dismissed.suffix(Self.dismissedRainKept)), for: Self.dismissedRainKey)
         rainSnacks.removeAll { $0.key == snacks.key }
         for index in rainAsks.indices where rainAsks[index].snacks?.key == snacks.key { rainAsks[index].snacks = nil }
     }

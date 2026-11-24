@@ -9,7 +9,9 @@ struct TopSuggestionCard: View {
     let session: WeekPlan.Session
 
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    /// Reduce Motion, or a UI test's `-reduceMotion` (Design/Motion.swift).
+    private var reduceMotion: Bool { Motion.reduced(systemReduceMotion) }
     /// The session just added, kept on screen with its Undo.
     @State private var added: WeekPlan.Session?
     @State private var showWhy = false
@@ -17,11 +19,17 @@ struct TopSuggestionCard: View {
 
     private var shown: WeekPlan.Session { added ?? session }
 
+    /// The widest "Add to plan" gets, so "Not now" and "Why" stay beside it.
+    private static let addMaxWidth: CGFloat = 180
+    /// How long "Added" and its Undo stay, and how long they take to come and go.
+    private static let addedSeconds = 4.0
+    private static let addedIn = 0.2
+    private static let addedOut = 0.25
+
     var body: some View {
-        let chips = Basis.chips(model.bases(for: shown), for: shown)
         VStack(alignment: .leading, spacing: Theme.sm) {
             Text(SuggestionWords.statement(shown, calendar: model.calendar))
-                .agentFont(34, relativeTo: .largeTitle)
+                .agentFont(Theme.heroTitleSize, relativeTo: .largeTitle)
                 .foregroundStyle(Theme.accent)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
@@ -29,39 +37,49 @@ struct TopSuggestionCard: View {
                 .font(.body)
                 .foregroundStyle(Theme.text)
                 .fixedSize(horizontal: false, vertical: true)
-            ForEach(chips.prefix(2)) { BasisChip(basis: $0) }
-            if added != nil {
-                HStack(spacing: Theme.md) {
-                    Label("Added", systemImage: "checkmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Theme.accent)
-                    Button("Undo", action: undo)
-                        .font(.body)
-                        .foregroundStyle(Theme.textMuted)
-                        .frame(minWidth: 44, minHeight: 48)
-                        .accessibilityHint("Takes it off your plan")
-                }
-            } else {
-                HStack(spacing: Theme.md) {
-                    Button("Add to plan", action: add)
-                        .buttonStyle(PrimaryButtonStyle())
-                        .frame(maxWidth: 180)
-                        .disabled(adding)
-                        .accessibilityHint("Adds it to your plan and calendar")
-                    Button("Not now") { Task { await model.decline(session) } }
-                        .frame(minWidth: 44, minHeight: 48)
-                    Button("Why") { showWhy = true }
-                        .frame(minWidth: 44, minHeight: 48)
-                        .accessibilityHint("Everything this suggestion is based on")
-                }
-                .font(.body)
-                .foregroundStyle(Theme.textMuted)
-                .padding(.top, Theme.xs)
-            }
+            ForEach(model.cardChips(for: shown)) { BasisChip(basis: $0) }
+            if added != nil { addedRow } else { answers }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.bottom, Theme.sm)
         .sheet(isPresented: $showWhy) { BasesSheet(session: shown) }
+    }
+
+    /// "Added", with Undo for a moment.
+    private var addedRow: some View {
+        HStack(spacing: Theme.md) {
+            Label("Added", systemImage: "checkmark")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+            Button("Undo", action: undo)
+                .font(.body)
+                .foregroundStyle(Theme.textMuted)
+                .frame(minWidth: TapTargetButtonStyle.minSide, minHeight: PrimaryButtonStyle.standardHeight)
+                .accessibilityHint("Takes it off your plan")
+                .accessibilityIdentifier("top.undo")
+        }
+    }
+
+    /// "Add to plan", then "Not now" and "Why" as quiet text.
+    private var answers: some View {
+        HStack(spacing: Theme.md) {
+            Button("Add to plan", action: add)
+                .buttonStyle(PrimaryButtonStyle())
+                .frame(maxWidth: Self.addMaxWidth)
+                .disabled(adding)
+                .accessibilityHint("Adds it to your plan and calendar")
+                .accessibilityIdentifier("top.add")
+            Button("Not now") { Task { await model.decline(session) } }
+                .frame(minWidth: TapTargetButtonStyle.minSide, minHeight: PrimaryButtonStyle.standardHeight)
+                .accessibilityIdentifier("top.notNow")
+            Button("Why") { showWhy = true }
+                .frame(minWidth: TapTargetButtonStyle.minSide, minHeight: PrimaryButtonStyle.standardHeight)
+                .accessibilityHint("Everything this suggestion is based on")
+                .accessibilityIdentifier("top.why")
+        }
+        .font(.body)
+        .foregroundStyle(Theme.textMuted)
+        .padding(.top, Theme.xs)
     }
 
     private func add() {
@@ -72,9 +90,9 @@ struct TopSuggestionCard: View {
             adding = false
             // Added in one tap: say so with Undo for a moment. A preview that needs an answer takes the top instead.
             guard model.suggestionState(session) == .added else { return }
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { added = session }
-            try? await Task.sleep(for: .seconds(4))
-            if added?.id == session.id { withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { added = nil } }
+            withAnimation(reduceMotion ? nil : .easeOut(duration: Self.addedIn)) { added = session }
+            try? await Task.sleep(for: .seconds(Self.addedSeconds))
+            if added?.id == session.id { withAnimation(reduceMotion ? nil : .easeInOut(duration: Self.addedOut)) { added = nil } }
         }
     }
 

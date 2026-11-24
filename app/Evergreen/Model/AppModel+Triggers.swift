@@ -25,6 +25,10 @@ extension AppModel {
         center.addObserver(forName: .EKEventStoreChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.calendarChangedForTriggers() }
         }
+        // A week skipped while the phone was locked is worked out once it is unlocked, not at the next run.
+        center.addObserver(forName: UIApplication.protectedDataDidBecomeAvailableNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.phoneUnlocked() }
+        }
         Task { await checkTriggers(foreground: UIApplication.shared.applicationState == .active) }
     }
 
@@ -38,15 +42,23 @@ extension AppModel {
     /// onboarding is done, so no permission is asked for during it. In the
     /// foreground the tick has just run (`RootView`); in the background it runs here.
     func checkTriggers(foreground: Bool) async {
-        guard onDevice, triggers.isSetUp, onboarded, deviceUnlocked else { return }
+        guard onDevice, triggers.isSetUp, onboarded else { return }
+        // Locked, nothing else runs; a week that is due is noted and worked out at the next chance.
+        guard deviceUnlocked else { await checkHomeWeek(); return }
         if !foreground { await tick() }
         // With the app open: a phone far from home makes today a day out (needs a home set in My rules).
         if foreground { await checkFarFromHome() }
         // The week the rules make: looked at again the first time each day, and for the week ahead on Sunday evening.
         await checkHomeWeek()
+        // A time of today's session that passed without a start hands it on to the next time.
+        moveMissedHomeTimes()
         // Each check runs only while its switch in Settings is on.
         if Automatic.rain.isOn(settings) { await triggers.checkRain(now: now, mayAsk: foreground) }
         if Automatic.shoes.isOn(settings) { await triggers.checkShoes(now: now) }
+    }
+
+    private func phoneUnlocked() {
+        Task { await deviceDidUnlock() }
     }
 
     /// A calendar change while the app is open moves the free time, so the dry
@@ -56,7 +68,7 @@ extension AppModel {
         guard UIApplication.shared.applicationState == .active else { return }
         Task {
             try? await Task.sleep(for: .seconds(2))
-            await triggers.checkRain(now: Date(), mayAsk: false)
+            await triggers.checkRain(now: now, mayAsk: false)
         }
     }
 
@@ -103,13 +115,16 @@ extension AppModel {
 
 /// A rainy afternoon at home: short breaks through the day, in place of a walk.
 extension AppModel {
+    /// Rain is looked at for today and this many days after it.
+    static let rainDaysAhead = 1
+
     /// Today and tomorrow when they are days at home by the rules, with each day's home session if it has one.
     var rainHomeDays: [RainHomeDay] {
         guard userRules.isOn, let week = homeWeek else { return [] }
-        return (0...1).compactMap { offset -> RainHomeDay? in
+        return (0...Self.rainDaysAhead).compactMap { offset -> RainHomeDay? in
             let iso = dayISO(offset: offset)
             guard dayKinds[iso] == .home || week.day(iso)?.kind == .home, let date = PlannedDays.date(iso, calendar: calendar) else { return nil }
-            let session = week.day(iso)?.first?.date.map { DateInterval(start: $0, duration: TimeInterval(userRules.sessionMax * 60)) }
+            let session = week.day(iso)?.first?.date.map { DateInterval(start: $0, duration: TimeInterval(userRules.sessionMax) * ClockUnits.minute) }
             return RainHomeDay(day: date, session: session)
         }
     }
@@ -141,12 +156,21 @@ extension AppModel {
         Task { await tick() }
     }
 
+    /// How many movements a short break takes turns with.
+    static let movementsPerSnack = 2
+
     /// Two movements for a break, taking turns through the day; only ones the person has the equipment for and hasn't left out.
     func snackMovements(turn: Int) -> [Movement] {
         let owned = Set(userRules.equipment.map(\.rawValue) + ["floor", "wall"])
         let all = movements.filter { $0.pattern == "snack" && Set($0.equipment).isSubset(of: owned) && !userRules.avoid.contains($0.id) }
         guard !all.isEmpty else { return [] }
-        return (0..<min(2, all.count)).map { all[(turn * 2 + $0) % all.count] }
+        let first = turn * Self.movementsPerSnack
+        return (0..<min(Self.movementsPerSnack, all.count)).map { all[(first + $0) % all.count] }
+    }
+
+    /// The movements for one of today's breaks: its turn is its place among today's breaks (the first when it isn't one).
+    func snackMovements(for item: PlanItem) -> [Movement] {
+        snackMovements(turn: snacksToday.firstIndex { $0.id == item.id } ?? 0)
     }
 
     /// The short breaks on today's plan, for Today.
@@ -173,7 +197,8 @@ extension AppModel {
         }
         var found: ShoeAdvice?
         if !askWithoutModel, let model = languageModel {
-            found = await ShoeSearch.advice(for: status, habit: RunningHabit(workouts, now: now), model: model, modelId: AIModels.model())
+            let runner = ShoeSearch.Runner(status: status, habit: RunningHabit(workouts, now: now))
+            found = await ShoeSearch.advice(for: runner, model: model, modelId: AIModels.model())
         }
         if let found { KeptShoeAdvice.save(found, for: status.log, to: settings) }
         shoeAdvice = found ?? .general(status)

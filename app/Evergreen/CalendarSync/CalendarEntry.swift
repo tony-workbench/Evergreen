@@ -23,26 +23,49 @@ struct CalendarEntry: Equatable, Sendable {
     let start: Date
     let end: Date
 
-    /// One entry per plan item, keyed by the story day and the item's id. The
-    /// story day is in the key because pinned plan ids repeat from day to day.
-    /// `notes` are extra lines for a day's strength workout, by day (YYYY-MM-DD): the movements of a home session.
-    static func entries(for plan: [PlanItem], storyDay: Date, calendar: Calendar, notes: [String: String] = [:]) -> [CalendarEntry] {
-        let day = Date.ISO8601FormatStyle(timeZone: calendar.timeZone).year().month().day().format(storyDay)
-        return plan.compactMap { item in
-            // A rest day is never written to the calendar.
+    /// What a day's strength event carries beyond the plan: the movements of a home session, by day (YYYY-MM-DD), and the
+    /// days whose home session is done, whose event says so in its title, at the time it was done when that is known,
+    /// else where it was planned.
+    struct Marks: Equatable, Sendable {
+        var notes: [String: String] = [:]
+        var done: Set<String> = []
+    }
+
+    /// What the entries are made from: the plan, the story day (in each key, because pinned plan ids repeat from day to
+    /// day), the calendar the days are read in, and the marks of the home sessions.
+    struct Request {
+        var plan: [PlanItem]
+        var storyDay: Date
+        var calendar: Calendar
+        var marks = Marks()
+    }
+
+    /// One entry per plan item, keyed by the story day and the item's id. A rest day is never written to the calendar.
+    static func entries(_ request: Request) -> [CalendarEntry] {
+        let calendar = request.calendar
+        let day = Date.ISO8601FormatStyle(timeZone: calendar.timeZone).year().month().day().format(request.storyDay)
+        return request.plan.compactMap { item in
             guard Activity.kind(item.slot.activityType) != .rest, let key = URL(string: "\(scheme)://plan/\(day)/\(item.id)") else { return nil }
             return CalendarEntry(
                 key: key,
-                title: Activity.title(item.slot),
-                notes: ["Planned by Evergreen.", homeNotes(item, notes: notes, calendar: calendar)].compactMap { $0 }.joined(separator: "\n"),
+                title: title(item, marks: request.marks, calendar: calendar),
+                notes: ["Planned by Evergreen.", homeNotes(item, marks: request.marks, calendar: calendar)].compactMap { $0 }.joined(separator: "\n"),
                 start: item.slot.start,
                 end: item.slot.end
             )
         }
     }
 
-    private static func homeNotes(_ item: PlanItem, notes: [String: String], calendar: Calendar) -> String? {
+    /// The words that mark a done session's event.
+    static let doneMark = " (done)"
+
+    private static func title(_ item: PlanItem, marks: Marks, calendar: Calendar) -> String {
+        let isDone = Activity.kind(item.slot.activityType) == .strength && marks.done.contains(LocalTime(item.slot.start, in: calendar.timeZone).day)
+        return Activity.title(item.slot) + (isDone ? doneMark : "")
+    }
+
+    private static func homeNotes(_ item: PlanItem, marks: Marks, calendar: Calendar) -> String? {
         guard Activity.kind(item.slot.activityType) == .strength else { return nil }
-        return notes[LocalTime(item.slot.start, in: calendar.timeZone).day]
+        return marks.notes[LocalTime(item.slot.start, in: calendar.timeZone).day]
     }
 }

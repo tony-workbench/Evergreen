@@ -8,17 +8,18 @@ struct AutomaticToggle: View {
     @State private var isOn = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Theme.xxs) {
             Toggle(what.title, isOn: $isOn)
                 .font(.body)
                 .tint(Theme.accent)
-                .frame(minHeight: 44)
+                .frame(minHeight: TapTargetButtonStyle.minSide)
+                .accessibilityIdentifier("automatic.\(what.rawValue)")
             Text(what.hint)
                 .font(.footnote)
                 .foregroundStyle(Theme.textMuted)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, Theme.sm)
-            Rectangle().fill(Theme.rule).frame(height: 1)
+            Rectangle().fill(Theme.rule).frame(height: Theme.borderWidth)
         }
         .onAppear { isOn = what.isOn(model.settings) }
         .onChange(of: isOn) { _, on in

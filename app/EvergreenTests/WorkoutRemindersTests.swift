@@ -22,7 +22,7 @@ struct WorkoutRemindersTests {
     private var eveningBefore: Date { Fixture.at(20, dayOffset: -1) }
 
     @Test func aDayWithTwoLaterTimesGetsSixRemindersInOrder() {
-        let reminders = WorkoutReminders.plan(day: usual, session: session, choice: all, now: eveningBefore, calendar: cal)
+        let reminders = WorkoutReminders.plan(.init(day: usual, session: session, choice: all), now: eveningBefore, calendar: cal)
         #expect(reminders.map(\.kind) == [.evening, .soon, .now, .moved, .later, .last])
         #expect(reminders.map(\.fires) == [Fixture.at(21, dayOffset: -1), Fixture.at(16, 30), Fixture.at(16, 40),
                                            Fixture.at(17, 0), Fixture.at(18, 10), Fixture.at(19, 40)])
@@ -34,27 +34,27 @@ struct WorkoutRemindersTests {
     }
 
     @Test func withKeepRemindingOffOnlyTheFirstThreeGo() {
-        let reminders = WorkoutReminders.plan(day: usual, session: session, choice: WorkoutReminders.Choice(keepReminding: false), now: eveningBefore, calendar: cal)
+        let reminders = WorkoutReminders.plan(.init(day: usual, session: session, choice: WorkoutReminders.Choice(keepReminding: false)), now: eveningBefore, calendar: cal)
         #expect(reminders.map(\.kind) == [.evening, .soon, .now])
     }
 
     @Test func withoutALaterTimeTheTimeItselfIsTheLast() {
-        let reminders = WorkoutReminders.plan(day: day(first: Fixture.at(16, 40), fallbacks: []), session: session, choice: all,
+        let reminders = WorkoutReminders.plan(.init(day: day(first: Fixture.at(16, 40), fallbacks: []), session: session, choice: all),
                                               now: eveningBefore, calendar: cal)
         #expect(reminders.map(\.kind) == [.evening, .soon, .last])
     }
 
     @Test func nothingPastFiresAndNothingFiresFromTen() {
-        let afternoon = WorkoutReminders.plan(day: usual, session: session, choice: all, now: Fixture.at(17, 30), calendar: cal)
+        let afternoon = WorkoutReminders.plan(.init(day: usual, session: session, choice: all), now: Fixture.at(17, 30), calendar: cal)
         #expect(afternoon.map(\.kind) == [.later, .last])
-        let late = WorkoutReminders.plan(day: day(first: Fixture.at(20, 30), fallbacks: [Fixture.at(22, 0)]), session: session,
-                                         choice: all, now: eveningBefore, calendar: cal)
+        let late = WorkoutReminders.plan(.init(day: day(first: Fixture.at(20, 30), fallbacks: [Fixture.at(22, 0)]), session: session,
+                                         choice: all), now: eveningBefore, calendar: cal)
         #expect(!late.contains { cal.component(.hour, from: $0.fires) >= 22 })
         #expect(late.count <= WorkoutReminders.maxPerDay)
     }
 
     @Test func aDayOutOrWithoutASessionHasNone() {
-        #expect(WorkoutReminders.plan(day: day(first: nil, fallbacks: [], kind: .out), session: session, choice: all,
+        #expect(WorkoutReminders.plan(.init(day: day(first: nil, fallbacks: [], kind: .out), session: session, choice: all),
                                       now: eveningBefore, calendar: cal).isEmpty)
     }
 
@@ -87,9 +87,14 @@ struct WorkoutRemindersTests {
 
     private let session1640 = DateInterval(start: Fixture.at(16, 40), duration: 25 * 60)
 
+    /// What the breaks fit around: nothing on the plan or the calendar unless given.
+    private func room(now: Date, plan: [PlanItem] = [], busy: [Busy] = []) -> RainCheck.SnackRoomBasis {
+        RainCheck.SnackRoomBasis(plan: plan, busy: busy, now: now, calendar: cal)
+    }
+
     @Test func aWetAfternoonAtHomeGetsTwoOrThreeShortBreaksSpreadOut() throws {
-        let found = RainCheck.snacks(days: [RainHomeDay(day: Fixture.storyDay, session: session1640)], plan: [], forecast: forecast(wet: 12..<20),
-                                     busy: [], now: Fixture.at(8), calendar: cal)
+        let found = RainCheck.snacks(days: [RainHomeDay(day: Fixture.storyDay, session: session1640)], forecast: forecast(wet: 12..<20),
+                                     around: room(now: Fixture.at(8)))
         let snacks = try #require(found.first)
         let blocks = snacks.blocks
         #expect((2...3).contains(blocks.count))
@@ -104,17 +109,17 @@ struct WorkoutRemindersTests {
 
     @Test func aDryAfternoonOrADayFullOfMeetingsGetsNone() {
         let home = [RainHomeDay(day: Fixture.storyDay, session: nil)]
-        #expect(RainCheck.snacks(days: home, plan: [], forecast: forecast(wet: nil), busy: [], now: Fixture.at(8), calendar: cal).isEmpty)
+        #expect(RainCheck.snacks(days: home, forecast: forecast(wet: nil), around: room(now: Fixture.at(8))).isEmpty)
         // Rain only in the morning doesn't count.
-        #expect(RainCheck.snacks(days: home, plan: [], forecast: forecast(wet: 7..<11), busy: [], now: Fixture.at(6), calendar: cal).isEmpty)
+        #expect(RainCheck.snacks(days: home, forecast: forecast(wet: 7..<11), around: room(now: Fixture.at(6))).isEmpty)
         // Room for one break only: none at all.
         let meetings = [Busy(start: Fixture.at(12), end: Fixture.at(19, 30))]
-        #expect(RainCheck.snacks(days: home, plan: [], forecast: forecast(wet: 12..<20), busy: meetings, now: Fixture.at(8), calendar: cal).isEmpty)
+        #expect(RainCheck.snacks(days: home, forecast: forecast(wet: 12..<20), around: room(now: Fixture.at(8), busy: meetings)).isEmpty)
     }
 
     @Test func theBreaksStayOffThePlanAndThePast() {
         let walk = PlanItem(id: "walk", slot: Slot(start: Fixture.at(12, 30), end: Fixture.at(13, 0), activityType: "Walking"))
-        let blocks = RainCheck.snackBlocks(on: Fixture.storyDay, session: nil, plan: [walk], busy: [], now: Fixture.at(12, 10), calendar: cal)
+        let blocks = RainCheck.snackBlocks(on: Fixture.storyDay, session: nil, around: room(now: Fixture.at(12, 10), plan: [walk]))
         #expect(!blocks.isEmpty)
         for block in blocks {
             #expect(block.start >= Fixture.at(12, 40))
@@ -131,7 +136,7 @@ struct WorkoutRemindersTests {
     // MARK: One time picked
 
     @Test func theEveningReminderOffersEachTimeOfTheDay() {
-        let evening = WorkoutReminders.plan(day: usual, session: session, choice: all, now: eveningBefore, calendar: cal)[0]
+        let evening = WorkoutReminders.plan(.init(day: usual, session: session, choice: all), now: eveningBefore, calendar: cal)[0]
         #expect(evening.kind == .evening && evening.choices == ["16:40", "18:10", "19:40"])
         #expect(Notifier.category(of: evening) == "home_tomorrow|16:40,18:10,19:40")
         #expect(Notifier.pickedClock(Notifier.pickAction("18:10")) == "18:10")
@@ -139,7 +144,7 @@ struct WorkoutRemindersTests {
     }
 
     @Test func pickingTheFirstTimeKeepsOnlyItAndAsksOnceBeforeMoving() {
-        let reminders = WorkoutReminders.plan(day: usual, session: session, choice: only("16:40"), now: eveningBefore, calendar: cal)
+        let reminders = WorkoutReminders.plan(.init(day: usual, session: session, choice: only("16:40")), now: eveningBefore, calendar: cal)
         #expect(reminders.map(\.kind) == [.evening, .soon, .now, .ask])
         #expect(reminders.map(\.fires) == [Fixture.at(21, dayOffset: -1), Fixture.at(16, 30), Fixture.at(16, 40), Fixture.at(17, 0)])
         // Nothing at 18:10 or 19:40 and no "Moved to": the question names the next time and moves only on its button.
@@ -151,55 +156,56 @@ struct WorkoutRemindersTests {
     @Test func onceThePickedTimeHasPassedNothingNewTurnsUp() {
         // After the question twenty minutes later, nothing more that day, whether the time was the first or a later one.
         for (clock, after) in [("16:40", Fixture.at(17, 1)), ("18:10", Fixture.at(18, 31)), ("19:40", Fixture.at(19, 41))] {
-            #expect(WorkoutReminders.plan(day: usual, session: session, choice: only(clock), now: after, calendar: cal).isEmpty)
+            #expect(WorkoutReminders.plan(.init(day: usual, session: session, choice: only(clock)), now: after, calendar: cal).isEmpty)
         }
     }
 
     @Test func pickingALaterTimeKeepsOnlyIt() {
-        let middle = WorkoutReminders.plan(day: usual, session: session, choice: only("18:10"), now: eveningBefore, calendar: cal)
+        let middle = WorkoutReminders.plan(.init(day: usual, session: session, choice: only("18:10")), now: eveningBefore, calendar: cal)
         #expect(middle.map(\.kind) == [.evening, .soon, .now, .ask])
         #expect(middle.map(\.fires).dropFirst() == [Fixture.at(18, 0), Fixture.at(18, 10), Fixture.at(18, 30)])
         #expect(middle[0].body.contains(Fixture.at(18, 10).clock), "the evening before names the picked time")
         // The last time of the day: nothing to move to, so no question, and it reads as the last time.
-        let last = WorkoutReminders.plan(day: usual, session: session, choice: only("19:40"), now: eveningBefore, calendar: cal)
+        let last = WorkoutReminders.plan(.init(day: usual, session: session, choice: only("19:40")), now: eveningBefore, calendar: cal)
         #expect(last.map(\.kind) == [.evening, .soon, .last])
         #expect(last.last?.fires == Fixture.at(19, 40))
     }
 
     @Test func aPickStandsWhenTheWeekIsWorkedOutAgainWithOtherTimes() {
         let moved = day(first: Fixture.at(17, 0), fallbacks: [Fixture.at(18, 40), Fixture.at(19, 40)])
-        let reminders = WorkoutReminders.plan(day: moved, session: session, choice: only("18:10"), now: eveningBefore, calendar: cal)
+        let reminders = WorkoutReminders.plan(.init(day: moved, session: session, choice: only("18:10")), now: eveningBefore, calendar: cal)
         #expect(reminders.map(\.fires).dropFirst() == [Fixture.at(18, 0), Fixture.at(18, 10), Fixture.at(18, 30)])
         #expect(reminders.last?.choices == ["18:40"])
     }
 
     @Test func pickingEachDayAsksTheEveningBeforeAndKeepsTheFirstTimeUntilThen() {
         let choice = WorkoutReminders.Choice(pickEachDay: true)
-        let reminders = WorkoutReminders.plan(day: usual, session: session, choice: choice, now: eveningBefore, calendar: cal)
+        let reminders = WorkoutReminders.plan(.init(day: usual, session: session, choice: choice), now: eveningBefore, calendar: cal)
         #expect(reminders.map(\.kind) == [.evening, .soon, .now, .ask])
         #expect(reminders[0].title == "Tomorrow at home: pick a time" && reminders[0].choices == ["16:40", "18:10", "19:40"])
         // Once a time is picked the evening reminder says it, and only that time reminds.
         var picked = choice
         picked.picked = "19:40"
-        let after = WorkoutReminders.plan(day: usual, session: session, choice: picked, now: eveningBefore, calendar: cal)
+        let after = WorkoutReminders.plan(.init(day: usual, session: session, choice: picked), now: eveningBefore, calendar: cal)
         #expect(after.map(\.kind) == [.evening, .soon, .last] && after[0].title == "Tomorrow at home")
     }
 
     // MARK: The reminders of the whole app
 
-    private func homeDay(_ iso: String, weekday: String, dayOffset: Int, first: (Int, Int) = (16, 40),
-                         later: [(Int, Int)] = [(18, 10), (19, 10)]) -> HomeWeek.Day {
-        HomeWeek.Day(day: iso, weekday: weekday, kind: .home, focus: "full",
+    /// The day `dayOffset` days from Thursday, at home, with its first time and later times as (hour, minute).
+    private func homeDay(_ dayOffset: Int, first: (Int, Int) = (16, 40), later: [(Int, Int)] = [(18, 10), (19, 10)]) -> HomeWeek.Day {
+        let day = Fixture.dayAndWeekday(dayOffset)
+        return HomeWeek.Day(day: day.iso, weekday: day.weekday, kind: .home, focus: "full",
                      first: LocalTime(Fixture.at(first.0, first.1, dayOffset: dayOffset), in: cal.timeZone),
                      fallbacks: later.map { LocalTime(Fixture.at($0.0, $0.1, dayOffset: dayOffset), in: cal.timeZone) })
     }
 
     /// Thursday 19 November at 9:00, no workouts before, rules on, today and Friday at home with a session at 16:40 and later times 18:10 and 19:10.
     @MainActor private func twoDaysAtHome(at now: Date = Clocks.morning) throws -> AppRig {
-        let rig = try AppRig(now: now, history: AppRig.runs(days: 0, before: now))
+        let rig = try AppRig(.init(now: now, history: AppRig.runs(days: 0, before: now)))
         rig.model.userRules.isOn = true
-        rig.model.homeWeek = HomeWeek(days: [homeDay(thursday, weekday: "Thursday", dayOffset: 0),
-                                             homeDay(friday, weekday: "Friday", dayOffset: 1)],
+        rig.model.homeWeek = HomeWeek(days: [homeDay(0),
+                                             homeDay(1)],
                                       homeDays: 2, trainingDays: 2, madeOn: rig.model.todayISO)
         rig.model.writeStrength = { _, _ in false }
         return rig
@@ -224,7 +230,7 @@ struct WorkoutRemindersTests {
     @MainActor @Test func aPickIsKeptWhenTheWeekIsWorkedOutAgain() async throws {
         let rig = try twoDaysAtHome()
         await rig.model.pickTime("18:10", day: friday)
-        rig.model.homeWeek?.days[1] = homeDay(friday, weekday: "Friday", dayOffset: 1, first: (17, 0), later: [(18, 40)])
+        rig.model.homeWeek?.days[1] = homeDay(1, first: (17, 0), later: [(18, 40)])
         let friday = rig.model.homeReminders().filter { $0.day == self.friday }
         #expect(friday.map(\.fires).dropFirst() == [Fixture.at(18, 0, dayOffset: 1), Fixture.at(18, 10, dayOffset: 1),
                                                      Fixture.at(18, 30, dayOffset: 1)])
@@ -347,11 +353,11 @@ struct WorkoutRemindersTests {
         rules.mornings = true
         #expect(rules.notificationsFrom == 6)
         let early = day(first: Fixture.at(7, 30), fallbacks: [])
-        let usual = WorkoutReminders.plan(day: early, session: session, choice: all, now: eveningBefore, calendar: cal)
+        let usual = WorkoutReminders.plan(.init(day: early, session: session, choice: all), now: eveningBefore, calendar: cal)
         #expect(!usual.contains { $0.kind == .soon || $0.kind == .now }, "before 09:00 nothing by default")
         var theirs = all
         theirs.quietUntil = rules.notificationsFrom
-        let own = WorkoutReminders.plan(day: early, session: session, choice: theirs, now: eveningBefore, calendar: cal)
+        let own = WorkoutReminders.plan(.init(day: early, session: session, choice: theirs), now: eveningBefore, calendar: cal)
         #expect(own.map(\.kind).contains(.soon) && own.map(\.kind).contains(.now))
     }
 
@@ -368,8 +374,8 @@ struct WorkoutRemindersTests {
     @MainActor @Test func theWeekTableShowsADaysShortBreaksForRainOnceAdded() async throws {
         let rig = try twoDaysAtHome(at: Fixture.at(8))
         #expect(rig.model.rainBreaks(on: thursday) == nil)
-        let snacks = try #require(RainCheck.snacks(days: [RainHomeDay(day: Fixture.storyDay, session: session1640)], plan: [],
-                                                   forecast: forecast(wet: 12..<20), busy: [], now: Fixture.at(8), calendar: cal).first)
+        let snacks = try #require(RainCheck.snacks(days: [RainHomeDay(day: Fixture.storyDay, session: session1640)],
+                                                   forecast: forecast(wet: 12..<20), around: room(now: Fixture.at(8))).first)
         rig.model.addRainSnacks(snacks)
         let added = try #require(rig.model.rainBreaks(on: thursday))
         #expect(added.added && added.clocks == snacks.blocks.map(\.start.clock))
@@ -382,8 +388,8 @@ struct WorkoutRemindersTests {
         let evening = try #require(rig.model.homeReminders().first { $0.day == friday })
         #expect(evening.kind == .outTomorrow && evening.fires == Fixture.at(21) && evening.title == "Tomorrow you’re out")
         #expect(Notifier.category(of: evening) == Notifier.outTomorrowCategory)
-        #expect(Notifier.route(action: UNNotificationDefaultActionIdentifier, day: friday, kind: "out_tomorrow", move: nil) == .open)
-        #expect(Notifier.route(action: "home_tomorrow", day: friday, kind: "out_tomorrow", move: nil) == .workout(.homeTomorrow, day: friday))
+        #expect(Notifier.route(.init(action: UNNotificationDefaultActionIdentifier, day: friday, kind: "out_tomorrow", move: nil)) == .open)
+        #expect(Notifier.route(.init(action: "home_tomorrow", day: friday, kind: "out_tomorrow", move: nil)) == .workout(.homeTomorrow, day: friday))
         await rig.model.handleWorkoutAction(.homeTomorrow, day: friday)
         #expect(rig.model.stayingHomeDays.contains(friday) && !rig.model.goingOutDays.contains(friday))
         // Past 21:00 there is nothing left to say.
@@ -419,7 +425,7 @@ actor CallCounter {
 @MainActor
 struct ComebackTests {
     @Test func aMissedDayBeforeTodayIsSeenEvenThoughTheWeekStartsToday() throws {
-        let rig = try AppRig(history: AppRig.runs(days: 0, before: Clocks.morning))
+        let rig = try AppRig(.init(history: AppRig.runs(days: 0, before: Clocks.morning)))
         rig.model.userRules.isOn = true
         let wednesday = rig.model.dayISO(offset: -1), today = rig.model.todayISO
         rig.settings.set([wednesday: "lower", today: "upper"], forKey: AppModel.homeFocusKey)

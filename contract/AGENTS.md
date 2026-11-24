@@ -41,7 +41,7 @@ These are identical in every bundle and in Swift. The schemas are the source.
   - `response`: `{ about, pattern }` (for example skipped early sessions)
   - `gear`: `{ item, km, boughtOn }`
   - `goal`: `{ what, date }`
-  - `training_place`: `{ place: "home", gymWorkouts: 0, weeks }` (group `routine`): over the last `weeks` (8 or more) of Health workouts, none was of a gym-equipment type
+  - `training_place`: `{ place: "home", gymWorkouts: 0, weeks }` (group `routine`): in the last `weeks` (the lookback, 8 or more; the person's history may be shorter) no Health workout was of a gym-equipment type
 - **Session:** `{ id, day, start, minutes, activity, intensity ("easy"|"steady"|"hard"), reason, basedOn: [memory key] }`. `id` is stable for the same day, activity and start.
 - **Preview block:** `{ id, sessionId?, activity, title, start, end, minutes, status ("new"|"moved"|"resized"|"cancelled"), reason }`.
 - **Outcome:** `{ sessionId, day, activity, plannedStart, done, actualStart?, actualMinutes? }`.

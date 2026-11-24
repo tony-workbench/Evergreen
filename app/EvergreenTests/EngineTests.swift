@@ -175,13 +175,13 @@ struct WeekCacheTests {
     @Test func theKeyChangesWithTheDayTheRowsAndTheCalendar() {
         let rows = PlanFakes.rows
         let busy = [Busy(start: Date(timeIntervalSince1970: 1000), end: Date(timeIntervalSince1970: 2000))]
-        let key = WeekCache.key(day: "2026-11-22", rows: rows, busy: busy)
-        #expect(key == WeekCache.key(day: "2026-11-22", rows: rows.reversed(), busy: busy))
-        #expect(key != WeekCache.key(day: "2026-11-23", rows: rows, busy: busy))
-        #expect(key != WeekCache.key(day: "2026-11-22", rows: rows, busy: []))
+        let key = WeekCache.key(.init(day: "2026-11-22", rows: rows, busy: busy))
+        #expect(key == WeekCache.key(.init(day: "2026-11-22", rows: rows.reversed(), busy: busy)))
+        #expect(key != WeekCache.key(.init(day: "2026-11-23", rows: rows, busy: busy)))
+        #expect(key != WeekCache.key(.init(day: "2026-11-22", rows: rows, busy: [])))
         var stopped = rows
         stopped[0].state = "rejected"
-        #expect(key != WeekCache.key(day: "2026-11-22", rows: stopped, busy: busy))
+        #expect(key != WeekCache.key(.init(day: "2026-11-22", rows: stopped, busy: busy)))
     }
 
     @Test func withUnderTwoWeeksOfWorkoutsNoLoadIsComparedWithTheUsual() throws {

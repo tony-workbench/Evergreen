@@ -1,0 +1,88 @@
+diff --git a/src/content.mjs b/src/content.mjs
+--- a/src/content.mjs
++++ b/src/content.mjs
+@@ -33,6 +33,7 @@
+ export const MIN_ITEMS = 3;
+ export const MAX_SETS = 6;
+ export const MAX_PROPOSED_ITEMS = 8;       // a proposal longer than this is not read past it
++export const MAX_SETS_ADDED = 24;          // a week adds at most this many sets while reaching for its floor and target
+ // Words that describe a feeling, not something the person can see or count. A movement's `pass` may use none of them.
+ export const FEELING_WORDS = ['feel', 'feeling', 'sense', 'burn', 'burning', 'ache', 'sore', 'warm', 'tight', 'pump', '感觉', '感受', '酸', '胀', '热'];
+ const ID = /^[a-z0-9_]{1,48}$/;
+@@ -277,14 +278,56 @@
+   return { contents, setsByPattern: sets, target: WEEK_TARGET_SETS, note: weekNote(contents, reqs, sets) };
+ }
+ 
+-// A main pattern no session has gets a movement; then sets go where a pattern is below the floor.
++// A main pattern no session has gets a movement; then sets go where a pattern is below the floor, come off any pattern
++// above the target's top, and go toward the target (not in a lighter week, whose sessions are one set short on purpose).
+ function fillPatterns(contents, reqs) {
+   for (const pattern of MAIN_PATTERNS) if (contents.length > 1 && setsByPattern(contents)[pattern] === 0) addItem(contents, reqs, pattern);
+   for (const pattern of MAIN_PATTERNS) {
+-    for (let guard = 0; guard < 8 && setsByPattern(contents)[pattern] < WEEK_FLOOR_SETS; guard += 1) {
+-      if (!addSet(contents, reqs, pattern)) break;
++    for (let guard = 0; guard < MAX_SETS_ADDED && setsByPattern(contents)[pattern] < WEEK_FLOOR_SETS; guard += 1) {
++      if (!addSet(contents, reqs, pattern, true)) break;
+     }
+   }
++  for (const pattern of MAIN_PATTERNS) capPattern(contents, pattern);
++  if (!reqs.some((r) => r.deload)) raiseToTarget(contents, reqs);
++}
++
++// One set at a time to the pattern furthest below eight that a session has the minutes for, until none has.
++function raiseToTarget(contents, reqs) {
++  for (let guard = 0; guard < MAX_SETS_ADDED; guard += 1) {
++    const sets = setsByPattern(contents);
++    const short = MAIN_PATTERNS.filter((p) => sets[p] > 0 && sets[p] < WEEK_TARGET_SETS[0]).sort((x, y) => sets[x] - sets[y]);
++    if (!short.some((p) => addSet(contents, reqs, p, false))) return;
++  }
++}
++
++// Above ten sets of a pattern: a movement of it goes from a session that keeps four movements, when the pattern keeps
++// eight; otherwise a set comes off its movement with the most sets.
++function capPattern(contents, pattern) {
++  for (let guard = 0; guard < MAX_SETS_ADDED; guard += 1) {
++    const over = setsByPattern(contents)[pattern] - WEEK_TARGET_SETS[1];
++    if (over <= 0 || !(dropItemOf(contents, pattern, over) || dropSetOf(contents, pattern))) return;
++  }
++}
++
++function dropItemOf(contents, pattern, over) {
++  const room = over + WEEK_TARGET_SETS[1] - WEEK_TARGET_SETS[0];
++  const spot = contents.filter((c) => c.items.length > MIN_ITEMS)
++    .flatMap((c) => c.items.filter((i) => patternOf(i) === pattern && i.sets <= room).map((i) => ({ c, i })))
++    .sort((x, y) => y.i.sets - x.i.sets)[0];
++  if (!spot) return false;
++  spot.c.items = spot.c.items.filter((i) => i !== spot.i);
++  spot.c.minutes = sessionMinutes(spot.c.items);
++  return true;
++}
++
++// The set comes off the movement with the most sets, in the longest session when two have as many, so the week stays even.
++function dropSetOf(contents, pattern) {
++  const spot = contents.flatMap((c) => c.items.filter((i) => patternOf(i) === pattern && i.sets > 1).map((i) => ({ c, i })))
++    .sort((x, y) => y.i.sets - x.i.sets || y.c.minutes - x.c.minutes)[0];
++  if (!spot) return false;
++  spot.i.sets -= 1;
++  spot.c.minutes = sessionMinutes(spot.c.items);
++  return true;
+ }
+ 
+ function weekNote(contents, reqs, sets) {
+@@ -303,12 +346,13 @@
+ 
+ // One more set of `pattern` somewhere in the week: in the session with the most time left, or, when none has the time,
+ // in place of a set of the pattern furthest above the floor in the same session. False when neither works.
+-function addSet(contents, reqs, pattern) {
+-  const spots = contents.flatMap((c, k) => c.items.filter((i) => patternOf(i) === pattern && i.sets < MAX_SETS).map((i) => ({ c, k, i })));
++function addSet(contents, reqs, pattern, swap) {
++  const spots = contents.flatMap((c, k) => c.items.filter((i) => patternOf(i) === pattern && i.sets < MAX_SETS).map((i) => ({ c, k, i })))
++    .filter(({ k }) => swap || !reqs[k].easeOff);
+   const fits = spots.filter(({ c, k, i }) => sessionMinutes(withSets(c.items, i, i.sets + 1)) <= reqs[k].minutes)
+     .sort((x, y) => x.c.minutes - y.c.minutes)[0];
+   if (fits) { fits.i.sets += 1; fits.c.minutes = sessionMinutes(fits.c.items); return true; }
+-  return spots.some((spot) => swapSet(contents, reqs, spot));
++  return swap && spots.some((spot) => swapSet(contents, reqs, spot));
+ }
+ 
+ // A set moves to `i` from another movement of the same session whose pattern stays at its floor, if the session still fits.

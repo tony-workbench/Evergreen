@@ -9,6 +9,8 @@ struct WorkoutLog: Codable, Equatable, Sendable {
     static let key = "workout_log"
     /// Older entries go: the engine looks at the last two times of each movement.
     static let keep = 300
+    /// Skipped days, done days and days done another way: the last sixty of each are kept.
+    static let keptDays = 60
 
     struct Entry: Codable, Equatable, Sendable {
         var movementId: String
@@ -19,11 +21,15 @@ struct WorkoutLog: Codable, Equatable, Sendable {
         var load: Double?
         /// Done at the slower tempo: the slow step of progression (each rep lowered two seconds slower).
         var slow: Bool?
+        /// "Too hard" was pressed on it that time: the engine never counts such a time towards moving on (plan 4.2).
+        /// Optional, true only when pressed, so an older log still reads.
+        var tooHard: Bool?
     }
 
     var entries: [Entry] = []
-    /// Kilograms for a backpack movement's next time only: "Too hard" took one off on the page, "Too easy" at the end adds two.
-    /// Taken off again after a session without either, so the usual kilogram at a time carries on from what was done.
+    /// Kilograms for a backpack movement's next time only: "Too hard" took one off on the page, "Too easy" (while the weight
+    /// is being found) adds two. Taken off again after a session without either, so the usual kilogram at a time carries
+    /// on from what was done.
     var loads: [String: Double] = [:]
     /// The soreness answer after the last session, 0 to 5 ("4" takes a set off next time).
     var lastPain: Int?
@@ -45,14 +51,14 @@ struct WorkoutLog: Codable, Equatable, Sendable {
     /// field takes its default instead of losing the whole log.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        entries = (try? c.decodeIfPresent([Entry].self, forKey: .entries)) ?? []
-        loads = (try? c.decodeIfPresent([String: Double].self, forKey: .loads)) ?? [:]
-        lastPain = try? c.decodeIfPresent(Int.self, forKey: .lastPain)
-        doneDays = (try? c.decodeIfPresent([String].self, forKey: .doneDays)) ?? []
-        lastFeeling = try? c.decodeIfPresent(WorkoutFeeling.self, forKey: .lastFeeling)
-        turn = (try? c.decodeIfPresent(Int.self, forKey: .turn)) ?? 0
-        skipped = try? c.decodeIfPresent([String: String].self, forKey: .skipped)
-        otherWay = try? c.decodeIfPresent([String].self, forKey: .otherWay)
+        entries = c.field([Entry].self, .entries, log: .workout) ?? []
+        loads = c.field([String: Double].self, .loads, log: .workout) ?? [:]
+        lastPain = c.field(Int.self, .lastPain, log: .workout)
+        doneDays = c.field([String].self, .doneDays, log: .workout) ?? []
+        lastFeeling = c.field(WorkoutFeeling.self, .lastFeeling, log: .workout)
+        turn = c.field(Int.self, .turn, log: .workout) ?? 0
+        skipped = c.field([String: String].self, .skipped, log: .workout)
+        otherWay = c.field([String].self, .otherWay, log: .workout)
     }
 
     static func load(from defaults: UserDefaults) -> WorkoutLog {
@@ -76,11 +82,18 @@ struct WorkoutLog: Codable, Equatable, Sendable {
                                               "sets": .array(entry.sets.map { .number(Double($0)) })]
             if let load = entry.load { value["load"] = .number(load) }
             if entry.slow == true { value["slow"] = .bool(true) }
+            if entry.tooHard == true { value["tooHard"] = .bool(true) }
             return .object(value)
         })
     }
 
     func didHomeSession(on day: String) -> Bool { doneDays.contains(day) }
+
+    /// The backpack's weight kept for a movement from an earlier session: the one set for next time, else the last one
+    /// logged. Nil the first time with the backpack, while its weight is still being found (plan 5.C).
+    func savedLoad(_ movementId: String) -> Double? {
+        loads[movementId] ?? entries.last { $0.movementId == movementId && $0.load != nil }?.load
+    }
 
     /// Done another way, not finished on the workout page.
     func didOtherWay(_ day: String) -> Bool { otherWay?.contains(day) == true }
@@ -94,13 +107,14 @@ struct WorkoutLog: Codable, Equatable, Sendable {
     mutating func skip(_ day: String, reason: String) {
         var all = skipped ?? [:]
         all[day] = reason
-        skipped = Dictionary(uniqueKeysWithValues: all.sorted { $0.key < $1.key }.suffix(60).map { ($0.key, $0.value) })
+        skipped = Dictionary(uniqueKeysWithValues: all.sorted { $0.key < $1.key }.suffix(Self.keptDays).map { ($0.key, $0.value) })
     }
 
     /// Records a finished session: each movement's sets, the soreness answer and the day.
     mutating func record(day: String, results: [WorkoutResult], pain: Int?) {
         for result in results where !result.sets.isEmpty {
-            entries.append(Entry(movementId: result.movementId, day: day, sets: result.sets, load: result.load, slow: result.slow == true ? true : nil))
+            entries.append(Entry(movementId: result.movementId, day: day, sets: result.sets, load: result.load,
+                                 slow: result.slow == true ? true : nil, tooHard: result.tooHard ? true : nil))
         }
         if entries.count > Self.keep { entries.removeFirst(entries.count - Self.keep) }
         if let pain { lastPain = pain }
@@ -109,30 +123,35 @@ struct WorkoutLog: Codable, Equatable, Sendable {
         otherWay?.removeAll { $0 == day }
     }
 
-    /// The backpack's weight for next time, from the session just done: "Too hard" on a movement keeps the lighter weight
-    /// the page already set, "Too easy" at the end adds two kilograms (up to what a backpack holds), anything else
-    /// leaves it to the usual step up.
+    /// The backpack's weight for next time, from the session just done: "Too hard" on a movement keeps the weight the
+    /// page left it at, and while the weight is still being found (`WorkoutResult.calibrating`) "Too easy" at the end adds
+    /// two kilograms (up to what a backpack holds). Anything else leaves it to the usual step up: a kilogram after a
+    /// session with every set at the top.
     mutating func settleLoads(_ results: [WorkoutResult], feeling: WorkoutFeeling?) {
         for result in results {
             guard let load = result.load else { continue }
             // A load changed on the page ("Too hard" or "Too easy" on that movement) is the one kept; the end-of-session
-            // "Too easy" only raises the ones not changed there.
-            if result.tooHard || result.tooEasy == true { loads[result.movementId] = load }
-            else if feeling == .easy { loads[result.movementId] = min(BackpackWater.maxKg, load + BackpackWater.easierStepKg) }
-            else { loads.removeValue(forKey: result.movementId) }
+            // "Too easy" only raises the ones not changed there, and only while their weight is being found.
+            if result.tooHard || result.tooEasy == true {
+                loads[result.movementId] = load
+            } else if feeling == .easy, result.calibrating == true {
+                loads[result.movementId] = min(BackpackWater.maxKg, load + BackpackWater.easierStepKg)
+            } else {
+                loads.removeValue(forKey: result.movementId)
+            }
         }
     }
 
     mutating func markDone(_ day: String) {
         if !doneDays.contains(day) { doneDays.append(day) }
-        doneDays = Array(doneDays.suffix(60))
+        doneDays = Array(doneDays.suffix(Self.keptDays))
     }
 
     /// "I did it another way" or "Already done".
     mutating func markDoneAnotherWay(_ day: String) {
         guard !didHomeSession(on: day) else { return }
         markDone(day)
-        otherWay = Array(((otherWay ?? []) + [day]).suffix(60))
+        otherWay = Array(((otherWay ?? []) + [day]).suffix(Self.keptDays))
     }
 
     /// Takes back "I did it another way" or "Already done"; a session finished on the page stays done.
@@ -156,6 +175,10 @@ struct WorkoutResult: Codable, Equatable, Sendable {
     var tooEasy: Bool?
     /// Done at the slower tempo the session asked for (the slow step), kept in the log so the engine knows it was done.
     var slow: Bool?
+    /// A backpack movement with no weight kept from an earlier session (plan 5.C): this session finds its weight, so
+    /// "Too hard" takes a kilogram off and "Too easy" adds two. Decided from the log when the session starts; nil for a
+    /// movement without a backpack, and for a session saved by an older build (then read from the log).
+    var calibrating: Bool?
 }
 
 /// A session left half done: picked up where it stopped when the page opens again the same day.
@@ -179,8 +202,8 @@ struct WorkoutProgress: Codable, Equatable, Sendable {
         return results[index].load ?? content.items[index].load
     }
 
-    /// "Too hard" on a backpack movement: a kilogram less now and next time, down to the least. The new weight, or nil
-    /// for a movement without a backpack.
+    /// "Too hard" on a backpack movement while its weight is being found: a kilogram less now and next time, down to the
+    /// least. The new weight, or nil for a movement without a backpack.
     mutating func backpackTooHard() -> Double? {
         guard let load = backpackLoad else { return nil }
         let lighter = max(BackpackWater.leastKg, load - BackpackWater.harderStepKg)
@@ -190,8 +213,8 @@ struct WorkoutProgress: Codable, Equatable, Sendable {
         return lighter
     }
 
-    /// "Too easy" on a backpack movement: two kilograms more now and next time, up to what a backpack holds. Nil when
-    /// it already holds that much, and nothing changes.
+    /// "Too easy" on a backpack movement while its weight is being found: two kilograms more now and next time, up to what
+    /// a backpack holds. Nil when it already holds that much, and nothing changes.
     mutating func backpackTooEasy() -> Double? {
         guard let load = backpackLoad else { return nil }
         let heavier = min(BackpackWater.maxKg, load + BackpackWater.easierStepKg)

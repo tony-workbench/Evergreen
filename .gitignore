@@ -1,5 +1,37 @@
+# macOS
 .DS_Store
+
+# Xcode and Swift
 xcuserdata/
+*.xcuserstate
 DerivedData/
+build/
 .build/
+.swiftpm/
+*.xcresult
+*.ipa
+*.dSYM.zip
+*.dSYM/
+
+# Node
 node_modules/
+coverage/
+.nyc_output/
+*.log
+npm-debug.log*
+
+# Caches, and leftovers from applying a patch by hand
+.cache/
+*.orig
+*.rej
+
+# Secrets and local settings: keys come from the environment or a file outside the repo
+.env
+.env.*
+!.env.example
+*.keys.env
+
+# Editors
+.vscode/
+.idea/
+*.swp

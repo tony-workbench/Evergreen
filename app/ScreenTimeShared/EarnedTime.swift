@@ -135,19 +135,32 @@ enum EarnMath {
         var cost: Double
     }
 
-    /// One unlock: the day's base time first, then earned credit for the rest, up to `block` minutes in all.
-    /// Nil when neither buys a minute.
-    static func unlock(baseLeft: Int, credit: Double, rate: Double, block: Int) -> Unlock? {
-        let fromBase = min(block, max(0, baseLeft))
-        let earned = min(block - fromBase, available(credit: credit, rate: rate))
-        guard fromBase + earned >= 1 else { return nil }
-        return Unlock(minutes: fromBase + earned, fromBase: fromBase, cost: earned > 0 ? cost(minutes: earned, rate: rate) : 0)
+    /// Earned credit as one group sees it: workout minutes of credit and the group's rate.
+    struct Credit: Equatable, Sendable {
+        var minutes: Double
+        var rate: Double
     }
 
-    /// The base minutes of a group left on `day`: its daily minutes, plus the comeback minutes on a comeback day,
+    /// One unlock: the day's base time first, then earned credit for the rest, up to `block` minutes in all.
+    /// Nil when neither buys a minute.
+    static func unlock(baseLeft: Int, credit: Credit, block: Int) -> Unlock? {
+        let fromBase = min(block, max(0, baseLeft))
+        let earned = min(block - fromBase, available(credit: credit.minutes, rate: credit.rate))
+        guard fromBase + earned >= 1 else { return nil }
+        let creditSpent = earned > 0 ? cost(minutes: earned, rate: credit.rate) : 0
+        return Unlock(minutes: fromBase + earned, fromBase: fromBase, cost: creditSpent)
+    }
+
+    /// The day whose base time is asked about (YYYY-MM-DD), and whether it is a comeback day.
+    struct BaseDay: Equatable, Sendable {
+        var key: String
+        var comeback: Bool
+    }
+
+    /// The base minutes of a group left on a day: its daily minutes, plus the comeback minutes on a comeback day,
     /// less what was used that day. What was used on another day doesn't count.
-    static func baseLeft(_ group: FunGroup, used: [String: Int], day: String, comeback: Bool) -> Int {
-        max(0, group.baseMinutes + (comeback ? EarnRules.comebackMinutes : 0) - (used[day] ?? 0))
+    static func baseLeft(_ group: FunGroup, used: [String: Int], on day: BaseDay) -> Int {
+        max(0, group.baseMinutes + (day.comeback ? EarnRules.comebackMinutes : 0) - (used[day.key] ?? 0))
     }
 
     /// The day as YYYY-MM-DD in the calendar's time zone, so the base time starts again at local midnight.
@@ -159,7 +172,7 @@ enum EarnMath {
     /// The Monday of the date's week, as YYYY-MM-DD: the weekly escape starts again each Monday.
     static func weekKey(_ date: Date, calendar: Calendar) -> String {
         var monday = calendar
-        monday.firstWeekday = 2
+        monday.firstWeekday = ClockUnits.mondayWeekday
         let start = monday.dateInterval(of: .weekOfYear, for: date)?.start ?? calendar.startOfDay(for: date)
         return dayKey(start, calendar: calendar)
     }
@@ -170,13 +183,13 @@ enum EarnMath {
         if let last = planned.filter({ $0 < today }).max() { return !done.contains(last) }
         guard let lastDone = done.filter({ $0 < today }).max(),
               let a = utcDay(lastDone), let b = utcDay(today) else { return false }
-        return b.timeIntervalSince(a) > 7 * 86_400
+        return b.timeIntervalSince(a) > Double(ClockUnits.daysPerWeek) * ClockUnits.day
     }
 
     /// YYYY-MM-DD as midnight UTC, to count days between two keys.
     private static func utcDay(_ key: String) -> Date? {
         let parts = key.split(separator: "-").compactMap { Int($0) }
-        guard parts.count == 3 else { return nil }
+        guard parts.count == ClockUnits.dayKeyParts else { return nil }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
         return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
@@ -254,7 +267,7 @@ enum EarnedTime {
 
     static func baseLeft(_ group: FunGroup, now: Date = Date(), calendar: Calendar = .current) -> Int {
         let day = EarnMath.dayKey(now, calendar: calendar)
-        return EarnMath.baseLeft(group, used: baseUsed(group), day: day, comeback: comebackDay == day)
+        return EarnMath.baseLeft(group, used: baseUsed(group), on: .init(key: day, comeback: comebackDay == day))
     }
 
     /// Everything a group can open now: base time left today plus what the credit buys.
@@ -346,9 +359,9 @@ enum EarnedTime {
     /// Nil when there is nothing to spend or the schedule could not be set.
     @discardableResult
     static func unlock(_ group: FunGroup, now: Date = Date(), calendar: Calendar = .current) -> Int? {
-        guard let spend = EarnMath.unlock(baseLeft: baseLeft(group, now: now, calendar: calendar), credit: credit,
-                                          rate: rate(group), block: block),
-              open(group, minutes: spend.minutes, now: now, calendar: calendar) else { return nil }
+        let groupCredit = EarnMath.Credit(minutes: credit, rate: rate(group))
+        guard let spend = EarnMath.unlock(baseLeft: baseLeft(group, now: now, calendar: calendar), credit: groupCredit, block: block),
+              open(group, until: EarnMath.relockWindow(now: now, minutes: spend.minutes), calendar: calendar) else { return nil }
         spent += spend.cost
         if spend.fromBase > 0 {
             let day = EarnMath.dayKey(now, calendar: calendar)
@@ -363,14 +376,14 @@ enum EarnedTime {
     @discardableResult
     static func escape(_ group: FunGroup, now: Date = Date(), calendar: Calendar = .current) -> Int? {
         guard escapeLeft(now: now, calendar: calendar),
-              open(group, minutes: EarnRules.escapeMinutes, now: now, calendar: calendar) else { return nil }
+              open(group, until: EarnMath.relockWindow(now: now, minutes: EarnRules.escapeMinutes), calendar: calendar)
+        else { return nil }
         escapeWeek = EarnMath.weekKey(now, calendar: calendar)
         return EarnRules.escapeMinutes
     }
 
-    /// Takes the lock off for `minutes` and sets the schedule that puts it back.
-    private static func open(_ group: FunGroup, minutes: Int, now: Date, calendar: Calendar) -> Bool {
-        let window = EarnMath.relockWindow(now: now, minutes: minutes)
+    /// Takes the lock off until the relock window starts and sets the schedule that puts it back.
+    private static func open(_ group: FunGroup, until window: (start: Date, end: Date), calendar: Calendar) -> Bool {
         let schedule = DeviceActivitySchedule(intervalStart: EarnMath.scheduleParts(window.start, calendar: calendar),
                                               intervalEnd: EarnMath.scheduleParts(window.end, calendar: calendar),
                                               repeats: false)

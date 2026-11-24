@@ -21,6 +21,12 @@ enum Fixture {
         return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day)!
     }
 
+    /// The day `dayOffset` days from the story day, as YYYY-MM-DD and its weekday's name.
+    static func dayAndWeekday(_ dayOffset: Int) -> (iso: String, weekday: String) {
+        let date = at(0, dayOffset: dayOffset)
+        return (LocalTime(date, in: timeZone).day, PlainWords.weekdays[UserRules.weekdayIndex(date, calendar: calendar)])
+    }
+
     static func workout(
         _ id: String, at start: Date, minutes: Int, type: String = "Walking", source: Workout.Source = .mock
     ) -> Workout {

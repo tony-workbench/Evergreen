@@ -23,12 +23,12 @@ struct ActivityNameTests {
             let item = PlanItem(id: "p-\(kind.rawValue)", slot: slot)
             #expect(Activity.title(slot) == title, "\(kind)")
             // The calendar entry and the reminder say the same word.
-            #expect(CalendarEntry.entries(for: [item], storyDay: slot.start, calendar: calendar).map(\.title) == [title], "\(kind)")
+            #expect(CalendarEntry.entries(.init(plan: [item], storyDay: slot.start, calendar: calendar)).map(\.title) == [title], "\(kind)")
             #expect(NotificationCopy.reminder(item).title.hasPrefix(title + " at "), "\(kind)")
         }
         // An activity outside the list goes by its own name; a rest day is never written.
         #expect(Activity.title(Self.slot(.other, minutes: 30, type: "Rowing")) == "Rowing" && Activity.noun(Self.slot(.other, minutes: 30, type: "MixedCardio")) == "mixed cardio")
-        #expect(CalendarEntry.entries(for: [PlanItem(id: "r", slot: Self.slot(.rest, minutes: 30))], storyDay: Date(), calendar: calendar).isEmpty)
+        #expect(CalendarEntry.entries(.init(plan: [PlanItem(id: "r", slot: Self.slot(.rest, minutes: 30))], storyDay: Date(), calendar: calendar)).isEmpty)
         #expect(Activity.noun(Self.slot(.stretch, minutes: 20)) == "stretch" && Activity.noun(Self.slot(.longRun, minutes: 75)) == "long run")
     }
 }

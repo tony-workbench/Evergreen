@@ -767,6 +767,7 @@ export const SCHEMAS = {
                 "maximum": 0
               },
               "weeks": {
+                "description": "How far back the Health workouts were read, in weeks (the lookback), not how much history the person has.",
                 "type": "integer",
                 "minimum": 8
               }

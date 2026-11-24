@@ -13,9 +13,12 @@ struct AIServiceBlock: View {
     @State private var result: String?
     @State private var failed = false
 
+    /// The key's row, a little taller than a tap target to hold the paste button's capsule.
+    private static let keyRowHeight: CGFloat = 52
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Evergreen talks to one AI service, Google’s Gemini, with your key. The only other request is the weather forecast for your area when rain check is on.")
+            Text("Evergreen talks to one AI service, Google’s Gemini, with your key. What else leaves this phone, and for what, is under What I use.")
                 .font(.footnote)
                 .foregroundStyle(Theme.textMuted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -23,64 +26,81 @@ struct AIServiceBlock: View {
             rule
             row("Service") { Text("Gemini").foregroundStyle(Theme.textMuted) }
             rule
-            row("Model") {
-                if model.aiModels.isEmpty {
-                    TextField(AIModels.standard, text: $chosenModel)
-                        .multilineTextAlignment(.trailing)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .foregroundStyle(Theme.textMuted)
-                } else {
-                    // After a check, the account's own models to pick from.
-                    Picker("Model", selection: $chosenModel) {
-                        ForEach(Array(Set(model.aiModels + [chosenModel])).sorted(), id: \.self) { Text($0).tag($0) }
-                    }
-                    .labelsHidden()
-                    .tint(Theme.textMuted)
-                }
-            }
+            row("Model") { modelChoice }
             rule
-            HStack(spacing: Theme.sm) {
-                SecureField(placeholder, text: $key)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .submitLabel(.done)
-                    .onSubmit(check)
-                    .accessibilityLabel("Gemini API key")
-                // The system's own paste button: it reads the clipboard only when tapped.
-                PasteButton(payloadType: String.self) { strings in
-                    key = strings.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    result = nil
-                }
-                .labelStyle(.titleOnly)
-                .buttonBorderShape(.capsule)
-                .tint(Theme.accent)
-            }
-            .frame(minHeight: 52)
+            keyRow
             rule
-            HStack(alignment: .center, spacing: Theme.md) {
-                Button(checking ? "Checking…" : "Check connection & save", action: check)
-                    .buttonStyle(GhostButtonStyle())
-                    .fixedSize()
-                    .disabled(checking || (key.isEmpty && !model.aiConnected))
-                if let result {
-                    Text(result)
-                        .font(.footnote)
-                        .foregroundStyle(failed ? Theme.warning : Theme.success)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(.vertical, Theme.sm)
-            if model.aiKeyTail?.isEmpty == false {
-                rule
-                Button("Remove key", action: remove)
-                    .font(.body)
-                    .foregroundStyle(Theme.text)
-                    .frame(minHeight: 44)
-                    .accessibilityHint("Takes the key off this phone")
-            }
+            checkRow
+            if model.aiKeyTail?.isEmpty == false { removeRow }
             rule
         }
+    }
+
+    @ViewBuilder private var modelChoice: some View {
+        if model.aiModels.isEmpty {
+            TextField(AIModels.standard, text: $chosenModel)
+                .multilineTextAlignment(.trailing)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .foregroundStyle(Theme.textMuted)
+                .accessibilityIdentifier("ai.model")
+        } else {
+            // After a check, the account's own models to pick from.
+            Picker("Model", selection: $chosenModel) {
+                ForEach(model.modelChoices(keeping: chosenModel), id: \.self) { Text($0).tag($0) }
+            }
+            .labelsHidden()
+            .tint(Theme.textMuted)
+            .accessibilityIdentifier("ai.model")
+        }
+    }
+
+    private var keyRow: some View {
+        HStack(spacing: Theme.sm) {
+            SecureField(placeholder, text: $key)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.done)
+                .onSubmit(check)
+                .accessibilityLabel("Gemini API key")
+                .accessibilityIdentifier("ai.key")
+            // The system's own paste button: it reads the clipboard only when tapped.
+            PasteButton(payloadType: String.self) { strings in
+                key = strings.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                result = nil
+            }
+            .labelStyle(.titleOnly)
+            .buttonBorderShape(.capsule)
+            .tint(Theme.accent)
+        }
+        .frame(minHeight: Self.keyRowHeight)
+    }
+
+    private var checkRow: some View {
+        HStack(alignment: .center, spacing: Theme.md) {
+            Button(checking ? "Checking…" : "Check connection & save", action: check)
+                .buttonStyle(GhostButtonStyle())
+                .fixedSize()
+                .disabled(checking || (key.isEmpty && !model.aiConnected))
+                .accessibilityIdentifier("ai.check")
+            if let result {
+                Text(result)
+                    .font(.footnote)
+                    .foregroundStyle(failed ? Theme.warning : Theme.success)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, Theme.sm)
+    }
+
+    @ViewBuilder private var removeRow: some View {
+        rule
+        Button("Remove key", action: remove)
+            .font(.body)
+            .foregroundStyle(Theme.text)
+            .frame(minHeight: TapTargetButtonStyle.minSide)
+            .accessibilityHint("Takes the key off this phone")
+            .accessibilityIdentifier("ai.remove")
     }
 
     /// The field never shows a key: connected, it says so with the last four characters.
@@ -89,7 +109,7 @@ struct AIServiceBlock: View {
         return tail.isEmpty ? "Connected for this run" : "Connected · key ending \(tail)"
     }
 
-    private var rule: some View { Rectangle().fill(Theme.rule).frame(height: 1) }
+    private var rule: some View { Rectangle().fill(Theme.rule).frame(height: Theme.borderWidth) }
 
     private func row(_ title: String, @ViewBuilder value: () -> some View) -> some View {
         HStack {
@@ -98,7 +118,7 @@ struct AIServiceBlock: View {
             value()
         }
         .font(.body)
-        .frame(minHeight: 44)
+        .frame(minHeight: TapTargetButtonStyle.minSide)
     }
 
     private func check() {

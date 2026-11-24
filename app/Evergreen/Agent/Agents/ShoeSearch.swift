@@ -25,11 +25,17 @@ enum ShoeSearch {
         return JSONValue.object(runner).text
     }
 
+    /// Who is asking: the shoes and, when known, how they run.
+    struct Runner {
+        var status: ShoeStatus
+        var habit: RunningHabit?
+    }
+
     /// Asks once. Nil when the model can't be reached or declines, or when none of its lines can be shown.
-    static func advice(for status: ShoeStatus, habit: RunningHabit? = nil, model: any LanguageModel, modelId: String) async -> ShoeAdvice? {
-        guard let reply = try? await model.reply(to: ModelRequest(
-            model: modelId, system: system, messages: [["role": "user", "content": .string(question(status, habit: habit))]], serverTools: [tool]
-        )), reply.stopReason == "end_turn" else { return nil }
+    static func advice(for runner: Runner, model: any LanguageModel, modelId: String) async -> ShoeAdvice? {
+        let message: JSONValue = ["role": "user", "content": .string(question(runner.status, habit: runner.habit))]
+        guard let reply = await model.replyIfPossible(to: ModelRequest(model: modelId, system: system, messages: [message], serverTools: [tool])),
+              reply.stopReason == "end_turn" else { return nil }
         return advice(in: reply)
     }
 
