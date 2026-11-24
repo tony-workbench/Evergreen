@@ -3835,6 +3835,7 @@
   var SETUP_SECONDS = 30;
   var LOAD_STEP_KG = 1;
   var LOAD_MAX_KG = 12;
+  var MAX_ITEMS = 5;
   var MIN_ITEMS = 3;
   var ROOT = /* @__PURE__ */ new Map();
   for (const m of MOVEMENTS) {
@@ -3842,6 +3843,7 @@
     while (r.easier) r = BY_ID.get(r.easier);
     ROOT.set(m.id, r.id);
   }
+  var chainOf = (id) => ROOT.get(id) ?? null;
   var CORE = ["dead_bug", "bird_dog", "kneeling_side_plank"];
   var SLOTS = {
     full: ["sit_to_stand", "wall_push_up", "backpack_row", "hip_hinge", "core"],
@@ -3890,8 +3892,10 @@
     const before = m.easier && movementOf(m.easier);
     if (!before) return true;
     if (!owns(rules, before)) return earned(rules, history, before);
-    return mastered(history, before.id);
+    return mastered(history, before.id) && fullyLoaded(history, before);
   }
+  var fullyLoaded = (history, m) => !m.equipment.includes("backpack") || (lastLoad(history, m.id) ?? 0) >= LOAD_MAX_KG;
+  var patternUsable = (rules, history, pattern) => MOVEMENTS.some((m) => m.pattern === pattern && blockOf(rules, history, m.id) === null);
   var isNew = (rules, history, m) => !m.entry && !doneBefore(history, m.id) && rules.movements[m.id] !== "can" && !(m.easier && !owns(rules, movementOf(m.easier)));
   function pickInChain(rules, history, root, allowNew) {
     let pick = null;
@@ -3900,7 +3904,7 @@
       if (block === "equipment_not_owned") continue;
       if (block === "gated_movement") break;
       if (block) {
-        if (block === "cannot_do" || block === "avoided_movement") break;
+        if (block === "cannot_do") break;
         continue;
       }
       if (isNew(rules, history, m) && !allowNew) break;
@@ -4005,6 +4009,7 @@
     if (!a || !Array.isArray(a.sessions)) throw new InputError("bad_content");
     const reqs = a.sessions.map((s, turn) => readSessionRequest({ ...a, ...s, turn }));
     const contents = reqs.map((r) => contentOf(r, buildSession(r)));
+    for (const pattern of MAIN_PATTERNS) if (contents.length > 1 && setsByPattern(contents)[pattern] === 0) addItem(contents, reqs, pattern);
     for (const pattern of MAIN_PATTERNS) {
       let guard = 0;
       while (setsByPattern(contents)[pattern] < WEEK_FLOOR_SETS && guard++ < 8) {
@@ -4012,8 +4017,13 @@
       }
     }
     const sets = setsByPattern(contents);
-    const short = MAIN_PATTERNS.filter((p) => contents.length > 0 && sets[p] < WEEK_TARGET_SETS[0]);
-    const note = short.length ? `This week has ${short.map((p) => `${sets[p]} sets of ${PATTERN_WORDS[p]}`).join(", ")}, below the ${WEEK_TARGET_SETS[0]} to ${WEEK_TARGET_SETS[1]} aimed for.` : null;
+    const history = reqs[0]?.history ?? [];
+    const none = MAIN_PATTERNS.filter((p) => contents.length > 0 && sets[p] === 0 && reqs[0] && !patternUsable(reqs[0].rules, history, p));
+    const short = MAIN_PATTERNS.filter((p) => contents.length > 0 && sets[p] < WEEK_TARGET_SETS[0] && !none.includes(p));
+    const notes = [];
+    if (short.length) notes.push(`This week has ${short.map((p) => `${sets[p]} sets of ${PATTERN_WORDS[p]}`).join(", ")}, below the ${WEEK_TARGET_SETS[0]} to ${WEEK_TARGET_SETS[1]} aimed for.`);
+    if (none.length) notes.push(`No movement for ${none.map((p) => PATTERN_WORDS[p]).join(" or ")} fits your equipment and the movements you left out.`);
+    const note = notes.length ? notes.join(" ") : null;
     return { contents, setsByPattern: sets, target: WEEK_TARGET_SETS, note };
   }
   var patternOf = (item) => movementOf(item.movementId).pattern;
@@ -4039,6 +4049,48 @@
     }
     return false;
   }
+  var PATTERN_ROOTS = {
+    lower_push: ["sit_to_stand", "wall_split_squat", "calf_raise"],
+    lower_pull: ["hip_hinge", "glute_bridge"],
+    upper_push: ["wall_push_up", "backpack_press"],
+    upper_pull: ["backpack_row", "prone_arm_raise", "backpack_curl"]
+  };
+  function addItem(contents, reqs, pattern) {
+    const order = contents.map((c, k) => k).sort((x, y) => contents[x].minutes - contents[y].minutes);
+    for (const k of order) {
+      const c = contents[k];
+      const req = reqs[k];
+      const newOnes = c.items.filter((i) => i.isNew).length;
+      const taken = new Set(c.items.map((i) => chainOf(i.movementId)));
+      let pick = null;
+      for (const root of PATTERN_ROOTS[pattern]) {
+        if (taken.has(root)) continue;
+        pick = pickInChain(req.rules, req.history, root, newOnes < MAX_NEW);
+        if (pick) break;
+      }
+      if (!pick) continue;
+      const sets = req.easeOff || req.deload ? Math.max(1, pick.dose.sets - 1) : pick.dose.sets;
+      const item = { ...itemFor(pick, req.history, req.loads, sets), isNew: isNew(req.rules, req.history, pick) };
+      const tries = [[...c.items, item]];
+      const counts = setsByPattern(contents);
+      const swaps = c.items.filter((i) => !MAIN_PATTERNS.includes(patternOf(i)) || counts[patternOf(i)] - i.sets >= WEEK_FLOOR_SETS).sort((a, b) => (counts[patternOf(b)] ?? 99) - (counts[patternOf(a)] ?? 99));
+      for (const out of swaps) tries.push(c.items.map((i) => i === out ? item : i));
+      for (const items of tries) {
+        const fitted = items.map((i) => ({ ...i }));
+        if (fitted.length > MAX_ITEMS) continue;
+        if (sessionMinutes(fitted) > req.minutes) {
+          for (const i of fitted.filter((x) => x.movementId !== item.movementId).sort((a, b) => b.sets - a.sets)) {
+            while (i.sets > 1 && sessionMinutes(fitted) > req.minutes) i.sets -= 1;
+          }
+        }
+        if (sessionMinutes(fitted) > req.minutes) continue;
+        c.items = fitted;
+        c.minutes = sessionMinutes(fitted);
+        return true;
+      }
+    }
+    return false;
+  }
   var PATTERN_WORDS = { lower_push: "legs pushing", lower_pull: "hips and the back of the legs", upper_push: "upper-body pushing", upper_pull: "upper-body pulling", core: "the middle of the body", snack: "short pieces" };
   function checkContent(a) {
     if (!a || !a.content || !Array.isArray(a.content.items)) throw new InputError("bad_content");
@@ -4058,7 +4110,7 @@
       const block = blockOf(rules, history, m.id);
       if (block === "equipment_not_owned") add(block, `${m.name} needs ${m.equipment.join(" and ")}, which the person doesn't have.`, m.id);
       else if (block === "avoided_movement" || block === "cannot_do") add("avoided_movement", `${m.name} is on the person's list to leave out.`, m.id);
-      else if (block === "gated_movement") add(block, `${m.name} comes only after ${movementOf(m.easier).name} is done at the top of its range twice.`, m.id);
+      else if (block === "gated_movement") add(block, `${m.name} comes only after ${movementOf(m.easier).name} is done at the top of its range twice${movementOf(m.easier).equipment.includes("backpack") ? `, with ${LOAD_MAX_KG} kg in the backpack` : ""}.`, m.id);
       if (isNew(rules, history, m)) fresh += 1;
     }
     if (fresh > MAX_NEW) add("too_many_new", `The session has ${fresh} movements the person hasn't done yet; at most ${MAX_NEW}.`);
@@ -4072,7 +4124,7 @@
     if (length > minutes) add("session_too_long", `The session takes about ${length} minutes; the person's sessions are at most ${minutes}.`);
     if (Array.isArray(a.week)) {
       const sets = setsByPattern(a.week.filter((c) => c && Array.isArray(c.items)));
-      for (const p of MAIN_PATTERNS) if (sets[p] < WEEK_FLOOR_SETS) add("sets_below_floor", `The week has ${sets[p]} sets of ${PATTERN_WORDS[p]}; at least ${WEEK_FLOOR_SETS}.`);
+      for (const p of MAIN_PATTERNS) if (sets[p] < WEEK_FLOOR_SETS && patternUsable(rules, history, p)) add("sets_below_floor", `The week has ${sets[p]} sets of ${PATTERN_WORDS[p]}; at least ${WEEK_FLOOR_SETS}.`);
     }
     return { pass: violations.length === 0, violations };
   }

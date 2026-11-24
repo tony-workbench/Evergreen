@@ -31,7 +31,7 @@ enum EarnRules {
     /// midnight, and what is left over is not carried to the next day.
     static let baseMinutes: [FunGroup: Int] = [.social: 60, .videos: 30, .games: 30]
     /// The most one unlock opens, in minutes.
-    static let block = EarnRules.block
+    static let block = 15
     /// "Unlock for 10 minutes": once a week, from Monday, free, when nothing else is left.
     static let escapeMinutes = 10
     /// Extra base minutes for every group on the day a workout is finished after a missed one.

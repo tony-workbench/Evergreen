@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MOVEMENTS, movementOf, chainOf, workoutContent, weekContent, checkContent, movementLibrary, feelingWordsIn, mastered,
   sessionMinutes, setsByPattern, MAIN_PATTERNS, WEEK_FLOOR_SETS, LOAD_MAX_KG } from '../src/content.mjs';
-import { EQUIPMENT } from '../src/rules.mjs';
+import { EQUIPMENT, ALWAYS_THERE } from '../src/rules.mjs';
 
 const ALL = ['backpack', 'chair', 'table', 'sofa', 'book', 'step'];
 const rules = (over = {}) => ({ equipment: ALL, ...over });
@@ -61,7 +61,8 @@ test('the shorter the session, the fewer movements or sets, never longer than as
 
 test('without the equipment, a chain starts further on or another stands in', () => {
   const { content } = workoutContent({ sessionId: 's', focus: 'full', rules: rules({ equipment: [] }) });
-  for (const i of content.items) assert.deepEqual(movementOf(i.movementId).equipment, [], i.movementId);
+  // Only what every home has: a floor and a wall.
+  for (const i of content.items) assert.ok(movementOf(i.movementId).equipment.every((e) => ALWAYS_THERE.includes(e)), i.movementId);
   assert.ok(content.items.some((i) => i.movementId === 'bodyweight_squat'));
 });
 
