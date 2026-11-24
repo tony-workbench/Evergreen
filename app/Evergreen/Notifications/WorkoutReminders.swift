@@ -18,9 +18,10 @@ import Foundation
 /// With "Always ask me to pick one time" on, the evening reminder asks for a time, and until one is picked only the first
 /// time reminds, the same way.
 ///
-/// At most six for a day and none from 22:00 or before 06:00; with the app's other notifications, six a day in all (`NotificationBudget`). With "Keep reminding me until I've trained" off and no time picked, only the
-/// first three. Once the session is done, by any way, what is left of that day's goes (`Notifier.cancelHomeReminders`,
-/// `AppModel.homeReminders`).
+/// At most six for a day, six a day with the app's other notifications too, and none from 22:00 or before 09:00 (earlier
+/// only when the person's own hours start earlier) (`NotificationBudget`). With "Keep reminding me until I've trained" off
+/// and no time picked, only the first three. Once the session is done, by any way, what is left of that day's goes
+/// (`Notifier.cancelHomeReminders`, `AppModel.homeReminders`).
 struct WorkoutReminder: Equatable, Sendable {
     enum Kind: String, Sendable {
         case evening, soon, now, moved, later, last, ask
@@ -66,6 +67,8 @@ enum WorkoutReminders {
         var pickEachDay = false
         /// The one time kept, by its clock ("18:10"); nil when none was picked.
         var picked: String?
+        /// The hour reminders may start (`UserRules.notificationsFrom`).
+        var quietUntil = NotificationBudget.quietUntilHour
     }
 
     /// One time of a day: its clock and the moment it stands for.
@@ -88,7 +91,7 @@ enum WorkoutReminders {
             out += everyTime(first, laters: day.fallbacks.compactMap(\.date), keepReminding: choice.keepReminding, session: session)
         }
         let reminders = out.enumerated().compactMap { index, entry -> WorkoutReminder? in
-            guard entry.fires > now, !NotificationBudget.isQuiet(entry.fires, calendar: calendar) else { return nil }
+            guard entry.fires > now, !NotificationBudget.isQuiet(entry.fires, calendar: calendar, from: choice.quietUntil) else { return nil }
             return WorkoutReminder(id: "\(prefix)\(day.day)-\(index + 1)", kind: entry.kind, fires: entry.fires,
                                    title: entry.copy.title, body: entry.copy.body, day: day.day, choices: entry.choices)
         }

@@ -57,11 +57,11 @@ struct DayKindTests {
         func coordinate(for text: String) async throws -> Coordinate? { throw Offline() }
     }
 
-    @Test func aTypedPlaceWhileOfflineSaysNothingAboutTheDay() async {
-        let week = await DayKinds.classify(rules: rules, busy: [event(1, at: .text("Library")), event(3, at: .coordinate(campus))],
+    @Test func offlineATypedPlaceNeverFoundIsNotHome() async {
+        let week = await DayKinds.classify(rules: rules, busy: [event(1, at: .text("Library")), event(3, at: .coordinate(home))],
                                            goingOut: [], farToday: false, from: monday, calendar: Fixture.calendar, geocoder: OfflineGeocoder())
-        #expect(week[day(1)] == .home)
-        #expect(week[day(3)] == .out)       // a coordinate needs no geocoder
+        #expect(week[day(1)] == .out)       // can't be asked and never found: not home
+        #expect(week[day(3)] == .home)      // a coordinate needs no geocoder
     }
 
     @Test func aTypedPlaceIsFoundOnThePhoneAndOneThatCantBeFoundIsNotHome() async {
@@ -103,9 +103,9 @@ struct DayKindTests {
     @Test func withoutAHomeATypedPlaceIsADayOutWithoutBeingLookedUp() async {
         var noHome = rules
         noHome.home = nil
-        // Offline: a looked-up place would keep the previous kind (home). Not looked up, it is simply a day out.
+        // Without a home the place isn't looked up at all: it never leaves the phone.
         let week = await DayKinds.classify(rules: noHome, busy: [event(3, at: .text("Library"))], goingOut: [], farToday: false,
-                                           from: monday, calendar: Fixture.calendar, geocoder: OfflineGeocoder(), previous: [day(3): .home])
+                                           from: monday, calendar: Fixture.calendar, geocoder: OfflineGeocoder())
         #expect(week[day(3)] == .out)
     }
 
@@ -118,12 +118,39 @@ struct DayKindTests {
         #expect(week[day(3)] == .home)
     }
 
-    @Test func offlineADayKeepsTheKindItHadLastTime() async {
-        let week = await DayKinds.classify(rules: rules, busy: [event(1, at: .text("Library")), event(4, at: .text("Library"))],
-                                           goingOut: [], farToday: false, from: monday, calendar: Fixture.calendar,
-                                           geocoder: OfflineGeocoder(), previous: [day(1): .out])
-        #expect(week[day(1)] == .out)       // judged out while online, kept while offline
-        #expect(week[day(4)] == .home)      // never judged: home until the place can be asked
+    struct CountingGeocoder: PlaceGeocoding {
+        let places: [String: Coordinate]
+        let asked = Asked()
+        actor Asked { var texts: [String] = []; func add(_ text: String) { texts.append(text) } }
+        func coordinate(for text: String) async throws -> Coordinate? { await asked.add(text); return places[text] }
+    }
+
+    @Test func placesFoundOnlineAreKnownOfflineAndNotAskedAgain() async {
+        let memory = PlaceMemory()
+        let online = CountingGeocoder(places: ["Library": campus, "Home office": home])
+        let busy = [event(0, at: .text("Home office")), event(1, at: .text("Library")), event(3, at: .text("Somewhere unknown"))]
+        _ = await DayKinds.classify(rules: rules, busy: busy, goingOut: [], farToday: false, from: monday, calendar: Fixture.calendar,
+                                    geocoder: RememberingGeocoder(geocoder: online, memory: memory))
+        #expect(await memory.found.map(\.text).sorted() == ["Home office", "Library"])   // not found: not kept
+
+        let offline = await DayKinds.classify(rules: rules, busy: busy, goingOut: [], farToday: false, from: monday, calendar: Fixture.calendar,
+                                              geocoder: RememberingGeocoder(geocoder: OfflineGeocoder(), memory: memory))
+        #expect(offline[day(0)] == .home)   // known from last time
+        #expect(offline[day(1)] == .out)
+        #expect(offline[day(3)] == .out)    // never found: not home
+
+        let again = CountingGeocoder(places: [:])
+        _ = await DayKinds.classify(rules: rules, busy: busy, goingOut: [], farToday: false, from: monday, calendar: Fixture.calendar,
+                                    geocoder: RememberingGeocoder(geocoder: again, memory: memory))
+        #expect(await again.asked.texts == ["Somewhere unknown"])   // a found place doesn't leave the phone again
+    }
+
+    @Test func foundPlacesAreKeptOnThePhoneBetweenLaunches() async {
+        let defaults = UserDefaults(suiteName: "found-places-\(UUID())")!
+        let memory = PlaceMemory()
+        await memory.remember("Library", at: campus)
+        PlaceMemory.save(await memory.found, to: defaults)
+        #expect(PlaceMemory.load(from: defaults) == [PlaceMemory.Found(text: "Library", point: campus)])
     }
 
     @Test func theEngineIsGivenOnlyHomeAndOutWords() async {

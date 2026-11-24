@@ -32,7 +32,7 @@ extension AppModel {
     /// How a day's reminders go: the two switches in Settings and the time picked for it.
     func reminderChoice(_ day: String) -> WorkoutReminders.Choice {
         WorkoutReminders.Choice(keepReminding: Automatic.keepReminding.isOn(settings), pickEachDay: Automatic.pickEachDay.isOn(settings),
-                                picked: pickedTimes[day])
+                                picked: pickedTimes[day], quietUntil: userRules.notificationsFrom)
     }
 
     /// Every reminder of the coming days at home that is still to do: not done any way, not skipped, not a day out, and
@@ -72,7 +72,8 @@ extension AppModel {
     /// before the day-at-home reminders, which are planned again to make room for it.
     func notifyNow(_ copy: (title: String, body: String), id: String) async {
         let today = todayISO
-        guard !NotificationBudget.isQuiet(now, calendar: calendar),
+        let from = userRules.isOn ? userRules.notificationsFrom : NotificationBudget.quietUntilHour
+        guard !NotificationBudget.isQuiet(now, calendar: calendar, from: from),
               NotificationBudget.sent(on: today, in: settings) < NotificationBudget.maxPerDay else {
             log("A notification was held back: night, or six already today")
             return

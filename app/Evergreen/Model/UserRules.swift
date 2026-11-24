@@ -98,6 +98,12 @@ struct UserRules: Codable, Equatable, Sendable {
 
     var lengthText: String { sessionMin == sessionMax ? "\(sessionMax) min" : "\(sessionMin)–\(sessionMax) min" }
 
+    /// The hour notifications may start: 09:00, or the hour the person's own sessions may start when that is earlier.
+    var notificationsFrom: Int {
+        let start = mornings ? NotificationBudget.earliestSessionHour : (Self.minutes(windowFrom) ?? 0) / 60
+        return max(NotificationBudget.earliestSessionHour, min(NotificationBudget.quietUntilHour, start))
+    }
+
     var windowText: String { "\(mornings ? "06:00" : windowFrom) – \(windowTo)" }
 
     var equipmentText: String {

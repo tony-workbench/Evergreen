@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import os
 
 /// What a day is for training, worked out on the phone and never by the model:
 /// a day at home trains, a day out and a rest weekday don't. Only the word for
@@ -12,7 +13,7 @@ enum DayKind: String, Codable, Sendable, CaseIterable {
 /// Turns an event's typed place into a coordinate. The system's geocoder, only
 /// for events the calendar kept no coordinate for; tests hand in a fake.
 /// nil is a place that can't be found; a thrown error is a geocoder that couldn't
-/// be asked (offline), which says nothing about where the event is.
+/// be asked (offline). Either way the place is not home.
 protocol PlaceGeocoding: Sendable {
     func coordinate(for text: String) async throws -> Coordinate?
 }
@@ -39,12 +40,12 @@ enum DayKinds {
     /// 2. a day the person said they go out, or today when the phone is far from home, is `out`; a day they said they
     ///    are home is `home`, whatever the calendar says (the way to correct a wrong guess);
     /// 3. a day with an event placed somewhere that isn't home is `out`: timed or all-day, marked busy or free, and every
-    ///    day an event spans. A place that can't be found counts as not home; a meeting link is no place, and nor is a
-    ///    typed place while the phone is offline: that day keeps the kind it had last time (`previous`) until the place can
-    ///    be asked again. Without a home set, no place is home, so any placed event makes a day out (plan 5.B.1);
+    ///    day an event spans. A meeting link is no place. A place that can't be found counts as not home, and so does a
+    ///    typed place offline that was never found while online (`PlaceMemory` keeps every place found, so most are still
+    ///    known offline). Without a home set, no place is home, so any placed event makes a day out (plan 5.B.1);
     /// 4. every other day is `home`.
     static func classify(rules: UserRules, busy: [Busy], goingOut: Set<String>, stayingHome: Set<String> = [], farToday: Bool, from today: Date,
-                         calendar: Calendar, geocoder: any PlaceGeocoding, previous: [String: DayKind] = [:]) async -> [String: DayKind] {
+                         calendar: Calendar, geocoder: any PlaceGeocoding) async -> [String: DayKind] {
         var kinds: [String: DayKind] = [:]
         var places = PlaceLookup(geocoder: geocoder)
         for offset in 0..<days {
@@ -55,9 +56,8 @@ enum DayKinds {
                 kinds[day] = said
                 continue
             }
-            places.offline = false
             let away = await isAway(on: date, events: busy, home: rules.home, places: &places, calendar: calendar)
-            kinds[day] = away ? .out : places.offline ? previous[day] ?? .home : .home
+            kinds[day] = away ? .out : .home
         }
         return kinds
     }
@@ -104,27 +104,73 @@ enum DayKinds {
 struct PlaceLookup {
     let geocoder: any PlaceGeocoding
     private var found: [String: Coordinate?] = [:]
-    /// Set when a typed place couldn't be asked because the phone is offline.
-    var offline = false
 
     init(geocoder: any PlaceGeocoding) { self.geocoder = geocoder }
 
-    /// A place: its coordinate (`.some(point)`), a place that can't be found (`.some(nil)`), or no place at all, or a typed
-    /// place while offline (nil).
+    /// A place: its coordinate (`.some(point)`), a place that can't be found or can't be asked offline (`.some(nil)`,
+    /// not home), or no place at all (nil).
     mutating func coordinate(of place: EventPlace) async -> Coordinate?? {
         switch place {
         case .coordinate(let point): return .some(point)
         case .text(let text):
             if DayKinds.isNoPlace(text) { return nil }
             if let known = found[text] { return .some(known) }
-            do {
-                let point = try await geocoder.coordinate(for: text)
-                found[text] = point
-                return .some(point)
-            } catch {
-                offline = true
-                return nil
-            }
+            let point: Coordinate? = try? await geocoder.coordinate(for: text)
+            found.updateValue(point, forKey: text)
+            return .some(point)
         }
+    }
+}
+
+/// Every typed place the geocoder found, kept on this phone so a day can still be judged with the phone offline. A
+/// place found once is not asked again: an address doesn't move, and it leaves the phone only the first time.
+actor PlaceMemory {
+    static let key = "found_places"
+    /// The places of a few months of events; the oldest go first.
+    static let keep = 200
+    private static let log = Logger(subsystem: "com.evergreentraining.app", category: "calendar")
+
+    struct Found: Codable, Equatable, Sendable {
+        var text: String
+        var point: Coordinate
+    }
+
+    private(set) var found: [Found]
+
+    init(_ found: [Found] = []) { self.found = found }
+
+    func point(for text: String) -> Coordinate? { found.last { $0.text == text }?.point }
+
+    func remember(_ text: String, at point: Coordinate) {
+        found.removeAll { $0.text == text }
+        found = Array((found + [Found(text: text, point: point)]).suffix(Self.keep))
+    }
+
+    static func load(from defaults: UserDefaults) -> [Found] {
+        guard let data = defaults.data(forKey: key) else { return [] }
+        do { return try JSONDecoder().decode([Found].self, from: data) } catch {
+            log.error("Found places couldn't be read: \(error.localizedDescription, privacy: .public)")
+            return []
+        }
+    }
+
+    static func save(_ found: [Found], to defaults: UserDefaults) {
+        do { defaults.set(try JSONEncoder().encode(found), forKey: key) } catch {
+            log.error("Found places couldn't be saved: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+}
+
+/// The geocoder with `PlaceMemory` in front: a place found before is answered from the phone, a new one is asked and
+/// kept. Offline, a place never found throws, and the day counts it as not home.
+struct RememberingGeocoder: PlaceGeocoding {
+    let geocoder: any PlaceGeocoding
+    let memory: PlaceMemory
+
+    func coordinate(for text: String) async throws -> Coordinate? {
+        if let known = await memory.point(for: text) { return known }
+        guard let point = try await geocoder.coordinate(for: text) else { return nil }
+        await memory.remember(text, at: point)
+        return point
     }
 }

@@ -335,7 +335,24 @@ struct WorkoutRemindersTests {
         rig.clock.now = Fixture.at(23)
         await rig.model.notifyNow(("Rain", "Tomorrow"), id: "rain-night")
         #expect(NotificationBudget.sent(on: thursday, in: rig.settings) == 2)
-        #expect(NotificationBudget.isQuiet(Fixture.at(5, 50), calendar: cal) && !NotificationBudget.isQuiet(Fixture.at(6), calendar: cal))
+        #expect(NotificationBudget.isQuiet(Fixture.at(8, 50), calendar: cal) && !NotificationBudget.isQuiet(Fixture.at(9), calendar: cal))
+    }
+
+    /// Nothing before 09:00, unless the person's own hours start earlier: then their sessions' reminders come from then.
+    @Test func morningsAreQuietUntilNineUnlessThePersonsHoursStartEarlier() {
+        var rules = UserRules()
+        #expect(rules.notificationsFrom == 9)               // the usual window from 12:00
+        rules.windowFrom = "07:30"
+        #expect(rules.notificationsFrom == 7)
+        rules.mornings = true
+        #expect(rules.notificationsFrom == 6)
+        let early = day(first: Fixture.at(7, 30), fallbacks: [])
+        let usual = WorkoutReminders.plan(day: early, session: session, choice: all, now: eveningBefore, calendar: cal)
+        #expect(!usual.contains { $0.kind == .soon || $0.kind == .now }, "before 09:00 nothing by default")
+        var theirs = all
+        theirs.quietUntil = rules.notificationsFrom
+        let own = WorkoutReminders.plan(day: early, session: session, choice: theirs, now: eveningBefore, calendar: cal)
+        #expect(own.map(\.kind).contains(.soon) && own.map(\.kind).contains(.now))
     }
 
     @Test func makingRoomKeepsTheTimeTheLastAndTheEveningWord() {

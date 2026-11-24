@@ -33,7 +33,7 @@ enum Automatic: String, CaseIterable, Identifiable, Sendable {
         case .rain: "For outdoor workouts in the next two days. No AI."
         case .shoes: "From your runs in Apple Health. No AI."
         case .meetings: "To the nearest free time, with Undo. No AI."
-        case .keepReminding: "On a day at home: at the time and at each later time, up to six a day, none after 22:00. No AI."
+        case .keepReminding: "On a day at home: at the time and at each later time, up to six a day, none from 22:00 until 09:00, or until your own earlier start. No AI."
         case .pickEachDay: "Each day at home keeps only the time you pick, the evening before or in the week, and nothing moves by itself. Until you pick, only the first time reminds. No AI."
         }
     }

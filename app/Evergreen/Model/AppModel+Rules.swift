@@ -92,12 +92,15 @@ extension AppModel {
 
     // MARK: Working the days out
 
-    /// Each of the next seven days as home, out or rest. Nothing without rules.
+    /// Today and the next seven days as home, out or rest. Nothing without rules.
     func refreshDayKinds() async {
         guard userRules.isOn else { dayKinds = [:]; return }
+        // Places found while online are kept, so the days can still be told apart offline.
+        let places = PlaceMemory(PlaceMemory.load(from: settings))
         dayKinds = await DayKinds.classify(rules: userRules, busy: busyNow + placedCache, goingOut: goingOutDays,
                                            stayingHome: stayingHomeDays, farToday: settings.string(forKey: Self.farDayKey) == todayISO,
-                                           from: now, calendar: calendar, geocoder: geocoder, previous: dayKinds)
+                                           from: now, calendar: calendar, geocoder: RememberingGeocoder(geocoder: geocoder, memory: places))
+        PlaceMemory.save(await places.found, to: settings)
     }
 
     private func replanForRules() async {

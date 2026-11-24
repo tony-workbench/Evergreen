@@ -64,8 +64,8 @@ The three engines have their own tests: run `npm install && npm test` in `memory
 
 ## What leaves your phone
 
-- To Google's Gemini API, with your key: the sentence you type, a short table of facts about your training (counts, times, averages), and, with My rules on, the limits from your rules, which of the coming days are at home, out or rest, and the movements open to you on each day at home (from the app's own library) so the AI can choose them; code checks every choice before you see it, and the workout page marks it as picked by AI. Never raw health readings, names, calendar event titles or places.
-- To Apple's geocoder, when you have set a home in My rules: the typed place of a calendar event that has no map location, to tell whether the day is at home. Event titles never leave.
+- To Google's Gemini API, with your key: the sentence you type, a short table of facts about your training (counts, times, averages), and, with My rules on, the limits from your rules, which of the coming days are at home, out or rest, and the movements open to you on each day at home (from the app's own library) so the AI can choose them; code checks every choice before you see it, and the workout page marks it as picked by AI. Never raw health readings (only sleep and resting heart rate as 7- and 28-day averages), names, calendar event titles or places.
+- To Apple's geocoder, when you have set a home in My rules: the typed place of a calendar event that has no map location, to tell whether the day is at home. A place found is kept on the phone, so it is sent once and still known offline; offline, a place never found counts as not home. Event titles never leave.
 - To Open-Meteo, when rain check is on: your location rounded to about a kilometre, to fetch the forecast.
 
 Nothing else. There is no Evergreen server.
