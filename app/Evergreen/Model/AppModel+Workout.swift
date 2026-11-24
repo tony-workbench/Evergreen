@@ -72,9 +72,7 @@ extension AppModel {
         record.record(day: progress.day, results: progress.results, pain: pain)
         record.lastFeeling = feeling
         record.turn += 1
-        for result in progress.results where result.tooHard {
-            if let load = result.load { record.loads[result.movementId] = max(1, load - 1) }
-        }
+        record.settleLoads(progress.results, feeling: feeling)
         workoutLog = record
         record.save(to: settings)
         WorkoutProgress.clear(from: settings)
@@ -87,7 +85,7 @@ extension AppModel {
         let saved = onDevice ? await WorkoutWriter.saveStrength(start: progress.startedAt, end: Date()) : false
         log(saved ? "Your home workout is done and saved to Apple Health" : "Your home workout is done")
         celebration += 1
-        if onDevice { await notifier.cancelReminders(on: now, calendar: calendar) }
+        if onDevice { await notifier.cancelHomeReminders(day: progress.day) }
         if saved { await refreshHealth() }
     }
 
@@ -97,7 +95,7 @@ extension AppModel {
         workoutLog.save(to: settings)
         WorkoutProgress.clear(from: settings)
         log("You did today’s workout another way")
-        if onDevice { await notifier.cancelReminders(on: now, calendar: calendar) }
+        if onDevice { await notifier.cancelHomeReminders(day: todayISO) }
     }
 }
 

@@ -142,7 +142,7 @@ private struct DayPreview: View {
                             if let move = model.movement(item.movementId) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(move.name).font(.body).foregroundStyle(Theme.text)
-                                    Text("\(item.sets) sets of \(item.target(sides: move.sides))" + (item.load.map { ", \($0.formatted()) kg" } ?? ""))
+                                    Text("\(item.sets) sets of \(item.target(sides: move.sides))" + (item.load.map { ", " + BackpackWater.words($0) } ?? ""))
                                         .font(.footnote).foregroundStyle(Theme.textMuted)
                                 }
                                 .frame(minHeight: 44, alignment: .leading)

@@ -2,7 +2,9 @@ import SwiftUI
 
 /// Onboarding, after the permissions: "How you train", five short questions
 /// whose answers become the person's rules. Every one can be skipped; skipping
-/// the screen keeps the usual week, built from the days they already train.
+/// the screen turns on the usual defaults (home, no gym equipment, Wednesday,
+/// Saturday and Sunday off, 20–25 minutes), which Settings › My rules can change.
+/// "Somewhere else" keeps the usual week, built from the days they already train.
 struct HowYouTrainView: View {
     let onContinue: () -> Void
 
@@ -73,7 +75,14 @@ struct HowYouTrainView: View {
                 onContinue()
             }
             .buttonStyle(PrimaryButtonStyle())
-            Button("Skip", action: onContinue)
+            Button("Skip") {
+                var defaults = UserRules()
+                defaults.isOn = true
+                model.userRules = defaults
+                defaults.save(to: model.settings)
+                onContinue()
+            }
+            .accessibilityHint("Uses the usual rules, which you can change in Settings")
                 .font(.body)
                 .foregroundStyle(Theme.textMuted)
                 .frame(maxWidth: .infinity, minHeight: 44)

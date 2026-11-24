@@ -4,9 +4,9 @@ import Foundation
 /// worked out from data. Memory is what Evergreen noticed; these are what the
 /// person decided, so they live apart, in UserDefaults under `user_rules`.
 ///
-/// Until the person answers "How you train" or imports a profile, `isOn` is
-/// false and the planner keeps its usual week, so nothing changes for anyone
-/// who skipped them.
+/// Answering "How you train", skipping it (the defaults below) or importing a
+/// profile turns them on. Until then, and for someone who trains "somewhere
+/// else", `isOn` is false and the planner keeps its usual week.
 struct UserRules: Codable, Equatable, Sendable {
     static let storeKey = "user_rules"
 
@@ -178,5 +178,31 @@ struct UserRules: Codable, Equatable, Sendable {
         }
         guard rules.isValid else { throw ImportError.outOfRange }
         return rules
+    }
+}
+
+extension UserRules {
+    enum CodingKeys: String, CodingKey {
+        case isOn, restWeekdays, sessionMin, sessionMax, windowFrom, windowTo, mornings, equipment, avoid, movements, home, farKilometres
+    }
+
+    /// Reads saved rules field by field: a field an older version didn't save, or one this version can't read, takes its
+    /// default, so adding a rule later never wipes or turns off the ones already saved.
+    init(from decoder: any Decoder) throws {
+        self.init()
+        let saved = try decoder.container(keyedBy: CodingKeys.self)
+        func read<T: Decodable>(_ key: CodingKeys, _ type: T.Type) -> T? { (try? saved.decodeIfPresent(type, forKey: key)) ?? nil }
+        isOn = read(.isOn, Bool.self) ?? isOn
+        restWeekdays = read(.restWeekdays, [Int].self) ?? restWeekdays
+        sessionMin = read(.sessionMin, Int.self) ?? sessionMin
+        sessionMax = read(.sessionMax, Int.self) ?? sessionMax
+        windowFrom = read(.windowFrom, String.self) ?? windowFrom
+        windowTo = read(.windowTo, String.self) ?? windowTo
+        mornings = read(.mornings, Bool.self) ?? mornings
+        equipment = read(.equipment, [String].self).map { $0.compactMap(Equipment.init(rawValue:)) } ?? equipment
+        avoid = read(.avoid, [String].self) ?? avoid
+        movements = read(.movements, [String: String].self).map { $0.compactMapValues(MovementState.init(rawValue:)) } ?? movements
+        home = read(.home, HomePlace.self) ?? home
+        farKilometres = read(.farKilometres, Double.self) ?? farKilometres
     }
 }

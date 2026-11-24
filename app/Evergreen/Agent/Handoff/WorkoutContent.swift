@@ -72,3 +72,28 @@ struct Movement: Codable, Equatable, Sendable, Identifiable {
         tempo.map { "Down in \($0.down) seconds, hold \($0.hold), up in \($0.up)." }
     }
 }
+
+/// The backpack's weight said as water, since a litre of water is a kilogram and bottles need no scale:
+/// "4 litres of water in the backpack (two 2-litre bottles)".
+enum BackpackWater {
+    /// What a backpack holds safely, in kilograms (the engine's LOAD_MAX_KG).
+    static let maxKg: Double = 12
+    /// "Too easy" at the end of a session: this many more kilograms next time.
+    static let easierStepKg: Double = 2
+
+    static func words(_ kg: Double) -> String {
+        let litres = kg.formatted(.number.precision(.fractionLength(0...1)))
+        let unit = kg == 1 ? "litre" : "litres"
+        return "\(litres) \(unit) of water in the backpack" + (bottles(kg).map { " (\($0))" } ?? "")
+    }
+
+    /// Whole litres as 2-litre and 1-litre bottles; nil for a part litre or a single 1-litre bottle.
+    static func bottles(_ kg: Double) -> String? {
+        guard kg >= 2, kg <= maxKg, kg == kg.rounded() else { return nil }
+        let twos = Int(kg) / 2, ones = Int(kg) % 2
+        let count = { (n: Int) in ["one", "two", "three", "four", "five", "six"][n - 1] }
+        var parts = ["\(count(twos)) 2-litre bottle" + (twos == 1 ? "" : "s")]
+        if ones == 1 { parts.append("one 1-litre bottle") }
+        return parts.joined(separator: " and ")
+    }
+}

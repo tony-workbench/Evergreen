@@ -19,7 +19,8 @@ struct WorkoutLog: Codable, Equatable, Sendable {
     }
 
     var entries: [Entry] = []
-    /// Kilograms the person settled on for a backpack movement ("Too hard" takes one off); used as is next time.
+    /// Kilograms for a backpack movement's next time only: "Too hard" took one off on the page, "Too easy" at the end adds two.
+    /// Taken off again after a session without either, so the usual kilogram at a time carries on from what was done.
     var loads: [String: Double] = [:]
     /// The soreness answer after the last session, 0 to 5 ("4" takes a set off next time).
     var lastPain: Int?
@@ -69,6 +70,18 @@ struct WorkoutLog: Codable, Equatable, Sendable {
         if entries.count > Self.keep { entries.removeFirst(entries.count - Self.keep) }
         if let pain { lastPain = pain }
         markDone(day)
+    }
+
+    /// The backpack's weight for next time, from the session just done: "Too hard" on a movement keeps the lighter weight
+    /// the page already set, "Too easy" at the end adds two kilograms (up to what a backpack holds), anything else
+    /// leaves it to the usual step up.
+    mutating func settleLoads(_ results: [WorkoutResult], feeling: WorkoutFeeling?) {
+        for result in results {
+            guard let load = result.load else { continue }
+            if result.tooHard { loads[result.movementId] = load }
+            else if feeling == .easy { loads[result.movementId] = min(BackpackWater.maxKg, load + BackpackWater.easierStepKg) }
+            else { loads.removeValue(forKey: result.movementId) }
+        }
     }
 
     mutating func markDone(_ day: String) {

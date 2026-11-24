@@ -10,7 +10,7 @@ import Foundation
 ///   the last time                "Last time today"                    Start · Skip today
 ///
 /// At most six for a day and none from 22:00. With "Keep reminding me until I've trained" off, only the first three.
-/// Finishing the workout takes off what is left (`Notifier.cancelReminders`).
+/// Finishing the workout takes off what is left of that day's (`Notifier.cancelHomeReminders`).
 struct WorkoutReminder: Equatable, Sendable {
     enum Kind: String, Sendable {
         case evening, soon, now, moved, later, last
@@ -68,6 +68,11 @@ enum WorkoutReminders {
                                    title: entry.copy.title, body: entry.copy.body, day: day.day)
         }
         return Array(reminders.prefix(maxPerDay))
+    }
+
+    /// Which of `ids` are the reminders of the session on `day`, and only those.
+    static func ids(_ ids: [String], day: String) -> [String] {
+        ids.filter { $0.hasPrefix("\(prefix)\(day)-") }
     }
 
     /// The next later time after `now` on a day, for "Later today"; nil when none is left.

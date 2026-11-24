@@ -93,7 +93,7 @@ struct WorkoutSessionView: View {
 
     private func targetLine(_ item: WorkoutContent.Item, _ move: Movement) -> String {
         var line = "Set \(min(setsDone + 1, item.sets)) of \(item.sets) · \(item.target(sides: move.sides))"
-        if let load = result?.load ?? item.load { line += " · \(load.formatted()) kg in the backpack" }
+        if let load = result?.load ?? item.load { line += " · " + BackpackWater.words(load) }
         return line
     }
 
@@ -103,7 +103,7 @@ struct WorkoutSessionView: View {
                 .font(.body).foregroundStyle(Theme.text)
             howTo(move)
             Button("Yes, I can") { Task { await model.answerCanDo(move.id, can: true) } }
-                .buttonStyle(PrimaryButtonStyle())
+                .buttonStyle(PrimaryButtonStyle.tall)
             Button("Not yet") {
                 Task {
                     await model.answerCanDo(move.id, can: false)
@@ -143,17 +143,24 @@ struct WorkoutSessionView: View {
             Stepper(item.isHold ? "Seconds held: \(count)" : "Reps done: \(count)", value: $count, in: 0...max(item.high * 2, 30))
                 .font(.body)
                 .frame(minHeight: 44)
-            Button("Done with this set") { doneWithSet() }
-                .buttonStyle(PrimaryButtonStyle())
-            HStack(spacing: Theme.md) {
-                Button("Too hard") { tooHard() }
-                Button("Swap") { swapping = true }
-                Button("Skip") { advance() }
+            HStack(spacing: Theme.sm) {
+                smallAction("Too hard") { tooHard() }
+                smallAction("Swap") { swapping = true }
+                smallAction("Skip") { advance() }
             }
+            Button("Done with this set") { doneWithSet() }
+                .buttonStyle(PrimaryButtonStyle.tall)
+        }
+    }
+
+    /// A secondary action on the workout page: at least 44 by 44 points to tap, with 8 points between neighbours.
+    private func smallAction(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
             .font(.body)
             .foregroundStyle(Theme.accent)
-            .frame(minHeight: 44)
-        }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(Rectangle())
+            .background(RoundedRectangle(cornerRadius: Theme.radiusButton).strokeBorder(Theme.rule, lineWidth: 1))
     }
 
     // MARK: Changing what's on screen
@@ -289,7 +296,7 @@ struct WorkoutSessionView: View {
                         dismiss()
                     }
                 }
-                .buttonStyle(PrimaryButtonStyle())
+                .buttonStyle(PrimaryButtonStyle.tall)
                 .disabled(saving)
                 Text("Finishing saves a strength workout to Apple Health and takes off today’s other reminders.")
                     .font(.footnote).foregroundStyle(Theme.textMuted)
@@ -316,10 +323,15 @@ private struct RestCountdown: View {
             Text(next).font(.body).foregroundStyle(Theme.textMuted)
             HStack(spacing: Theme.lg) {
                 Button("−15 s") { change(until.addingTimeInterval(-15)) }
+                    .frame(minWidth: 64, minHeight: 44)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("15 seconds less rest")
                 Button("+15 s") { change(until.addingTimeInterval(15)) }
+                    .frame(minWidth: 64, minHeight: 44)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("15 seconds more rest")
             }
             .font(.body.weight(.medium))
-            .frame(minHeight: 44)
             Button("Skip rest", action: onDone).buttonStyle(GhostButtonStyle())
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -71,4 +71,16 @@ struct UserRulesTests {
         #expect(UserRules.weekdayIndex(monday, calendar: Fixture.calendar) == 0)
         #expect(UserRules.weekdayIndex(sunday, calendar: Fixture.calendar) == 6)
     }
+
+    @Test func savedRulesMissingAFieldKeepTheRestAndStayOn() throws {
+        let saved = #"{"isOn":true,"restWeekdays":[0,6],"sessionMin":15,"sessionMax":20,"avoid":["jump_squat"],"equipment":["backpack","rocket"]}"#
+        let rules = try JSONDecoder().decode(UserRules.self, from: Data(saved.utf8))
+        #expect(rules.isOn)
+        #expect(rules.restWeekdays == [0, 6])
+        #expect(rules.sessionMin == 15 && rules.sessionMax == 20)
+        #expect(rules.avoid == ["jump_squat"])
+        #expect(rules.equipment == [.backpack])
+        #expect(rules.windowFrom == "12:00" && rules.windowTo == "20:30")
+        #expect(rules.farKilometres == HomePlace.defaultFarKilometres)
+    }
 }

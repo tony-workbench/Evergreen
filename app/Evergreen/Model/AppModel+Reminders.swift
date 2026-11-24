@@ -72,8 +72,17 @@ extension AppModel {
     func skipDay(_ day: String, reason: String) async {
         workoutLog.skip(day, reason: reason)
         workoutLog.save(to: settings)
-        if onDevice, let date = PlannedDays.date(day, calendar: calendar) { await notifier.cancelReminders(on: date, calendar: calendar) }
+        if onDevice { await notifier.cancelHomeReminders(day: day) }
         log("You skipped the home workout on \(day)")
         if reason == "out" { await setGoingOut(true, day: day) } else { await scheduleNotifications() }
+    }
+
+    /// Takes a skip back ("Train today after all" on Today): the day trains again, with its reminders.
+    func unskipDay(_ day: String) async {
+        let reason = workoutLog.skipped?[day]
+        workoutLog.skipped?.removeValue(forKey: day)
+        workoutLog.save(to: settings)
+        log("You’re training on \(day) after all")
+        if reason == "out" { await setGoingOut(false, day: day) } else { await scheduleNotifications() }
     }
 }

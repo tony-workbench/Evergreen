@@ -52,6 +52,18 @@ struct DayKindTests {
         #expect(week[day(3)] == .home)      // within 200 m of home
     }
 
+    struct OfflineGeocoder: PlaceGeocoding {
+        struct Offline: Error {}
+        func coordinate(for text: String) async throws -> Coordinate? { throw Offline() }
+    }
+
+    @Test func aTypedPlaceWhileOfflineSaysNothingAboutTheDay() async {
+        let week = await DayKinds.classify(rules: rules, busy: [event(1, at: .text("Library")), event(3, at: .coordinate(campus))],
+                                           goingOut: [], farToday: false, from: monday, calendar: Fixture.calendar, geocoder: OfflineGeocoder())
+        #expect(week[day(1)] == .home)
+        #expect(week[day(3)] == .out)       // a coordinate needs no geocoder
+    }
+
     @Test func aTypedPlaceIsFoundOnThePhoneAndOneThatCantBeFoundIsNotHome() async {
         let geocoder = FakeGeocoder(places: ["Library": campus, "Home office": home])
         let week = await kinds(busy: [event(0, at: .text("Home office")), event(1, at: .text("Library")), event(3, at: .text("Somewhere unknown"))],

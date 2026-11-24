@@ -54,7 +54,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let startNow = UNNotificationAction(identifier: WorkoutAction.start.rawValue, title: "Start now", options: [.foreground])
         let later = UNNotificationAction(identifier: WorkoutAction.later.rawValue, title: "Later today", options: [])
         let skips = [(WorkoutAction.skipOut, "Skip today: I’m out"), (.skipUnwell, "Skip today: not feeling well"), (.skipNotToday, "Skip today: not today")]
-            .map { UNNotificationAction(identifier: $0.0.rawValue, title: $0.1, options: []) }
+            // Skipping a day needs the phone unlocked, so a tap in a pocket can't do it; Today can take it back.
+            .map { UNNotificationAction(identifier: $0.0.rawValue, title: $0.1, options: [.authenticationRequired]) }
         let goingOut = UNNotificationAction(identifier: WorkoutAction.goingOut.rawValue, title: "I’m going out tomorrow", options: [])
         center.setNotificationCategories([
             UNNotificationCategory(identifier: Self.movedCategory, actions: [undo], intentIdentifiers: []),
@@ -145,15 +146,11 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     static let weekAheadId = "week-ahead"
 
-    /// Takes off what is left of a day's workout reminders, once the day's session is done.
-    func cancelReminders(on day: Date, calendar: Calendar = .current) async {
-        let pending = await center.pendingNotificationRequests()
-        let ids = pending.filter { request in
-            guard request.identifier.hasPrefix("reminder-"), let trigger = request.trigger as? UNCalendarNotificationTrigger,
-                  let fires = trigger.nextTriggerDate() else { return false }
-            return calendar.isDate(fires, inSameDayAs: day)
-        }.map(\.identifier)
-        center.removePendingNotificationRequests(withIdentifiers: ids)
+    /// Takes off what is left of one day's home workout reminders, once its session is done or skipped. Only that day's:
+    /// another day's reminders, the evening one about tomorrow and the other notifications stay.
+    func cancelHomeReminders(day: String) async {
+        let pending = await center.pendingNotificationRequests().map(\.identifier)
+        center.removePendingNotificationRequests(withIdentifiers: WorkoutReminders.ids(pending, day: day))
     }
 
     // MARK: Now

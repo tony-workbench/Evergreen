@@ -74,4 +74,22 @@ struct WorkoutContentTests {
         #expect(item.target(sides: 2) == "20–30 seconds each side")
         #expect(WorkoutContent.Item(movementId: "x", sets: 3, reps: [8, 12], rest: 60, isNew: false).target(sides: 1) == "8–12 reps")
     }
+
+    @Test func theBackpackIsSaidInLitresOfWater() {
+        #expect(BackpackWater.words(4) == "4 litres of water in the backpack (two 2-litre bottles)")
+        #expect(BackpackWater.words(3) == "3 litres of water in the backpack (one 2-litre bottle and one 1-litre bottle)")
+        #expect(BackpackWater.words(1) == "1 litre of water in the backpack")
+    }
+
+    @Test func tooHardKeepsOneKiloOffTooEasyAddsTwoAndAnythingElseLetsTheUsualStepCarryOn() {
+        var log = WorkoutLog()
+        log.loads["backpack_row"] = 3
+        var hard = WorkoutResult(movementId: "backpack_squat", sets: [8], load: 3)
+        hard.tooHard = true
+        log.settleLoads([hard, WorkoutResult(movementId: "backpack_row", sets: [12, 12], load: 3)], feeling: .right)
+        #expect(log.loads["backpack_squat"] == 3)      // the page already took the kilogram off: not two
+        #expect(log.loads["backpack_row"] == nil)      // used once, so the usual step up applies again
+        log.settleLoads([WorkoutResult(movementId: "backpack_press", sets: [10], load: 11)], feeling: .easy)
+        #expect(log.loads["backpack_press"] == 12)     // no more than a backpack holds
+    }
 }

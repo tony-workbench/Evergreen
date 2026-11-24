@@ -11,14 +11,22 @@ enum DayKind: String, Codable, Sendable, CaseIterable {
 
 /// Turns an event's typed place into a coordinate. The system's geocoder, only
 /// for events the calendar kept no coordinate for; tests hand in a fake.
+/// nil is a place that can't be found; a thrown error is a geocoder that couldn't
+/// be asked (offline), which says nothing about where the event is.
 protocol PlaceGeocoding: Sendable {
-    func coordinate(for text: String) async -> Coordinate?
+    func coordinate(for text: String) async throws -> Coordinate?
 }
 
 struct SystemGeocoder: PlaceGeocoding {
-    func coordinate(for text: String) async -> Coordinate? {
-        guard let point = try? await CLGeocoder().geocodeAddressString(text).first?.location?.coordinate else { return nil }
-        return Coordinate(latitude: point.latitude, longitude: point.longitude)
+    func coordinate(for text: String) async throws -> Coordinate? {
+        do {
+            guard let point = try await CLGeocoder().geocodeAddressString(text).first?.location?.coordinate else { return nil }
+            return Coordinate(latitude: point.latitude, longitude: point.longitude)
+        } catch let error as CLError where error.code == .network {
+            throw error
+        } catch {
+            return nil
+        }
     }
 }
 
@@ -31,7 +39,7 @@ enum DayKinds {
     /// 2. a day the person said they go out, or today when the phone is far from home, is `out`; a day they said they
     ///    are home is `home`, whatever the calendar says (the way to correct a wrong guess);
     /// 3. a day with an event placed somewhere that isn't home is `out` (a place that can't be found counts as not home;
-    ///    a meeting link is no place);
+    ///    a meeting link is no place, and nor is a typed place while the phone is offline: it's asked again next time);
     /// 4. every other day is `home`.
     /// Without a home set, only rules 1, 2 and the far-away check apply, since no event can be told to be at home.
     static func classify(rules: UserRules, busy: [Busy], goingOut: Set<String>, stayingHome: Set<String> = [], farToday: Bool, from today: Date,
@@ -76,9 +84,13 @@ enum DayKinds {
         case .text(let text):
             if isNoPlace(text) { return nil }
             if let known = found[text] { return .some(known) }
-            let point = await geocoder.coordinate(for: text)
-            found[text] = point
-            return .some(point)
+            do {
+                let point = try await geocoder.coordinate(for: text)
+                found[text] = point
+                return .some(point)
+            } catch {
+                return nil
+            }
         }
     }
 }

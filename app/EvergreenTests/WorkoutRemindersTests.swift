@@ -117,4 +117,18 @@ struct WorkoutRemindersTests {
             #expect(!(block.start < walk.slot.end && walk.slot.start < block.end))
         }
     }
+
+    @Test func finishingADayTakesOffOnlyThatDaysReminders() {
+        let pending = ["reminder-home-2026-11-19-2", "reminder-home-2026-11-19-3", "reminder-home-2026-11-20-1",
+                       "reminder-walk-1763600000", "week-ahead"]
+        #expect(WorkoutReminders.ids(pending, day: "2026-11-19") == ["reminder-home-2026-11-19-2", "reminder-home-2026-11-19-3"])
+    }
+
+    @Test func theWeekEndsOnSunday() {
+        let days = (0..<7).map { offset in
+            AppModel.daysToSunday(Fixture.calendar.date(from: DateComponents(year: 2026, month: 11, day: 30 + offset, hour: 9))!,
+                                  calendar: Fixture.calendar)
+        }
+        #expect(days == [6, 5, 4, 3, 2, 1, 0])
+    }
 }

@@ -16,6 +16,11 @@ struct HomeWorkoutRow: View {
                         .font(.body)
                         .foregroundStyle(Theme.textMuted)
                         .frame(minHeight: 44, alignment: .leading)
+                    Button("Train today after all") { Task { await model.unskipDay(model.todayISO) } }
+                        .font(.body)
+                        .foregroundStyle(Theme.accent)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 } else if model.homeDoneToday {
                     Text("Today’s home workout is done.")
                         .font(.body)
@@ -43,9 +48,13 @@ struct HomeWorkoutRow: View {
         Button("Start") { open = true }
             .font(.body.weight(.semibold))
             .foregroundStyle(Theme.accent)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
         Button("I did it another way") { Task { await model.doneAnotherWay() } }
             .font(.body)
             .foregroundStyle(Theme.textMuted)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         Menu("Not now") {
             Button("Later today") { Task { await model.laterToday() } }
             Section("Skip today") {
@@ -56,6 +65,8 @@ struct HomeWorkoutRow: View {
         }
         .font(.body)
         .foregroundStyle(Theme.textMuted)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 
     private func openIfAsked() {
