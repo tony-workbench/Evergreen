@@ -25,7 +25,12 @@ This continues the app our team built at the Personal Agents Hackathon in Novemb
 - **Add or decline in one tap.** Add a session and it goes on your calendar; decline it and that habit is no longer planned around.
 - **Ask in a sentence.** "Find me 45 minutes to run tonight." "Move Sunday's run to the afternoon." "What do you remember about me?"
 - **See what it remembers.** A short list built once a day from your data. Stop any line, or forget a day or everything.
-- **Earn screen time by working out.** Pick the video and game apps to lock in Settings, then Earned screen time. Every workout minute earns minutes for them at a rate you set (1 minute of videos and half a minute of games by default). Open a locked app and use what you earned, up to 15 minutes at a time; it locks again when the time is up.
+- **Set your own rules.** Settings, then My rules: your rest days, the hours you can train, how long a session may be, what equipment you have and any movement to avoid. Each day of the week is then at home, out or rest, from your rules and your calendar, and "I’m going out today" on Today changes a day in one tap.
+- **Train at home without thinking about it.** On a day at home Today shows the session and "Start" opens a workout page: each movement in words, its sets and reps, a rest countdown, "Too hard" and "Swap". Finishing it saves a strength workout to Apple Health.
+- **See the whole week as a table.** The plan is kept day by day and moves when a day is missed; the week table shows each day's kind, time, later times and movements.
+- **Get reminded until it's done.** On a day at home: the evening before, before the session, at its time and at each later time, at most six a day and none after 22:00. "Later today" or "Skip today" from the notification.
+- **Short breaks when rain keeps you in.** Rain through the afternoon of a day at home brings an offer of two or three six-minute breaks, spread out and clear of your calendar.
+- **Earn screen time by working out.** Pick the social, video and game apps to lock in Settings, then Earned screen time. Each group has free time every day (60 minutes of social apps, 30 of videos, 30 of games), used first and not carried over. After that, every workout minute earns more at a rate you set (2 minutes of social apps, 1 of videos and half a minute of games by default). Open a locked app and use the time, up to 15 minutes at a time; it locks again when the time is up. Once a week, with nothing left, "Unlock for 10 minutes" opens it anyway, and the day you train after a missed day adds 15 minutes to each group.
 
 ## What you need
 
@@ -59,7 +64,8 @@ The three engines have their own tests: run `npm install && npm test` in `memory
 
 ## What leaves your phone
 
-- To Google's Gemini API, with your key: the sentence you type, and a short table of facts about your training (counts, times, averages). Never raw health readings, names or calendar event titles.
+- To Google's Gemini API, with your key: the sentence you type, a short table of facts about your training (counts, times, averages), and, with My rules on, the limits from your rules and which of the coming days are at home, out or rest. Never raw health readings, names, calendar event titles or places.
+- To Apple's geocoder, when you have set a home in My rules: the typed place of a calendar event that has no map location, to tell whether the day is at home. Event titles never leave.
 - To Open-Meteo, when rain check is on: your location rounded to about a kilometre, to fetch the forecast.
 
 Nothing else. There is no Evergreen server.

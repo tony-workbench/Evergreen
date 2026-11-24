@@ -8,7 +8,7 @@ Everything runs on the phone. Three agents think with the person's own Gemini ke
 | --- | --- | --- |
 | App | `app/` | SwiftUI. Holds the plan, writes the calendar, keeps the key, shows the screens, passes values between the agents, and locks the apps picked for earned screen time through Screen Time (three extensions) |
 | Memory | `memory-agent/` | Turns Apple Health data into exact facts each day. Once a day the model proposes what to remember; code keeps only what the facts support |
-| Recommendations | `recommend-agent/` | Computes what the model needs to plan a week and checks every proposed week against safety rules |
+| Recommendations | `recommend-agent/` | Computes what the model needs to plan a week and checks every proposed week against safety rules. With My rules on, it also plans the week at home day by day and builds each session's movements, sets and reps from its movement library, in code |
 | Calendar | `calendar-planner/` | Finds where a session fits around real events and re-plans when something moves. Built on [Plan Calendar](https://github.com/tony-workbench/plan-calendar) |
 | Contract | `contract/` | The shapes every part agrees on, and a test that runs the three engines together |
 

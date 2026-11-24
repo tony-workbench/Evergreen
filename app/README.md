@@ -28,7 +28,9 @@ Any file added under `app/Evergreen/` or `app/EvergreenTests/` is in the build a
 | `Resources/` | The three engine bundles and the asset catalog |
 | `ScreenTime/` | Earned screen time: its model and screen |
 
-Earned screen time also uses folders beside `app/Evergreen/`. `ScreenTimeShared/` holds the chosen apps, the rates, the counted workouts and spent minutes, and locking and unlocking; it is built into the app and all three extensions, which share it through the App Group `group.com.evergreentraining.app`. `EarnShieldConfiguration/` draws the screen over a locked app, `EarnShieldAction/` handles its button, and `EarnActivityMonitor/` locks the apps again when the unlocked time is up. Evergreen also locks any unlock that ran out each time it opens. Their Info.plist and entitlements files are in `ExtensionSettings/`.
+The exercise rules: `Model/UserRules.swift` and `HomePlace.swift` hold My rules, `CalendarSync/DayKind.swift` sorts each day into home, out or rest, `Model/HomeWeek.swift` and `AppModel+HomeWeek.swift` keep the week planned day by day, `Model/WorkoutLog.swift` and `AppModel+Workout.swift` record each session, `Views/Workout/WorkoutSessionView.swift` is the workout page, `Views/Week/WeekTableView.swift` the week table, `Notifications/WorkoutReminders.swift` and `AppModel+Reminders.swift` a day at home's reminders, and `Weather/RainSnacks.swift` the short breaks on a rainy afternoon. `Health/WorkoutWriter.swift` saves a finished session to Apple Health as a strength workout.
+
+Earned screen time also uses folders beside `app/Evergreen/`. `ScreenTimeShared/` holds the chosen apps, the rates and every other number (`EarnRules`), the counted workouts and spent minutes, each day's free time, the weekly escape and the comeback day, and locking and unlocking; it is built into the app and all three extensions, which share it through the App Group `group.com.evergreentraining.app`. `EarnShieldConfiguration/` draws the screen over a locked app, `EarnShieldAction/` handles its two buttons (use time, or the weekly "Unlock for 10 minutes"), and `EarnActivityMonitor/` locks the apps again when the unlocked time is up. Evergreen also locks any unlock that ran out each time it opens. Their Info.plist and entitlements files are in `ExtensionSettings/`.
 
 ## How the pieces call each other
 
@@ -107,6 +109,7 @@ xcrun simctl launch booted com.evergreentraining.app -uiTest runner -uiScreen se
 | `runner` | Four weeks of morning runs, 212 km on the shoes, tomorrow's run on the plan |
 | `rain` | The same, with rain due on tomorrow's run and three gyms nearby |
 | `shoes` | The same, with 492 km on the shoes |
+| `home` | My rules on with no equipment, a day at home with rain through the afternoon, then a day out |
 
 With a seed, these also work:
 
