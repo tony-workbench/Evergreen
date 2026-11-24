@@ -1,0 +1,38 @@
+{
+  "sessionId": null,
+  "focus": "full",
+  "minutes": 18,
+  "items": [
+    {
+      "movementId": "sit_to_stand",
+      "sets": 3,
+      "reps": [
+        8,
+        12
+      ],
+      "rest": 60,
+      "isNew": false,
+      "load": 20
+    },
+    {
+      "movementId": "wall_push_up",
+      "sets": 3,
+      "reps": [
+        10,
+        15
+      ],
+      "rest": 60,
+      "isNew": false
+    },
+    {
+      "movementId": "dead_bug",
+      "sets": 2,
+      "reps": [
+        8,
+        12
+      ],
+      "rest": 45,
+      "isNew": false
+    }
+  ]
+}

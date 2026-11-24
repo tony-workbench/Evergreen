@@ -7,7 +7,7 @@ import { buildPhone, OUT } from '../scripts/build-phone.mjs';
 import { recommendWeek, bundleArgs } from './support/sample.mjs';
 import { memoryFor } from './support/harness-memory.mjs';
 
-const GLOBALS = ['recommendWeek', 'planContext', 'checkPlan', 'explainAction', 'checkWeek', 'planBrief'];
+const GLOBALS = ['recommendWeek', 'planContext', 'checkPlan', 'explainAction', 'checkWeek', 'planBrief', 'workoutContent', 'weekContent', 'checkContent', 'movementLibrary'];
 const bundle = await buildPhone();
 const fresh = () => { const c = vm.createContext({}); vm.runInContext(bundle, c); return c; };
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
@@ -74,7 +74,7 @@ test('the bundle holds no web address: no http or https, and nothing that reads 
   assert.deepEqual([...new Set(domains)], []);
   const data = new URL('../data/', import.meta.url);
   const files = readdirSync(data, { recursive: true }).filter((f) => f.endsWith('.json'));
-  assert.deepEqual(files, ['workout_ideas/running.json']);
+  assert.deepEqual(files.sort(), ['movements.json', 'workout_ideas/running.json']);
   for (const f of files) assert.doesNotMatch(readFileSync(new URL(f, data), 'utf8'), /https?:|www\.|"(url|imageUrl|imagePage|sourceHost)"/i, f);
 });
 
@@ -87,7 +87,7 @@ test('nothing in the bundle is left from the demo: no sample person, no sponsor 
 
 test('docs: the example in docs/PHONE.md runs, and both documents stay short', () => {
   const doc = read('../docs/PHONE.md');
-  assert.ok(words(doc.replace(/```js[\s\S]*?```/g, '')) <= 350, `docs/PHONE.md has ${words(doc.replace(/```js[\s\S]*?```/g, ''))} words`);
+  assert.ok(words(doc.replace(/```js[\s\S]*?```/g, '')) <= 400, `docs/PHONE.md has ${words(doc.replace(/```js[\s\S]*?```/g, ''))} words`);
   assert.ok(words(read('../README.md')) <= 200, `README.md has ${words(read('../README.md'))} words`);
   for (const name of GLOBALS) assert.ok(doc.includes(`\`${name}(`), name);
   const example = /```js\n([\s\S]*?)```/.exec(doc)[1];

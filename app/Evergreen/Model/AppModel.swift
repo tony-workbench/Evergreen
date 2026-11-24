@@ -65,6 +65,10 @@ final class AppModel {
     var userRules = UserRules()
     /// Each of the next seven days as home, out or rest, worked out on the phone (AppModel+Rules.swift).
     var dayKinds: [String: DayKind] = [:]
+    /// What the person did on the workout page (Model/WorkoutLog.swift).
+    var workoutLog = WorkoutLog()
+    /// Every movement's words, read from the engine once (AppModel+Workout.swift).
+    var movements: [Movement] = []
     /// Whether notifications are allowed.
     private(set) var notificationAccess: NotificationAccess = .notAsked
 
@@ -112,6 +116,7 @@ final class AppModel {
         save()
         guard onDevice else { return }
         userRules = UserRules.load(from: settings)
+        workoutLog = WorkoutLog.load(from: settings)
         self.calendarSync.onChange = { [weak self] in self?.calendarChanged() }
         notifier.onOpen = { [weak self] in Task { await self?.tick() } }
         notifier.onUndo = { [weak self] id in self?.undoMove(id) }

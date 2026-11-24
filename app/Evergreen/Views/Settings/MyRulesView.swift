@@ -50,8 +50,14 @@ struct MyRulesView: View {
                             ))
                         }
                     }
-                    Section("Movements to avoid") {
-                        LabeledContent("Avoided", value: rules.avoid.isEmpty ? "None" : "\(rules.avoid.count)")
+                    Section {
+                        NavigationLink {
+                            AvoidMovementsView(rules: $rules)
+                        } label: {
+                            LabeledContent("Movements to leave out", value: rules.avoid.isEmpty ? "None" : "\(rules.avoid.count)")
+                        }
+                    } footer: {
+                        Text("A movement you couldn’t do is marked and the easier one comes instead. It’s left out for good only if you pick it here.")
                     }
                     Section {
                         Button(settingHome ? "Finding where you are…" : (rules.home == nil ? "Set my current location as home" : "Move home to where I am now")) {
@@ -115,6 +121,48 @@ struct MyRulesView: View {
         }
         rules.home = HomePlace(place: here)
         homeLine = "Home is set to where you are now."
+    }
+}
+
+/// Every movement, by what it works, to leave out for good or to clear a "can't do" mark.
+struct AvoidMovementsView: View {
+    @Binding var rules: UserRules
+    @Environment(AppModel.self) private var model
+
+    private static let groups: [(pattern: String, title: String)] = [
+        ("lower_push", "Legs"), ("lower_pull", "Hips and the back of the legs"), ("upper_push", "Pushing"),
+        ("upper_pull", "Pulling"), ("core", "The middle"), ("snack", "Short pieces"),
+    ]
+
+    var body: some View {
+        List {
+            if model.movements.isEmpty { Text("Reading the movements…").foregroundStyle(Theme.textMuted) }
+            ForEach(Self.groups, id: \.pattern) { group in
+                let moves = model.movements.filter { $0.pattern == group.pattern }
+                if !moves.isEmpty {
+                    Section(group.title) {
+                        ForEach(moves) { move in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Toggle(move.name, isOn: Binding(
+                                    get: { rules.avoid.contains(move.id) },
+                                    set: { on in rules.avoid = on ? (rules.avoid + [move.id]) : rules.avoid.filter { $0 != move.id } }
+                                ))
+                                if rules.movements[move.id] == .cannot {
+                                    HStack {
+                                        Text("Marked “can’t do yet”").font(.footnote).foregroundStyle(Theme.textMuted)
+                                        Spacer()
+                                        Button("Clear") { rules.movements[move.id] = nil }.font(.footnote)
+                                    }
+                                }
+                            }
+                            .frame(minHeight: 44)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Leave out")
+        .task { await model.loadMovements() }
     }
 }
 

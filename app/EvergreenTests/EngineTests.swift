@@ -23,6 +23,7 @@ struct EngineTests {
     @Test func theBundlesLoadWithEveryFunctionTheAppCalls() async {
         #expect(await AppModel.planBundle.has(BundlePlanRules.globals))
         #expect(await AppModel.calendarBundle.has(BundleCalendar.globals))
+        #expect(await AppModel.planBundle.has(BundleContent.globals))
         #expect(await !JSBundle(resource: "not-there").has([]))
         #expect(await JSBundle(resource: "not-there").call("planContext")["ok"] == .bool(false))
     }

@@ -1,0 +1,126 @@
+[
+  {
+    "sessionId": "w1-wed",
+    "focus": "upper",
+    "minutes": 24,
+    "items": [
+      {
+        "movementId": "table_push_up",
+        "sets": 3,
+        "reps": [
+          8,
+          12
+        ],
+        "rest": 60,
+        "isNew": false
+      },
+      {
+        "movementId": "backpack_row",
+        "sets": 3,
+        "reps": [
+          10,
+          15
+        ],
+        "rest": 60,
+        "isNew": false,
+        "load": 5
+      },
+      {
+        "movementId": "backpack_press",
+        "sets": 3,
+        "reps": [
+          8,
+          12
+        ],
+        "rest": 60,
+        "isNew": false,
+        "load": 2
+      },
+      {
+        "movementId": "forearm_plank",
+        "sets": 2,
+        "seconds": [
+          20,
+          40
+        ],
+        "rest": 45,
+        "isNew": true
+      }
+    ]
+  },
+  {
+    "sessionId": "w1-sat",
+    "focus": "full_lower",
+    "minutes": 35,
+    "items": [
+      {
+        "movementId": "reverse_lunge",
+        "sets": 3,
+        "reps": [
+          8,
+          12
+        ],
+        "rest": 60,
+        "isNew": false
+      },
+      {
+        "movementId": "backpack_hip_hinge",
+        "sets": 4,
+        "reps": [
+          8,
+          12
+        ],
+        "rest": 60,
+        "isNew": false,
+        "load": 6
+      },
+      {
+        "movementId": "push_up",
+        "sets": 3,
+        "reps": [
+          6,
+          12
+        ],
+        "rest": 60,
+        "isNew": false
+      }
+    ]
+  },
+  {
+    "sessionId": null,
+    "focus": "full",
+    "minutes": 18,
+    "items": [
+      {
+        "movementId": "sit_to_stand",
+        "sets": 3,
+        "reps": [
+          8,
+          12
+        ],
+        "rest": 60,
+        "isNew": false
+      },
+      {
+        "movementId": "wall_push_up",
+        "sets": 3,
+        "reps": [
+          10,
+          15
+        ],
+        "rest": 60,
+        "isNew": false
+      },
+      {
+        "movementId": "dead_bug",
+        "sets": 2,
+        "reps": [
+          8,
+          12
+        ],
+        "rest": 45,
+        "isNew": false
+      }
+    ]
+  }
+]

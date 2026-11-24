@@ -37,7 +37,7 @@ struct HandOffTests {
         // A new fixture file must get a line below.
         #expect(files == ["activity.json", "calendar-intent.json", "calendar-result.json", "error.json", "handoffs.json", "memory-row.json",
                           "memory-table.json", "outcome.json", "plan-check.json", "plan.json", "preview-block.json", "session.json", "stopped-slot.json",
-                          "user-rules.json"])
+                          "user-rules.json", "workout-content.json"])
         #expect(try Self.load("stopped-slot", as: [JSONValue].self).allSatisfy { $0["activity"]?.string != nil && $0["weekday"]?.number != nil && $0["hour"]?.number != nil })
         #expect(try !Self.load("activity", as: [ActivityKind].self).isEmpty)
         #expect(try !Self.load("calendar-intent", as: [CalendarIntent].self).isEmpty)
@@ -51,6 +51,7 @@ struct HandOffTests {
         #expect(try !Self.load("preview-block", as: [PreviewBlock].self).isEmpty)
         #expect(try !Self.load("session", as: [PlanSession].self).isEmpty)
         #expect(try !Self.load("handoffs", as: [HandOffs].self).isEmpty)
+        #expect(try Self.load("workout-content", as: [WorkoutContent].self).allSatisfy { !$0.items.isEmpty && $0.items.allSatisfy { ($0.reps == nil) != ($0.seconds == nil) } })
         // The rules the engine takes are what a profile file holds, so each one imports.
         let rules = try FileManager.default.contents(atPath: Self.fixtures.appending(path: "user-rules.json").path).flatMap { try JSONSerialization.jsonObject(with: $0) as? [Any] } ?? []
         #expect(rules.count >= 3)

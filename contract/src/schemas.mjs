@@ -1095,5 +1095,123 @@ export const SCHEMAS = {
         }
       }
     }
+  },
+  "workout-content": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "workout-content.schema.json",
+    "title": "Workout content",
+    "description": "What one home session holds, as workoutContent and weekContent in recommend-agent/src/content.mjs return it and the workout page shows it: movements from the movement library (recommend-agent/data/movements.json), each with its sets, its range of reps or seconds, its rest and, for a backpack movement, the kilograms in the backpack. Every word the page shows about a movement comes from the library, never from this value.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "sessionId",
+      "focus",
+      "minutes",
+      "items"
+    ],
+    "properties": {
+      "sessionId": {
+        "description": "The session this is for, or null when built on its own.",
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "focus": {
+        "description": "What the session works.",
+        "enum": [
+          "full",
+          "lower",
+          "upper",
+          "full_lower",
+          "full_upper"
+        ]
+      },
+      "minutes": {
+        "description": "About how long it takes, rests and getting set up included.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 120
+      },
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 8,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "movementId",
+            "sets",
+            "rest",
+            "isNew"
+          ],
+          "properties": {
+            "movementId": {
+              "description": "A movement's id in the library.",
+              "type": "string",
+              "pattern": "^[a-z0-9_]{1,48}$"
+            },
+            "sets": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "reps": {
+              "description": "The lowest and highest reps a set aims for.",
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50
+              }
+            },
+            "seconds": {
+              "description": "The shortest and longest hold a set aims for.",
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 5,
+                "maximum": 300
+              }
+            },
+            "load": {
+              "description": "Kilograms in the backpack.",
+              "type": "number",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "rest": {
+              "description": "Seconds of rest between sets.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 300
+            },
+            "isNew": {
+              "description": "The person hasn't done it yet: the page asks first whether they can do one.",
+              "type": "boolean"
+            }
+          },
+          "oneOf": [
+            {
+              "required": [
+                "reps"
+              ]
+            },
+            {
+              "required": [
+                "seconds"
+              ]
+            }
+          ]
+        }
+      }
+    }
   }
 };

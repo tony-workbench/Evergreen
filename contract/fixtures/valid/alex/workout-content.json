@@ -1,0 +1,49 @@
+{
+  "sessionId": "w1-wed",
+  "focus": "upper",
+  "minutes": 24,
+  "items": [
+    {
+      "movementId": "table_push_up",
+      "sets": 3,
+      "reps": [
+        8,
+        12
+      ],
+      "rest": 60,
+      "isNew": false
+    },
+    {
+      "movementId": "backpack_row",
+      "sets": 3,
+      "reps": [
+        10,
+        15
+      ],
+      "rest": 60,
+      "isNew": false,
+      "load": 5
+    },
+    {
+      "movementId": "backpack_press",
+      "sets": 3,
+      "reps": [
+        8,
+        12
+      ],
+      "rest": 60,
+      "isNew": false,
+      "load": 2
+    },
+    {
+      "movementId": "forearm_plank",
+      "sets": 2,
+      "seconds": [
+        20,
+        40
+      ],
+      "rest": 45,
+      "isNew": true
+    }
+  ]
+}

@@ -52,6 +52,13 @@ const RULES = {
   alex: { restWeekdays: [2, 5, 6], sessionMinutes: { min: 20, max: 25 }, window: { from: '12:00', to: '20:30' }, mornings: false, equipment: ['backpack', 'chair', 'table', 'sofa', 'book', 'step'], avoid: ['jump_squat'], movements: { split_squat: 'can', push_up: 'untried' } },
   jordan: { restWeekdays: [4], sessionMinutes: { min: 30, max: 40 }, window: { from: '06:00', to: '20:00' }, mornings: true, equipment: ['backpack', 'step'], avoid: [], movements: { pike_push_up: 'cannot' } },
 };
+// A home session of each person's: written by hand with movements from the library, as workoutContent returns them.
+const item = (movementId, sets, dose, rest, extra = {}) => ({ movementId, sets, ...dose, rest, isNew: false, ...extra });
+const CONTENT = {
+  sam: { sessionId: null, focus: 'full', minutes: 18, items: [item('sit_to_stand', 3, { reps: [8, 12] }, 60), item('wall_push_up', 3, { reps: [10, 15] }, 60), item('dead_bug', 2, { reps: [8, 12] }, 45)] },
+  alex: { sessionId: 'w1-wed', focus: 'upper', minutes: 24, items: [item('table_push_up', 3, { reps: [8, 12] }, 60), item('backpack_row', 3, { reps: [10, 15] }, 60, { load: 5 }), item('backpack_press', 3, { reps: [8, 12] }, 60, { load: 2 }), item('forearm_plank', 2, { seconds: [20, 40] }, 45, { isNew: true })] },
+  jordan: { sessionId: 'w1-sat', focus: 'full_lower', minutes: 35, items: [item('reverse_lunge', 3, { reps: [8, 12] }, 60), item('backpack_hip_hinge', 4, { reps: [8, 12] }, 60, { load: 6 }), item('push_up', 3, { reps: [6, 12] }, 60)] },
+};
 for (const p of PEOPLE) {
   const S = await runWeek(loadBundles(STUBS), p, async (title, needs, fn) => { await fn(); });
   const row = S.table.rows.find((r) => r.kind === 'usual_slot');
@@ -60,6 +67,7 @@ for (const p of PEOPLE) {
     'calendar-intent': S.intent, 'preview-block': S.block, 'calendar-result': S.calendarResult, outcome: S.outcomes.find((o) => o.done), error: S.error, 'stopped-slot': S.stopped[0],
   };
   values['user-rules'] = RULES[p.persona];
+  values['workout-content'] = CONTENT[p.persona];
   for (const [name, value] of Object.entries(values)) write(`fixtures/valid/${p.persona}/${name}.json`, assertValid(name, value));
   write(`fixtures/valid/${p.persona}/plan-check.rejected.json`, assertValid('plan-check', S.staleCheck));
   write(`fixtures/valid/${p.persona}/outcome.missed.json`, assertValid('outcome', S.outcomes.find((o) => !o.done)));
@@ -211,6 +219,17 @@ const bad = {
     'movement-state-not-on-the-list': change(g['user-rules'], (v) => { v.movements = { squat: 'maybe' }; }),
     'avoid-id-with-a-space': change(g['user-rules'], (v) => { v.avoid = ['jump squat']; }),
     'home-is-not-a-field': change(g['user-rules'], (v) => { v.home = { latitude: 1, longitude: 2 }; }),
+  },
+  'workout-content': {
+    'focus-not-on-the-list': change(g['workout-content'], (v) => { v.focus = 'arms'; }),
+    'no-items': change(g['workout-content'], (v) => { v.items = []; }),
+    'reps-and-seconds': change(g['workout-content'], (v) => { v.items[0].seconds = [20, 30]; }),
+    'neither-reps-nor-seconds': change(g['workout-content'], (v) => { delete v.items[0].reps; delete v.items[0].seconds; }),
+    'reps-as-one-number': change(g['workout-content'], (v) => { v.items[0].reps = 10; delete v.items[0].seconds; }),
+    'sets-0': change(g['workout-content'], (v) => { v.items[0].sets = 0; }),
+    'load-over-what-a-backpack-holds': change(g['workout-content'], (v) => { v.items[0].load = 20; }),
+    'movement-name-instead-of-id': change(g['workout-content'], (v) => { v.items[0].movementId = 'Push-up'; }),
+    'words-in-the-item': change(g['workout-content'], (v) => { v.items[0].steps = ['Stand tall.']; }),
   },
   error: {
     'error-is-a-name-not-an-object': { ok: false, error: 'BadJSON' },

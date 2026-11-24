@@ -8,6 +8,6 @@ enum Permissions {
 
     static func requestHealth() async {
         guard HKHealthStore.isHealthDataAvailable() else { return }
-        try? await healthStore.requestAuthorization(toShare: [], read: HealthReader.readTypes)
+        try? await healthStore.requestAuthorization(toShare: [WorkoutWriter.type], read: HealthReader.readTypes)
     }
 }

@@ -34,11 +34,11 @@ extension AppModel {
     // MARK: Changing the rules
 
     /// Saves the rules, works the days out again and plans the week again.
-    func saveRules(_ rules: UserRules) async {
+    func saveRules(_ rules: UserRules, quiet: Bool = false) async {
         guard rules.isValid else { return }
         userRules = rules
         rules.save(to: settings)
-        log("Your rules changed; the week was planned again")
+        if !quiet { log("Your rules changed; the week was planned again") }
         await replanForRules()
     }
 
@@ -114,7 +114,7 @@ extension AppModel {
         let focus = homeFocus
         return (1...Self.carryDays).reversed().compactMap { back -> String? in
             let day = dayISO(offset: -back)
-            guard let wanted = focus[day], !trainedStrength(on: day) else { return nil }
+            guard let wanted = focus[day], !trainedStrength(on: day), !workoutLog.didHomeSession(on: day) else { return nil }
             return wanted
         }
     }

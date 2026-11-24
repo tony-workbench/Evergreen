@@ -1,6 +1,6 @@
 # Phone host
 
-`dist/recommend-phone.js` sets six globals: JSON string in, JSON string out, never a throw. Success: `{"ok":true,...}`. Failure: `{"ok":false,"error":{"code","text"}}`. No network, clock or model, and no web address in or out.
+`dist/recommend-phone.js` sets ten globals: JSON string in, JSON string out, never a throw. Success: `{"ok":true,...}`. Failure: `{"ok":false,"error":{"code","text"}}`. No network, clock or model, and no web address in or out.
 
 Shared values follow `contract/AGENTS.md`: ISO 8601 times with offset; `memory` is `{rows}` (a `key` goes into `basedOn`, never parsed); activities: `run`, `long_run` (the longest run, 60+ minutes), `walk`, `strength`, `yoga`, `ride`, `elliptical`, `swim`, `stretch`, `rest`, `other` (named by `data.label`).
 
@@ -10,10 +10,11 @@ Shared values follow `contract/AGENTS.md`: ISO 8601 times with offset; `memory` 
 - `checkPlan({plan: {sessions}, context})`: `{pass, violations: [{code, text, sessionId?}], hints: [{code, action?, sessionId?, fix}], load}`; `hints[i]` fixes `violations[i]`; `context` is `planContext`'s input.
 - `explainAction({action, memory})`: `{text, basedOn, memory: [{key, found, text}]}`.
 - `checkWeek({sessions, calendar})`: `{conflicts: [{code, action, id, start, end, text, fix}]}`.
+- `workoutContent({sessionId, focus, rules, history?})`, `weekContent({sessions, rules})`, `checkContent({content, rules, week?})`, `movementLibrary({})`: a home session's movements, a week of them, a check of proposed ones, every movement's words (`src/content.mjs`).
 
 `history`: `{workouts: [{activityType, start, end, durationMin?, avgHeartRate?, effort?, distanceKm?}], daily: [{date, sleepMin?, restingHeartRate?}]}`, as read from Apple Health. Without it, `planContext` and `checkPlan` work from memory rows, in minutes. `shoes` is `{boughtOn, startMiles}`: a worn pair moves long runs off the road, and a new pair starts with two short easy runs.
 
-`checkPlan` codes: `invalid_session`, `unknown_activity`, `bad_duration`, `outside_window`, `overlap`, `calendar_conflict`, `load_over_cap`, `hard_when_tired`, `race_day_session`, `no_rest_before_race`, `taper_too_long`, `worn_shoes_long_run`, `break_in_too_long`, `break_in_not_easy`, `too_many_sessions`, `too_many_minutes`, `too_many_days_in_a_row`, `back_to_back_hard`, `unknown_memory_key`, `stopped_memory_key`, `stopped_slot`.
+`checkPlan` codes: `invalid_session`, `unknown_activity`, `bad_duration`, `outside_window`, `overlap`, `calendar_conflict`, `load_over_cap`, `hard_when_tired`, `race_day_session`, `no_rest_before_race`, `taper_too_long`, `worn_shoes_long_run`, `break_in_too_long`, `break_in_not_easy`, `too_many_sessions`, `too_many_minutes`, `too_many_days_in_a_row`, `back_to_back_hard`, `unknown_memory_key`, `stopped_memory_key`, `stopped_slot`; with `rules`: `rest_day_rule`, `out_day_rule`, `outside_rule_hours`, `session_length_rule`, `home_day_missing`.
 
 The week is 7 local days from today; a session today starts 60+ minutes after `now` and ends by 22:00. A week may sit 10% over `loadCap`.
 

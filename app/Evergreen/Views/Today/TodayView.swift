@@ -90,6 +90,7 @@ struct TodayView: View {
                     }
                 }
                 GoingOutRow()
+                HomeWorkoutRow()
                 if let problem = model.planProblem, model.aiConnected {
                     Text(problem)
                         .font(.footnote)

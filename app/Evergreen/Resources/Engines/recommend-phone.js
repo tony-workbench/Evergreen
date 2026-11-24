@@ -2064,6 +2064,2020 @@
     return { conflicts };
   }
 
+  // data/movements.json
+  var movements_default = {
+    version: 1,
+    note: "Every movement Evergreen may plan, with one set of words for each. Units are reps and seconds only. Backpack load is in kilograms: 1 litre of water weighs 1 kg.",
+    movements: [
+      {
+        id: "sit_to_stand",
+        name: "Sit down and stand up",
+        pattern: "lower_push",
+        position: "stand",
+        equipment: [
+          "chair"
+        ],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Stand in front of a sturdy chair, feet hip-width apart.",
+        steps: [
+          "Sit down to the chair in 3 seconds, arms crossed on your chest.",
+          "Touch the seat lightly, don't rest.",
+          "Stand up in 1 second."
+        ],
+        feel: "Front of the thighs and the buttocks.",
+        pass: "Buttocks touch the seat each time and you stand all the way up without using your hands.",
+        mistakes: [
+          "Dropping onto the seat instead of lowering.",
+          "Knees falling inwards."
+        ],
+        easier: null,
+        harder: "bodyweight_squat",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "bodyweight_squat",
+        name: "Squat",
+        pattern: "lower_push",
+        position: "stand",
+        equipment: [],
+        level: 2,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Stand with feet shoulder-width apart, toes slightly out.",
+        steps: [
+          "Push your hips back and bend your knees for 3 seconds.",
+          "Stop when your thighs are level with the floor.",
+          "Stand up in 1 second."
+        ],
+        feel: "Front of the thighs and the buttocks.",
+        pass: "Thighs reach level with the floor, heels stay down and knees point the same way as the toes.",
+        mistakes: [
+          "Heels lifting off the floor.",
+          "Knees falling inwards."
+        ],
+        easier: "sit_to_stand",
+        harder: "backpack_squat",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            10,
+            15
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "backpack_squat",
+        name: "Backpack squat",
+        pattern: "lower_push",
+        position: "stand",
+        equipment: [
+          "backpack"
+        ],
+        level: 3,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Stand with feet shoulder-width apart, backpack held against your chest.",
+        steps: [
+          "Hug the backpack to your chest.",
+          "Push your hips back and bend your knees for 3 seconds.",
+          "Stop when your thighs are level with the floor.",
+          "Stand up in 1 second."
+        ],
+        feel: "Front of the thighs and the buttocks.",
+        pass: "Thighs reach level with the floor, heels stay down and the backpack stays against your chest.",
+        mistakes: [
+          "Leaning far forward.",
+          "Knees falling inwards."
+        ],
+        easier: "bodyweight_squat",
+        harder: "single_leg_box_squat",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: [],
+        load: 4
+      },
+      {
+        id: "single_leg_box_squat",
+        name: "One-leg sit down to a chair",
+        pattern: "lower_push",
+        position: "stand",
+        equipment: [
+          "chair"
+        ],
+        level: 4,
+        balance: true,
+        entry: false,
+        gated: true,
+        setup: "Stand in front of a sturdy chair on one leg, arms forward.",
+        steps: [
+          "Lift one foot just off the floor.",
+          "Sit down to the chair on the other leg in 3 seconds.",
+          "Stand up on the same leg in 1 second.",
+          "Do all reps on one side, then the other."
+        ],
+        feel: "Front of the thigh and the buttock of the standing leg.",
+        pass: "Buttocks touch the seat and you stand back up without the lifted foot touching the floor.",
+        mistakes: [
+          "Dropping onto the seat.",
+          "Standing knee falling inwards."
+        ],
+        easier: "backpack_squat",
+        harder: null,
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            5,
+            8
+          ]
+        },
+        sides: 2,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "glute_bridge",
+        name: "Hip lift on the floor",
+        pattern: "lower_pull",
+        position: "floor",
+        equipment: [],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Lie on your back, knees bent, feet flat and hip-width apart, arms by your sides.",
+        steps: [
+          "Push through your heels and lift your hips in 1 second.",
+          "Hold at the top for 1 second.",
+          "Lower in 3 seconds."
+        ],
+        feel: "Buttocks and back of the thighs.",
+        pass: "At the top your shoulders, hips and knees are in one straight line.",
+        mistakes: [
+          "Arching the lower back at the top.",
+          "Pushing through the toes instead of the heels."
+        ],
+        easier: null,
+        harder: "backpack_hip_thrust",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            10,
+            15
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "backpack_hip_thrust",
+        name: "Hip lift with shoulders on the sofa",
+        pattern: "lower_pull",
+        position: "floor",
+        equipment: [
+          "sofa",
+          "backpack"
+        ],
+        level: 3,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Sit on the floor with your upper back against the sofa edge, knees bent, feet flat.",
+        steps: [
+          "Hold the backpack on your hips.",
+          "Push through your heels and lift your hips in 1 second.",
+          "Hold at the top for 1 second.",
+          "Lower in 3 seconds."
+        ],
+        feel: "Buttocks and back of the thighs.",
+        pass: "At the top your shins are upright and your shoulders, hips and knees are in one straight line.",
+        mistakes: [
+          "Arching the lower back at the top.",
+          "Feet too close, so the knees bend past the toes."
+        ],
+        easier: "glute_bridge",
+        harder: "single_leg_glute_bridge",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: [],
+        load: 4
+      },
+      {
+        id: "single_leg_glute_bridge",
+        name: "One-leg hip lift",
+        pattern: "lower_pull",
+        position: "floor",
+        equipment: [],
+        level: 4,
+        balance: false,
+        entry: false,
+        gated: true,
+        setup: "Lie on your back, knees bent, feet flat, arms by your sides.",
+        steps: [
+          "Lift one foot and straighten that leg.",
+          "Push through the other heel and lift your hips in 1 second.",
+          "Lower in 3 seconds.",
+          "Do all reps on one side, then the other."
+        ],
+        feel: "Buttocks and back of the thigh of the working leg.",
+        pass: "At the top both hips are level and in one straight line with the shoulder and the bent knee.",
+        mistakes: [
+          "One hip dropping lower than the other.",
+          "Pushing through the toes."
+        ],
+        easier: "backpack_hip_thrust",
+        harder: null,
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            6,
+            10
+          ]
+        },
+        sides: 2,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "wall_split_squat",
+        name: "Split squat holding the wall",
+        pattern: "lower_push",
+        position: "stand",
+        equipment: [
+          "wall"
+        ],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Stand side-on to a wall, one hand on it, one foot a long step in front of the other.",
+        steps: [
+          "Lower your back knee towards the floor in 3 seconds.",
+          "Stop with the back knee a hand's width above the floor.",
+          "Push up in 1 second.",
+          "Do all reps on one side, then the other."
+        ],
+        feel: "Front of the thigh and the buttock of the front leg.",
+        pass: "The back knee stops a hand's width above the floor and the front knee stays over the front foot.",
+        mistakes: [
+          "Front heel lifting.",
+          "Front knee falling inwards."
+        ],
+        easier: null,
+        harder: "reverse_lunge",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 2,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "reverse_lunge",
+        name: "Step back and lower",
+        pattern: "lower_push",
+        position: "stand",
+        equipment: [],
+        level: 2,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Stand tall, feet hip-width apart, hands on hips.",
+        steps: [
+          "Step one foot back.",
+          "Lower the back knee in 3 seconds to a hand's width above the floor.",
+          "Push through the front heel and step back up in 1 second.",
+          "Change legs each time."
+        ],
+        feel: "Front of the thigh and the buttock of the front leg.",
+        pass: "The back knee stops a hand's width above the floor and you return to standing without a wobble.",
+        mistakes: [
+          "Short step, so the front knee shoots forward.",
+          "Leaning the upper body forward."
+        ],
+        easier: "wall_split_squat",
+        harder: "backpack_reverse_lunge",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "backpack_reverse_lunge",
+        name: "Step back and lower with the backpack",
+        pattern: "lower_push",
+        position: "stand",
+        equipment: [
+          "backpack"
+        ],
+        level: 3,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Stand tall, feet hip-width apart, backpack held against your chest.",
+        steps: [
+          "Hug the backpack to your chest.",
+          "Step one foot back and lower the back knee in 3 seconds.",
+          "Push through the front heel and step back up in 1 second.",
+          "Change legs each time."
+        ],
+        feel: "Front of the thigh and the buttock of the front leg.",
+        pass: "The back knee stops a hand's width above the floor and the backpack stays against your chest.",
+        mistakes: [
+          "Short step, so the front knee shoots forward.",
+          "Leaning the upper body forward."
+        ],
+        easier: "reverse_lunge",
+        harder: "rear_foot_split_squat",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            6,
+            10
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: [],
+        load: 4
+      },
+      {
+        id: "rear_foot_split_squat",
+        name: "Split squat with the back foot on the sofa",
+        pattern: "lower_push",
+        position: "stand",
+        equipment: [
+          "sofa"
+        ],
+        level: 4,
+        balance: true,
+        entry: false,
+        gated: true,
+        setup: "Stand a long step in front of the sofa, the top of your back foot resting on the seat.",
+        steps: [
+          "Lower your back knee in 3 seconds.",
+          "Stop with the front thigh level with the floor.",
+          "Push up through the front heel in 1 second.",
+          "Do all reps on one side, then the other."
+        ],
+        feel: "Front of the thigh and the buttock of the front leg.",
+        pass: "The front thigh reaches level with the floor and the front heel stays down.",
+        mistakes: [
+          "Front foot too close to the sofa.",
+          "Front knee falling inwards."
+        ],
+        easier: "backpack_reverse_lunge",
+        harder: null,
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            6,
+            10
+          ]
+        },
+        sides: 2,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "hip_hinge",
+        name: "Push the hips back",
+        pattern: "lower_pull",
+        position: "stand",
+        equipment: [],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Stand with feet hip-width apart, knees a little bent, hands on the front of your thighs.",
+        steps: [
+          "Keep your back straight and push your hips back in 3 seconds.",
+          "Stop when your upper body is about halfway to level.",
+          "Push your hips forward to stand in 1 second."
+        ],
+        feel: "Back of the thighs and the buttocks.",
+        pass: "Your hands slide down to just above the knees, your back stays straight and your knees don't bend further.",
+        mistakes: [
+          "Rounding the back.",
+          "Bending the knees into a squat."
+        ],
+        easier: null,
+        harder: "backpack_hip_hinge",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            10,
+            15
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "backpack_hip_hinge",
+        name: "Push the hips back with the backpack",
+        pattern: "lower_pull",
+        position: "stand",
+        equipment: [
+          "backpack"
+        ],
+        level: 2,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Stand with feet hip-width apart, knees a little bent, backpack hanging in front of your thighs.",
+        steps: [
+          "Hold the backpack by its top handle in both hands.",
+          "Keep your back straight and push your hips back in 3 seconds.",
+          "Stop when the backpack reaches your knees.",
+          "Push your hips forward to stand in 1 second."
+        ],
+        feel: "Back of the thighs and the buttocks.",
+        pass: "The backpack reaches the knees with a straight back, and you finish standing tall.",
+        mistakes: [
+          "Rounding the back.",
+          "Lifting with the arms."
+        ],
+        easier: "hip_hinge",
+        harder: "staggered_hip_hinge",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: [],
+        load: 4
+      },
+      {
+        id: "staggered_hip_hinge",
+        name: "Push the hips back, one foot ahead",
+        pattern: "lower_pull",
+        position: "stand",
+        equipment: [
+          "backpack"
+        ],
+        level: 3,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Stand with one foot half a step ahead of the other, backpack in both hands.",
+        steps: [
+          "Put most of your weight on the front foot.",
+          "Keep your back straight and push your hips back in 3 seconds until the backpack reaches the front knee.",
+          "Stand up in 1 second.",
+          "Do all reps on one side, then the other."
+        ],
+        feel: "Back of the thigh and the buttock of the front leg.",
+        pass: "The backpack reaches the front knee with a straight back and the back foot only rests on its toes.",
+        mistakes: [
+          "Rounding the back.",
+          "Shifting the weight to the back foot."
+        ],
+        easier: "backpack_hip_hinge",
+        harder: "single_leg_hinge",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 2,
+        rest: 60,
+        images: [],
+        load: 4
+      },
+      {
+        id: "single_leg_hinge",
+        name: "One-leg reach",
+        pattern: "lower_pull",
+        position: "stand",
+        equipment: [],
+        level: 4,
+        balance: true,
+        entry: false,
+        gated: true,
+        setup: "Stand on one leg, the other foot just off the floor, arms hanging.",
+        steps: [
+          "Lean forward from the hips while the free leg goes back in 3 seconds.",
+          "Stop when your body and the back leg are near level.",
+          "Come back up in 1 second.",
+          "Do all reps on one side, then the other."
+        ],
+        feel: "Back of the thigh and the buttock of the standing leg.",
+        pass: "Your upper body and the back leg form one straight line and the free foot doesn't touch down.",
+        mistakes: [
+          "Twisting the hips open.",
+          "Rounding the back."
+        ],
+        easier: "staggered_hip_hinge",
+        harder: null,
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            6,
+            10
+          ]
+        },
+        sides: 2,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "calf_raise",
+        name: "Rise onto the toes",
+        pattern: "lower_push",
+        position: "stand",
+        equipment: [],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Stand with feet hip-width apart, fingertips on a wall for balance.",
+        steps: [
+          "Rise onto your toes in 1 second.",
+          "Hold at the top for 1 second.",
+          "Lower in 3 seconds."
+        ],
+        feel: "Calves.",
+        pass: "Heels lift as high as they go each time and come all the way back down.",
+        mistakes: [
+          "Bouncing.",
+          "Rolling onto the outer edge of the feet."
+        ],
+        easier: null,
+        harder: "wall_single_calf_raise",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            12,
+            20
+          ]
+        },
+        sides: 1,
+        rest: 45,
+        images: []
+      },
+      {
+        id: "wall_single_calf_raise",
+        name: "One-foot rise, hand on the wall",
+        pattern: "lower_push",
+        position: "stand",
+        equipment: [
+          "wall"
+        ],
+        level: 2,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Stand on one foot, one hand on a wall.",
+        steps: [
+          "Lift one foot.",
+          "Rise onto the toes of the other in 1 second.",
+          "Lower in 3 seconds.",
+          "Do all reps on one side, then the other."
+        ],
+        feel: "Calf of the standing leg.",
+        pass: "The heel lifts as high as it goes and comes all the way down, with the hand only steadying you.",
+        mistakes: [
+          "Pushing on the wall to rise.",
+          "Bending the knee."
+        ],
+        easier: "calf_raise",
+        harder: "book_edge_calf_raise",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            10,
+            15
+          ]
+        },
+        sides: 2,
+        rest: 45,
+        images: []
+      },
+      {
+        id: "book_edge_calf_raise",
+        name: "One-foot rise off a book",
+        pattern: "lower_push",
+        position: "stand",
+        equipment: [
+          "book",
+          "wall"
+        ],
+        level: 3,
+        balance: true,
+        entry: false,
+        gated: true,
+        setup: "Stand on one foot with the ball of the foot on a thick book, one hand on a wall.",
+        steps: [
+          "Let your heel drop below the book edge in 3 seconds.",
+          "Rise as high as you can in 1 second.",
+          "Do all reps on one side, then the other."
+        ],
+        feel: "Calf of the standing leg.",
+        pass: "The heel goes below the book edge and then rises above it every time.",
+        mistakes: [
+          "Bending the knee.",
+          "Rushing the way down."
+        ],
+        easier: "wall_single_calf_raise",
+        harder: null,
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 2,
+        rest: 45,
+        images: []
+      },
+      {
+        id: "wall_push_up",
+        name: "Push-up against the wall",
+        pattern: "upper_push",
+        position: "wall",
+        equipment: [
+          "wall"
+        ],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Stand an arm's length from a wall, hands on it at shoulder height.",
+        steps: [
+          "Lower your chest to the wall in 3 seconds.",
+          "Keep your body straight from head to heels.",
+          "Push back in 1 second."
+        ],
+        feel: "Chest, front of the shoulders and back of the arms.",
+        pass: "Your nose comes within a fist of the wall and your hips stay in line with your shoulders and heels.",
+        mistakes: [
+          "Hips sagging or sticking out.",
+          "Elbows flaring straight out to the sides."
+        ],
+        easier: null,
+        harder: "table_push_up",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            10,
+            15
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "table_push_up",
+        name: "Push-up on the table edge",
+        pattern: "upper_push",
+        position: "wall",
+        equipment: [
+          "table"
+        ],
+        level: 2,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Hands on the edge of a sturdy table, shoulder-width apart, feet back so your body is straight.",
+        steps: [
+          "Lower your chest to the table edge in 3 seconds.",
+          "Keep your body straight.",
+          "Push back up in 1 second."
+        ],
+        feel: "Chest, front of the shoulders and back of the arms.",
+        pass: "Your chest comes within a fist of the edge and your hips don't sag.",
+        mistakes: [
+          "Hips sagging.",
+          "Elbows flaring straight out to the sides."
+        ],
+        easier: "wall_push_up",
+        harder: "knee_push_up",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "knee_push_up",
+        name: "Push-up on the knees",
+        pattern: "upper_push",
+        position: "floor",
+        equipment: [],
+        level: 3,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Hands on the floor under your shoulders, knees on the floor, body straight from knees to head.",
+        steps: [
+          "Lower your chest to the floor in 3 seconds.",
+          "Keep a straight line from knees to head.",
+          "Push back up in 1 second."
+        ],
+        feel: "Chest, front of the shoulders and back of the arms.",
+        pass: "Your chest comes within a fist of the floor and your hips stay in line.",
+        mistakes: [
+          "Hips piking up.",
+          "Head dropping first."
+        ],
+        easier: "table_push_up",
+        harder: "push_up",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "push_up",
+        name: "Push-up",
+        pattern: "upper_push",
+        position: "floor",
+        equipment: [],
+        level: 4,
+        balance: false,
+        entry: false,
+        gated: true,
+        setup: "Hands on the floor under your shoulders, legs straight behind you on your toes.",
+        steps: [
+          "Lower your chest to the floor in 3 seconds.",
+          "Keep your body straight from head to heels.",
+          "Push back up in 1 second."
+        ],
+        feel: "Chest, front of the shoulders and back of the arms.",
+        pass: "Your chest comes within a fist of the floor and your hips stay in line with your shoulders and heels.",
+        mistakes: [
+          "Hips sagging.",
+          "Only the head going down."
+        ],
+        easier: "knee_push_up",
+        harder: "feet_up_push_up",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            6,
+            12
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "feet_up_push_up",
+        name: "Push-up with feet on the sofa",
+        pattern: "upper_push",
+        position: "floor",
+        equipment: [
+          "sofa"
+        ],
+        level: 5,
+        balance: false,
+        entry: false,
+        gated: true,
+        setup: "Hands on the floor under your shoulders, feet on the sofa seat behind you.",
+        steps: [
+          "Lower your chest to the floor in 3 seconds.",
+          "Keep your body straight.",
+          "Push back up in 1 second."
+        ],
+        feel: "Chest, front of the shoulders and back of the arms.",
+        pass: "Your chest comes within a fist of the floor and your hips stay in line.",
+        mistakes: [
+          "Hips sagging.",
+          "Hands too far forward."
+        ],
+        easier: "push_up",
+        harder: "pike_push_up",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            6,
+            10
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "pike_push_up",
+        name: "Hips-high push-up",
+        pattern: "upper_push",
+        position: "floor",
+        equipment: [],
+        level: 5,
+        balance: false,
+        entry: false,
+        gated: true,
+        setup: "Hands and feet on the floor, hips high so your body makes an upside-down V.",
+        steps: [
+          "Bend your elbows and lower the top of your head towards the floor in 3 seconds.",
+          "Push back up in 1 second."
+        ],
+        feel: "Shoulders and back of the arms.",
+        pass: "The top of your head comes within a fist of the floor between your hands, hips stay high.",
+        mistakes: [
+          "Dropping the hips.",
+          "Hands too close to the feet."
+        ],
+        easier: "feet_up_push_up",
+        harder: null,
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            5,
+            8
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: []
+      },
+      {
+        id: "backpack_press",
+        name: "Backpack press overhead",
+        pattern: "upper_push",
+        position: "stand",
+        equipment: [
+          "backpack"
+        ],
+        level: 2,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Stand tall, feet hip-width apart, backpack held by its sides at your chest.",
+        steps: [
+          "Press the backpack straight up in 1 second until your arms are straight.",
+          "Lower it to your chest in 3 seconds."
+        ],
+        feel: "Shoulders and back of the arms.",
+        pass: "At the top your arms are straight beside your ears and your lower back stays flat.",
+        mistakes: [
+          "Arching the back.",
+          "Pushing the backpack forward, not up."
+        ],
+        easier: null,
+        harder: "slow_backpack_press",
+        tempo: {
+          down: 3,
+          hold: 0,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: [],
+        load: 2
+      },
+      {
+        id: "slow_backpack_press",
+        name: "Slow backpack press overhead",
+        pattern: "upper_push",
+        position: "stand",
+        equipment: [
+          "backpack"
+        ],
+        level: 3,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Stand tall, feet hip-width apart, backpack held by its sides at your chest.",
+        steps: [
+          "Press the backpack up in 1 second.",
+          "Hold at the top for 2 seconds.",
+          "Lower it to your chest in 4 seconds."
+        ],
+        feel: "Shoulders and back of the arms.",
+        pass: "Arms straight beside the ears for the full 2 seconds and the lower back stays flat.",
+        mistakes: [
+          "Arching the back.",
+          "Rushing the way down."
+        ],
+        easier: "backpack_press",
+        harder: null,
+        tempo: {
+          down: 4,
+          hold: 2,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            6,
+            10
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: [],
+        load: 2
+      },
+      {
+        id: "backpack_row",
+        name: "Backpack row",
+        pattern: "upper_pull",
+        position: "stand",
+        equipment: [
+          "backpack"
+        ],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Feet hip-width apart, sit your hips back and lean forward to about 45 degrees with a straight back, backpack hanging from both hands.",
+        steps: [
+          "Pull the backpack to your lower ribs in 1 second.",
+          "Squeeze your shoulder blades for 1 second.",
+          "Lower it in 3 seconds."
+        ],
+        feel: "Upper back and the back of the shoulders.",
+        pass: "The backpack touches your lower ribs each time and your back stays straight and still.",
+        mistakes: [
+          "Standing up as you pull.",
+          "Rounding the back."
+        ],
+        easier: null,
+        harder: "one_arm_row",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            10,
+            15
+          ]
+        },
+        sides: 1,
+        rest: 60,
+        images: [],
+        load: 4
+      },
+      {
+        id: "one_arm_row",
+        name: "One-arm row, hand on a chair",
+        pattern: "upper_pull",
+        position: "stand",
+        equipment: [
+          "backpack",
+          "chair"
+        ],
+        level: 2,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "One hand on a chair seat, the same-side foot back, back straight and level, backpack in the free hand.",
+        steps: [
+          "Pull the backpack to your hip in 1 second.",
+          "Hold for 1 second.",
+          "Lower it in 3 seconds.",
+          "Do all reps on one side, then the other."
+        ],
+        feel: "Upper back and the back of the shoulder.",
+        pass: "The backpack reaches your hip, your elbow passes your back and your shoulders stay level.",
+        mistakes: [
+          "Twisting the body to lift.",
+          "Shrugging the shoulder up."
+        ],
+        easier: "backpack_row",
+        harder: "slow_one_arm_row",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 2,
+        rest: 60,
+        images: [],
+        load: 4
+      },
+      {
+        id: "slow_one_arm_row",
+        name: "Slow one-arm row",
+        pattern: "upper_pull",
+        position: "stand",
+        equipment: [
+          "backpack",
+          "chair"
+        ],
+        level: 3,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "One hand on a chair seat, back straight and level, backpack in the free hand.",
+        steps: [
+          "Pull the backpack to your hip in 1 second.",
+          "Hold for 2 seconds.",
+          "Lower it in 4 seconds.",
+          "Do all reps on one side, then the other."
+        ],
+        feel: "Upper back and the back of the shoulder.",
+        pass: "The backpack stays at your hip for the full 2 seconds and your shoulders stay level.",
+        mistakes: [
+          "Twisting the body to lift.",
+          "Rushing the way down."
+        ],
+        easier: "one_arm_row",
+        harder: null,
+        tempo: {
+          down: 4,
+          hold: 2,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 2,
+        rest: 60,
+        images: [],
+        load: 4
+      },
+      {
+        id: "prone_arm_raise",
+        name: "Arms up lying face down",
+        pattern: "upper_pull",
+        position: "floor",
+        equipment: [],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Lie face down, arms stretched forward in a Y, thumbs up, forehead on a folded towel.",
+        steps: [
+          "Lift both arms off the floor in 1 second.",
+          "Hold for 1 second.",
+          "Lower in 3 seconds."
+        ],
+        feel: "Upper back and the back of the shoulders.",
+        pass: "Both hands lift a fist's height off the floor and your forehead stays down.",
+        mistakes: [
+          "Lifting the head and chest instead of the arms.",
+          "Bending the elbows."
+        ],
+        easier: null,
+        harder: "prone_arm_raise_hold",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            10,
+            15
+          ]
+        },
+        sides: 1,
+        rest: 45,
+        images: []
+      },
+      {
+        id: "prone_arm_raise_hold",
+        name: "Arms up lying face down, with a hold",
+        pattern: "upper_pull",
+        position: "floor",
+        equipment: [],
+        level: 2,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Lie face down, arms stretched forward in a Y, thumbs up, forehead on a folded towel.",
+        steps: [
+          "Lift both arms off the floor in 1 second.",
+          "Hold for 2 seconds.",
+          "Lower in 3 seconds."
+        ],
+        feel: "Upper back and the back of the shoulders.",
+        pass: "Both hands stay a fist's height off the floor for the full 2 seconds.",
+        mistakes: [
+          "Lifting the head.",
+          "Bending the elbows."
+        ],
+        easier: "prone_arm_raise",
+        harder: null,
+        tempo: {
+          down: 3,
+          hold: 2,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 1,
+        rest: 45,
+        images: []
+      },
+      {
+        id: "backpack_curl",
+        name: "Backpack curl",
+        pattern: "upper_pull",
+        position: "stand",
+        equipment: [
+          "backpack"
+        ],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Stand tall, backpack held by its top handle with both hands, arms straight.",
+        steps: [
+          "Bend your elbows and lift the backpack to your chest in 1 second.",
+          "Lower it in 3 seconds until your arms are straight."
+        ],
+        feel: "Front of the upper arms.",
+        pass: "Your elbows stay at your sides and the backpack goes from straight arms to your chest each time.",
+        mistakes: [
+          "Swinging the body.",
+          "Elbows drifting forward."
+        ],
+        easier: null,
+        harder: null,
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            10,
+            15
+          ]
+        },
+        sides: 1,
+        rest: 45,
+        images: [],
+        load: 2
+      },
+      {
+        id: "dead_bug",
+        name: "Opposite arm and leg out, lying on your back",
+        pattern: "core",
+        position: "floor",
+        equipment: [],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Lie on your back, arms pointing at the ceiling, knees bent at 90 degrees above your hips.",
+        steps: [
+          "Reach one arm back and the opposite leg out in 3 seconds.",
+          "Stop just above the floor.",
+          "Bring them back in 1 second.",
+          "Change sides each time."
+        ],
+        feel: "Stomach.",
+        pass: "Your lower back stays pressed to the floor and the moving heel stops just above it.",
+        mistakes: [
+          "Lower back lifting off the floor.",
+          "Moving the arm and leg of the same side."
+        ],
+        easier: null,
+        harder: "forearm_plank",
+        tempo: {
+          down: 3,
+          hold: 1,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 1,
+        rest: 45,
+        images: []
+      },
+      {
+        id: "forearm_plank",
+        name: "Forearm plank",
+        pattern: "core",
+        position: "floor",
+        equipment: [],
+        level: 2,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Lie face down, forearms on the floor under your shoulders, on your toes.",
+        steps: [
+          "Lift your hips so your body is straight from head to heels.",
+          "Hold, breathing normally."
+        ],
+        feel: "Stomach and front of the shoulders.",
+        pass: "Shoulders, hips and heels stay in one straight line for the whole time.",
+        mistakes: [
+          "Hips sagging.",
+          "Hips piking up."
+        ],
+        easier: "dead_bug",
+        harder: "long_lever_plank",
+        tempo: null,
+        dose: {
+          sets: 3,
+          seconds: [
+            20,
+            40
+          ]
+        },
+        sides: 1,
+        rest: 45,
+        images: []
+      },
+      {
+        id: "long_lever_plank",
+        name: "Forearm plank, elbows further forward",
+        pattern: "core",
+        position: "floor",
+        equipment: [],
+        level: 3,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Lie face down on your forearms, on your toes.",
+        steps: [
+          "Place your elbows a hand ahead of your shoulders.",
+          "Lift your hips so your body is straight.",
+          "Hold, breathing normally."
+        ],
+        feel: "Stomach.",
+        pass: "Elbows stay ahead of the shoulders and the body stays in one straight line for the whole time.",
+        mistakes: [
+          "Hips sagging.",
+          "Holding your breath."
+        ],
+        easier: "forearm_plank",
+        harder: null,
+        tempo: null,
+        dose: {
+          sets: 3,
+          seconds: [
+            20,
+            30
+          ]
+        },
+        sides: 1,
+        rest: 45,
+        images: []
+      },
+      {
+        id: "kneeling_side_plank",
+        name: "Side plank on the knees",
+        pattern: "core",
+        position: "floor",
+        equipment: [],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Lie on your side, elbow under the shoulder, knees bent behind you.",
+        steps: [
+          "Lift your hips off the floor.",
+          "Hold, then do the other side."
+        ],
+        feel: "Side of the stomach.",
+        pass: "Shoulder, hip and knee stay in one straight line for the whole time.",
+        mistakes: [
+          "Hips dropping.",
+          "Leaning forward."
+        ],
+        easier: null,
+        harder: "side_plank",
+        tempo: null,
+        dose: {
+          sets: 3,
+          seconds: [
+            15,
+            30
+          ]
+        },
+        sides: 2,
+        rest: 30,
+        images: []
+      },
+      {
+        id: "side_plank",
+        name: "Side plank",
+        pattern: "core",
+        position: "floor",
+        equipment: [],
+        level: 2,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Lie on your side, elbow under the shoulder, legs straight and stacked.",
+        steps: [
+          "Lift your hips off the floor.",
+          "Hold, then do the other side."
+        ],
+        feel: "Side of the stomach.",
+        pass: "Shoulder, hip and ankle stay in one straight line for the whole time.",
+        mistakes: [
+          "Hips dropping.",
+          "Leaning forward."
+        ],
+        easier: "kneeling_side_plank",
+        harder: null,
+        tempo: null,
+        dose: {
+          sets: 3,
+          seconds: [
+            15,
+            30
+          ]
+        },
+        sides: 2,
+        rest: 30,
+        images: []
+      },
+      {
+        id: "bird_dog",
+        name: "Opposite arm and leg out, on hands and knees",
+        pattern: "core",
+        position: "floor",
+        equipment: [],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "On hands and knees, hands under shoulders, knees under hips.",
+        steps: [
+          "Reach one arm forward and the opposite leg back in 1 second.",
+          "Hold for 2 seconds.",
+          "Bring them back in 2 seconds.",
+          "Change sides each time."
+        ],
+        feel: "Stomach, lower back and buttocks.",
+        pass: "Arm and leg reach level with your back and your hips stay square to the floor.",
+        mistakes: [
+          "Twisting the hips.",
+          "Arching the lower back."
+        ],
+        easier: null,
+        harder: null,
+        tempo: {
+          down: 2,
+          hold: 2,
+          up: 1
+        },
+        dose: {
+          sets: 3,
+          reps: [
+            8,
+            12
+          ]
+        },
+        sides: 1,
+        rest: 30,
+        images: []
+      },
+      {
+        id: "march_in_place",
+        name: "March on the spot",
+        pattern: "snack",
+        position: "stand",
+        equipment: [],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Stand tall.",
+        steps: [
+          "March, lifting each knee to hip height.",
+          "Swing your arms."
+        ],
+        feel: "Front of the hips and the heart rate going up.",
+        pass: "Each knee reaches hip height and you keep going for the whole time.",
+        mistakes: [
+          "Leaning back.",
+          "Lifting the knees only a little."
+        ],
+        easier: null,
+        harder: "high_knees",
+        tempo: null,
+        dose: {
+          sets: 1,
+          seconds: [
+            60,
+            90
+          ]
+        },
+        sides: 1,
+        rest: 0,
+        images: []
+      },
+      {
+        id: "high_knees",
+        name: "Quick high knees",
+        pattern: "snack",
+        position: "stand",
+        equipment: [],
+        level: 2,
+        balance: false,
+        entry: false,
+        gated: false,
+        setup: "Stand tall.",
+        steps: [
+          "Run on the spot, bringing each knee to hip height.",
+          "Land softly on the balls of your feet."
+        ],
+        feel: "Front of the hips and the heart rate going up.",
+        pass: "Each knee reaches hip height and you keep going for the whole time.",
+        mistakes: [
+          "Leaning back.",
+          "Landing hard."
+        ],
+        easier: "march_in_place",
+        harder: null,
+        tempo: null,
+        dose: {
+          sets: 2,
+          seconds: [
+            30,
+            45
+          ]
+        },
+        sides: 1,
+        rest: 30,
+        images: []
+      },
+      {
+        id: "step_up",
+        name: "Step up and down",
+        pattern: "snack",
+        position: "stand",
+        equipment: [
+          "step"
+        ],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Stand facing a bottom stair or a sturdy step.",
+        steps: [
+          "Step up with one foot and stand tall on the step.",
+          "Step down with the same foot.",
+          "Change the leading foot every 10 steps."
+        ],
+        feel: "Front of the thighs and the heart rate going up.",
+        pass: "You stand fully upright on the step each time and keep going for the whole time.",
+        mistakes: [
+          "Pushing off the back foot.",
+          "Not standing tall at the top."
+        ],
+        easier: null,
+        harder: null,
+        tempo: null,
+        dose: {
+          sets: 2,
+          seconds: [
+            60,
+            90
+          ]
+        },
+        sides: 1,
+        rest: 30,
+        images: []
+      },
+      {
+        id: "squat_reach",
+        name: "Squat and reach up",
+        pattern: "snack",
+        position: "stand",
+        equipment: [],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Stand with feet shoulder-width apart.",
+        steps: [
+          "Squat until your thighs are level with the floor in 2 seconds.",
+          "Stand up and reach both arms straight overhead in 1 second."
+        ],
+        feel: "Thighs, buttocks and shoulders.",
+        pass: "Thighs reach level with the floor and your arms finish straight beside your ears.",
+        mistakes: [
+          "Heels lifting.",
+          "Half reach overhead."
+        ],
+        easier: null,
+        harder: null,
+        tempo: {
+          down: 2,
+          hold: 0,
+          up: 1
+        },
+        dose: {
+          sets: 2,
+          reps: [
+            10,
+            15
+          ]
+        },
+        sides: 1,
+        rest: 30,
+        images: []
+      },
+      {
+        id: "shadow_boxing",
+        name: "Shadow boxing",
+        pattern: "snack",
+        position: "stand",
+        equipment: [],
+        level: 1,
+        balance: false,
+        entry: true,
+        gated: false,
+        setup: "Stand with one foot half a step ahead, knees soft, fists by your chin.",
+        steps: [
+          "Punch straight ahead, one hand then the other.",
+          "Turn your back heel with each punch.",
+          "Bring each hand back to your chin."
+        ],
+        feel: "Shoulders, the middle of the body and the heart rate going up.",
+        pass: "Each punch reaches a straight arm and the hand comes back to your chin before the next.",
+        mistakes: [
+          "Dropping the hands.",
+          "Locking the elbow hard."
+        ],
+        easier: null,
+        harder: null,
+        tempo: null,
+        dose: {
+          sets: 2,
+          seconds: [
+            45,
+            60
+          ]
+        },
+        sides: 1,
+        rest: 30,
+        images: []
+      }
+    ]
+  };
+
+  // src/content.mjs
+  var MOVEMENTS = movements_default.movements;
+  var BY_ID = new Map(MOVEMENTS.map((m) => [m.id, m]));
+  var movementOf = (id) => BY_ID.get(id) ?? null;
+  var MAIN_PATTERNS = ["lower_push", "lower_pull", "upper_push", "upper_pull"];
+  var WEEK_FLOOR_SETS = 4;
+  var WEEK_TARGET_SETS = [8, 10];
+  var MAX_NEW = 1;
+  var SETUP_SECONDS = 30;
+  var LOAD_STEP_KG = 1;
+  var LOAD_MAX_KG = 12;
+  var MIN_ITEMS = 3;
+  var ROOT = /* @__PURE__ */ new Map();
+  for (const m of MOVEMENTS) {
+    let r = m;
+    while (r.easier) r = BY_ID.get(r.easier);
+    ROOT.set(m.id, r.id);
+  }
+  var CORE = ["dead_bug", "bird_dog", "kneeling_side_plank"];
+  var SLOTS = {
+    full: ["sit_to_stand", "wall_push_up", "backpack_row", "hip_hinge", "core"],
+    lower: ["sit_to_stand", "hip_hinge", "wall_split_squat", "glute_bridge", "core"],
+    upper: ["wall_push_up", "backpack_row", "backpack_press", "prone_arm_raise", "core"],
+    full_lower: ["sit_to_stand", "hip_hinge", "wall_split_squat", "wall_push_up", "backpack_row"],
+    full_upper: ["wall_push_up", "backpack_row", "backpack_press", "sit_to_stand", "core"]
+  };
+  var STAND_INS = {
+    sit_to_stand: ["wall_split_squat", "calf_raise"],
+    hip_hinge: ["glute_bridge"],
+    glute_bridge: ["hip_hinge"],
+    wall_split_squat: ["sit_to_stand", "calf_raise"],
+    wall_push_up: ["backpack_press"],
+    backpack_press: ["wall_push_up"],
+    backpack_row: ["prone_arm_raise", "backpack_curl"],
+    prone_arm_raise: ["backpack_row", "backpack_curl"]
+  };
+  function readHistory2(raw) {
+    if (raw === void 0 || raw === null) return [];
+    if (!Array.isArray(raw)) throw new InputError("bad_content");
+    return raw.map((h) => {
+      if (!h || typeof h.movementId !== "string" || !Array.isArray(h.sets) || !h.sets.every((n) => Number.isFinite(n) && n >= 0)) throw new InputError("bad_content");
+      return { movementId: h.movementId, day: String(h.day ?? ""), sets: h.sets, load: Number.isFinite(h.load) ? h.load : null };
+    }).sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
+  }
+  var owns = (rules, m) => m.equipment.every((e) => rules.equipment.includes(e) || ALWAYS_THERE.includes(e));
+  var top = (m) => (m.dose.reps ?? m.dose.seconds)[1];
+  function mastered(history, id) {
+    const m = movementOf(id);
+    const times = history.filter((h) => h.movementId === id).slice(-2);
+    return times.length === 2 && times.every((t) => t.sets.length >= m.dose.sets && t.sets.every((n) => n >= top(m)));
+  }
+  var doneBefore = (history, id) => history.some((h) => h.movementId === id);
+  function blockOf(rules, history, id) {
+    const m = movementOf(id);
+    if (!m) return "unknown_movement";
+    if (!owns(rules, m)) return "equipment_not_owned";
+    if (rules.avoid.includes(id)) return "avoided_movement";
+    if (rules.movements[id] === "cannot") return "cannot_do";
+    if (!earned(rules, history, m)) return "gated_movement";
+    return null;
+  }
+  function earned(rules, history, m) {
+    if (m.entry || rules.movements[m.id] === "can" || doneBefore(history, m.id)) return true;
+    const before = m.easier && movementOf(m.easier);
+    if (!before) return true;
+    if (!owns(rules, before)) return earned(rules, history, before);
+    return mastered(history, before.id);
+  }
+  var isNew = (rules, history, m) => !m.entry && !doneBefore(history, m.id) && rules.movements[m.id] !== "can" && !(m.easier && !owns(rules, movementOf(m.easier)));
+  function pickInChain(rules, history, root, allowNew) {
+    let pick = null;
+    for (let m = movementOf(root); m; m = m.harder ? movementOf(m.harder) : null) {
+      const block = blockOf(rules, history, m.id);
+      if (block === "equipment_not_owned") continue;
+      if (block === "gated_movement") break;
+      if (block) {
+        if (block === "cannot_do" || block === "avoided_movement") break;
+        continue;
+      }
+      if (isNew(rules, history, m) && !allowNew) break;
+      pick = m;
+      if (isNew(rules, history, m)) break;
+    }
+    return pick;
+  }
+  var repSeconds = (m) => m.tempo ? m.tempo.down + m.tempo.hold + m.tempo.up : 3;
+  var middle = ([lo, hi]) => (lo + hi) / 2;
+  function itemSeconds(item) {
+    const m = movementOf(item.movementId);
+    const work = item.reps ? middle(item.reps) * repSeconds(m) : middle(item.seconds);
+    return item.sets * work * m.sides + Math.max(0, item.sets - 1) * item.rest + SETUP_SECONDS;
+  }
+  var sessionMinutes = (items) => Math.ceil(items.reduce((sum, i) => sum + itemSeconds(i), 0) / 60);
+  function lastLoad(history, id) {
+    const times = history.filter((h) => h.movementId === id && h.load !== null);
+    return times.length ? times[times.length - 1].load : null;
+  }
+  function itemFor(m, history, loads, sets) {
+    const item = { movementId: m.id, sets, rest: m.rest, isNew: false };
+    if (m.dose.reps) item.reps = [...m.dose.reps];
+    else item.seconds = [...m.dose.seconds];
+    if (m.equipment.includes("backpack")) {
+      const set = Number.isFinite(loads[m.id]) ? loads[m.id] : null;
+      const last = lastLoad(history, m.id);
+      let load = set ?? last ?? m.load ?? 2;
+      if (set === null && last !== null && mastered(history, m.id)) load += LOAD_STEP_KG;
+      item.load = Math.min(LOAD_MAX_KG, Math.max(1, load));
+    }
+    return item;
+  }
+  function readSessionRequest(a) {
+    if (!a || typeof a !== "object") throw new InputError("bad_content");
+    const rules = readRules(a.rules ?? {});
+    const focus = a.focus ?? "full";
+    if (!FOCUS.includes(focus)) throw new InputError("bad_content");
+    const minutes = Number.isInteger(a.minutes) ? a.minutes : rules.session.max;
+    if (minutes < 5 || minutes > 120) throw new InputError("bad_content");
+    const loads = a.loads && typeof a.loads === "object" && !Array.isArray(a.loads) ? a.loads : {};
+    return {
+      rules,
+      focus,
+      minutes,
+      loads,
+      history: readHistory2(a.history),
+      turn: Number.isInteger(a.turn) ? a.turn : 0,
+      easeOff: Number.isFinite(a.lastPain) && a.lastPain >= 4,
+      deload: a.deload === true,
+      sessionId: typeof a.sessionId === "string" ? a.sessionId : null
+    };
+  }
+  function buildSession(req) {
+    const { rules, history, focus, loads } = req;
+    const slots = SLOTS[focus].map((s) => s === "core" ? CORE[req.turn % CORE.length] : s);
+    const items = [];
+    let newOnes = 0;
+    const used = /* @__PURE__ */ new Set();
+    for (const slot of slots) {
+      let pick = null;
+      for (const root of [slot, ...STAND_INS[slot] ?? []]) {
+        if (used.has(root)) continue;
+        pick = pickInChain(rules, history, root, newOnes < MAX_NEW);
+        if (pick) {
+          used.add(root);
+          break;
+        }
+      }
+      if (!pick || items.some((i) => i.movementId === pick.id)) continue;
+      const fresh = isNew(rules, history, pick);
+      if (fresh) newOnes += 1;
+      let sets = pick.dose.sets;
+      if (req.easeOff || req.deload) sets = Math.max(1, sets - 1);
+      items.push({ ...itemFor(pick, history, loads, sets), isNew: fresh });
+    }
+    fitTime(items, req.minutes);
+    return items;
+  }
+  function fitTime(items, minutes) {
+    while (sessionMinutes(items) > minutes && items.length > MIN_ITEMS) items.pop();
+    while (sessionMinutes(items) > minutes) {
+      const longest = items.filter((i) => i.sets > 1).sort((a, b) => itemSeconds(b) - itemSeconds(a))[0];
+      if (!longest) break;
+      longest.sets -= 1;
+    }
+  }
+  var contentOf = (req, items) => ({ sessionId: req.sessionId, focus: req.focus, minutes: sessionMinutes(items), items });
+  function workoutContent(a) {
+    const req = readSessionRequest(a);
+    return { content: contentOf(req, buildSession(req)) };
+  }
+  var setsByPattern = (contents) => {
+    const out = Object.fromEntries(MAIN_PATTERNS.map((p) => [p, 0]));
+    for (const c of contents) for (const i of c.items) {
+      const p = movementOf(i.movementId)?.pattern;
+      if (p in out) out[p] += i.sets;
+    }
+    return out;
+  };
+  function weekContent(a) {
+    if (!a || !Array.isArray(a.sessions)) throw new InputError("bad_content");
+    const reqs = a.sessions.map((s, turn) => readSessionRequest({ ...a, ...s, turn }));
+    const contents = reqs.map((r) => contentOf(r, buildSession(r)));
+    for (const pattern of MAIN_PATTERNS) {
+      let guard = 0;
+      while (setsByPattern(contents)[pattern] < WEEK_FLOOR_SETS && guard++ < 8) {
+        if (!addSet(contents, reqs, pattern)) break;
+      }
+    }
+    const sets = setsByPattern(contents);
+    const short = MAIN_PATTERNS.filter((p) => contents.length > 0 && sets[p] < WEEK_TARGET_SETS[0]);
+    const note = short.length ? `This week has ${short.map((p) => `${sets[p]} sets of ${PATTERN_WORDS[p]}`).join(", ")}, below the ${WEEK_TARGET_SETS[0]} to ${WEEK_TARGET_SETS[1]} aimed for.` : null;
+    return { contents, setsByPattern: sets, target: WEEK_TARGET_SETS, note };
+  }
+  var patternOf = (item) => movementOf(item.movementId).pattern;
+  var withSets = (items, item, sets) => items.map((x) => x === item ? { ...x, sets } : x);
+  function addSet(contents, reqs, pattern) {
+    const spots = contents.flatMap((c, k) => c.items.filter((i) => patternOf(i) === pattern && i.sets < 6).map((i) => ({ c, k, i })));
+    const fits = spots.filter(({ c, k, i }) => sessionMinutes(withSets(c.items, i, i.sets + 1)) <= reqs[k].minutes).sort((x, y) => x.c.minutes - y.c.minutes)[0];
+    if (fits) {
+      fits.i.sets += 1;
+      fits.c.minutes = sessionMinutes(fits.c.items);
+      return true;
+    }
+    const sets = setsByPattern(contents);
+    for (const { c, k, i } of spots) {
+      const donor = c.items.filter((d) => d !== i && d.sets > 1 && (sets[patternOf(d)] ?? 0) - 1 >= (MAIN_PATTERNS.includes(patternOf(d)) ? WEEK_FLOOR_SETS : 0)).sort((a, b) => (sets[patternOf(b)] ?? 99) - (sets[patternOf(a)] ?? 99))[0];
+      if (!donor) continue;
+      const items = c.items.map((x) => x === i ? { ...x, sets: x.sets + 1 } : x === donor ? { ...x, sets: x.sets - 1 } : x);
+      if (sessionMinutes(items) > reqs[k].minutes) continue;
+      i.sets += 1;
+      donor.sets -= 1;
+      c.minutes = sessionMinutes(c.items);
+      return true;
+    }
+    return false;
+  }
+  var PATTERN_WORDS = { lower_push: "legs pushing", lower_pull: "hips and the back of the legs", upper_push: "upper-body pushing", upper_pull: "upper-body pulling", core: "the middle of the body", snack: "short pieces" };
+  function checkContent(a) {
+    if (!a || !a.content || !Array.isArray(a.content.items)) throw new InputError("bad_content");
+    const rules = readRules(a.rules ?? {});
+    const history = readHistory2(a.history);
+    const minutes = Number.isInteger(a.minutes) ? a.minutes : rules.session.max;
+    const violations = [];
+    const add = (code, text, movementId) => violations.push(movementId ? { code, text, movementId } : { code, text });
+    let fresh = 0;
+    for (const item of a.content.items) {
+      const m = movementOf(item.movementId);
+      if (!m) {
+        add("unknown_movement", `${item.movementId} is not in the movement library.`, item.movementId);
+        continue;
+      }
+      if (!Number.isInteger(item.sets) || item.sets < 1 || item.sets > 6) add("bad_dose", `${m.name} needs between 1 and 6 sets.`, m.id);
+      const block = blockOf(rules, history, m.id);
+      if (block === "equipment_not_owned") add(block, `${m.name} needs ${m.equipment.join(" and ")}, which the person doesn't have.`, m.id);
+      else if (block === "avoided_movement" || block === "cannot_do") add("avoided_movement", `${m.name} is on the person's list to leave out.`, m.id);
+      else if (block === "gated_movement") add(block, `${m.name} comes only after ${movementOf(m.easier).name} is done at the top of its range twice.`, m.id);
+      if (isNew(rules, history, m)) fresh += 1;
+    }
+    if (fresh > MAX_NEW) add("too_many_new", `The session has ${fresh} movements the person hasn't done yet; at most ${MAX_NEW}.`);
+    const valid = a.content.items.filter((i) => movementOf(i.movementId) && Number.isInteger(i.sets) && i.sets >= 1);
+    const length = sessionMinutes(valid.map((i) => ({
+      ...i,
+      rest: Number.isFinite(i.rest) ? i.rest : movementOf(i.movementId).rest,
+      reps: i.reps ?? movementOf(i.movementId).dose.reps,
+      seconds: i.seconds ?? movementOf(i.movementId).dose.seconds
+    })));
+    if (length > minutes) add("session_too_long", `The session takes about ${length} minutes; the person's sessions are at most ${minutes}.`);
+    if (Array.isArray(a.week)) {
+      const sets = setsByPattern(a.week.filter((c) => c && Array.isArray(c.items)));
+      for (const p of MAIN_PATTERNS) if (sets[p] < WEEK_FLOOR_SETS) add("sets_below_floor", `The week has ${sets[p]} sets of ${PATTERN_WORDS[p]}; at least ${WEEK_FLOOR_SETS}.`);
+    }
+    return { pass: violations.length === 0, violations };
+  }
+  var movementLibrary = () => ({ version: movements_default.version, movements: MOVEMENTS });
+
   // src/phone/entry.mjs
   var TEXT = {
     bad_json: "The request could not be read.",
@@ -2078,6 +4092,7 @@
     bad_action: "There is no session to explain.",
     bad_rules: "Your rules could not be read.",
     bad_day_kinds: "A day is marked as something other than home, out or rest.",
+    bad_content: "The workout could not be read.",
     missing_history: "There is no workout history to plan from.",
     internal: "Something went wrong while working this out."
   };
@@ -2101,4 +4116,8 @@
   globalThis.explainAction = tool(explainAction);
   globalThis.checkWeek = tool(checkWeek);
   globalThis.planBrief = tool(planBrief);
+  globalThis.workoutContent = tool(workoutContent);
+  globalThis.weekContent = tool(weekContent);
+  globalThis.checkContent = tool(checkContent);
+  globalThis.movementLibrary = tool(movementLibrary);
 })();

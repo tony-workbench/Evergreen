@@ -67,6 +67,17 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    /// Takes off what is left of a day's workout reminders, once the day's session is done.
+    func cancelReminders(on day: Date, calendar: Calendar = .current) async {
+        let pending = await center.pendingNotificationRequests()
+        let ids = pending.filter { request in
+            guard request.identifier.hasPrefix("reminder-"), let trigger = request.trigger as? UNCalendarNotificationTrigger,
+                  let fires = trigger.nextTriggerDate() else { return false }
+            return calendar.isDate(fires, inSameDayAs: day)
+        }.map(\.identifier)
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+    }
+
     // MARK: Now
 
     /// A notification right away, such as "I moved your run". It shows as a
