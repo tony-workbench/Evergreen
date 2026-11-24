@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Evergreen
 
-/// Workout minutes turn into minutes of videos and games at each group's rate.
+/// Workout minutes turn into minutes of social apps, videos and games at each group's rate, after each day's free time.
 struct EarnedTimeTests {
     let now = Date(timeIntervalSince1970: 1_795_000_000)
 
@@ -150,5 +150,63 @@ struct EarnedTimeTests {
         #expect(EarnMath.expired(open, now: now) == [.videos])
         #expect(EarnMath.expired([.games: now], now: now) == [.games])
         #expect(EarnMath.expired([:], now: now).isEmpty)
+    }
+
+    // MARK: Free time each day, the weekly escape and the comeback day
+
+    @Test func socialAppsEarnTwiceAsMuchAndEachGroupHasItsOwnFreeTime() {
+        #expect(FunGroup.allCases == [.social, .videos, .games])
+        #expect(FunGroup.social.defaultRate == 2 && FunGroup.videos.defaultRate == 1 && FunGroup.games.defaultRate == 0.5)
+        #expect(FunGroup.social.baseMinutes == 60 && FunGroup.videos.baseMinutes == 30 && FunGroup.games.baseMinutes == 30)
+        #expect(EarnRules.block == 15 && EarnedTime.block == EarnRules.block)
+        #expect(EarnMath.available(credit: 20, rate: FunGroup.social.defaultRate) == 40)
+    }
+
+    @Test func anUnlockSpendsTodaysFreeTimeBeforeTheCredit() {
+        // Plenty of free time: none of the credit goes.
+        #expect(EarnMath.unlock(baseLeft: 60, credit: 50, rate: 2, block: 15) == .init(minutes: 15, fromBase: 15, cost: 0))
+        // 5 free minutes left: the other 10 come from the credit, at the group's rate.
+        #expect(EarnMath.unlock(baseLeft: 5, credit: 50, rate: 2, block: 15) == .init(minutes: 15, fromBase: 5, cost: 5))
+        // No free time: all from the credit, as before.
+        #expect(EarnMath.unlock(baseLeft: 0, credit: 50, rate: 0.5, block: 15) == .init(minutes: 15, fromBase: 0, cost: 30))
+        // A little of each that doesn't fill the block.
+        #expect(EarnMath.unlock(baseLeft: 3, credit: 2, rate: 1, block: 15) == .init(minutes: 5, fromBase: 3, cost: 2))
+        #expect(EarnMath.unlock(baseLeft: 0, credit: 0.4, rate: 1, block: 15) == nil)
+    }
+
+    @Test func freeTimeStartsAgainEachDayAndIsNotCarriedOver() {
+        let used = ["2026-11-23": 45, "2026-11-24": 20]
+        #expect(EarnMath.baseLeft(.social, used: used, day: "2026-11-24", comeback: false) == 40)
+        #expect(EarnMath.baseLeft(.social, used: used, day: "2026-11-25", comeback: false) == 60)
+        // Nothing left over from a quiet day is added to the next.
+        #expect(EarnMath.baseLeft(.games, used: [:], day: "2026-11-25", comeback: false) == 30)
+        #expect(EarnMath.baseLeft(.videos, used: ["2026-11-24": 40], day: "2026-11-24", comeback: false) == 0)
+        // The comeback day adds 15 to the day's free time.
+        #expect(EarnMath.baseLeft(.videos, used: ["2026-11-24": 30], day: "2026-11-24", comeback: true) == 15)
+    }
+
+    @Test func theDayChangesAtLocalMidnightAndTheWeekOnMonday() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let late = calendar.date(from: DateComponents(year: 2026, month: 11, day: 22, hour: 23, minute: 59))!
+        #expect(EarnMath.dayKey(late, calendar: calendar) == "2026-11-22")
+        #expect(EarnMath.dayKey(late.addingTimeInterval(120), calendar: calendar) == "2026-11-23")
+        // Sunday 22 November still belongs to the week of Monday 16; Monday 23 starts a new one.
+        #expect(EarnMath.weekKey(late, calendar: calendar) == "2026-11-16")
+        #expect(EarnMath.weekKey(late.addingTimeInterval(120), calendar: calendar) == "2026-11-23")
+        // A calendar whose weeks start on Sunday still resets the escape on Monday.
+        calendar.firstWeekday = 1
+        #expect(EarnMath.weekKey(late, calendar: calendar) == "2026-11-16")
+    }
+
+    @Test func aWorkoutAfterAMissedTrainingDayIsAComeback() {
+        let planned = ["2026-11-17", "2026-11-19", "2026-11-21"]
+        #expect(EarnMath.isComeback(today: "2026-11-21", planned: planned, done: ["2026-11-17"]))
+        #expect(!EarnMath.isComeback(today: "2026-11-21", planned: planned, done: ["2026-11-17", "2026-11-19"]))
+        // The first training day of a new week looks at the last done day instead.
+        #expect(EarnMath.isComeback(today: "2026-11-24", planned: ["2026-11-24"], done: ["2026-11-14"]))
+        #expect(!EarnMath.isComeback(today: "2026-11-24", planned: ["2026-11-24"], done: ["2026-11-21"]))
+        // Never trained before: nothing to come back from.
+        #expect(!EarnMath.isComeback(today: "2026-11-24", planned: [], done: []))
     }
 }

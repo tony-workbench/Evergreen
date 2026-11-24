@@ -4,8 +4,9 @@ import HealthKit
 import Observation
 import UIKit
 
-/// Screen time earned by working out: the person picks the apps to lock (videos and games),
-/// sets how many minutes of each a workout minute earns, and spends them from the locked-app screen.
+/// Screen time earned by working out: the person picks the apps to lock (social, videos and games),
+/// sets how many minutes of each a workout minute earns, and spends them from the locked-app screen,
+/// each day's free time first.
 /// The credit lives in the App Group, where the Screen Time extensions read and spend it.
 @Observable
 @MainActor
@@ -16,6 +17,9 @@ final class EarnedTimeModel {
     private(set) var weekMinutes: Double = 0
     private(set) var rates = Dictionary(uniqueKeysWithValues: FunGroup.allCases.map { ($0, EarnedTime.rate($0)) })
     private(set) var selections = Dictionary(uniqueKeysWithValues: FunGroup.allCases.map { ($0, EarnedTime.selection($0)) })
+    /// Free minutes of each group left today, and whether the weekly escape is still there.
+    private(set) var baseLeft = Dictionary(uniqueKeysWithValues: FunGroup.allCases.map { ($0, $0.baseMinutes) })
+    private(set) var escapeLeft = true
     /// Said under the button when turning on did not work.
     var problem: String?
 
@@ -42,6 +46,13 @@ final class EarnedTimeModel {
             EarnedTime.ledger = ledger
         }
         credit = EarnedTime.credit
+        for group in FunGroup.allCases { baseLeft[group] = EarnedTime.baseLeft(group, now: now, calendar: calendar) }
+        escapeLeft = EarnedTime.escapeLeft(now: now, calendar: calendar)
+    }
+
+    /// A workout finished on `day` after a missed one: every group gets the comeback minutes that day.
+    func markComeback(_ day: String) {
+        EarnedTime.comebackDay = day
     }
 
     func turnOn(workouts: [Workout], now: Date, calendar: Calendar) async {

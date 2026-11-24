@@ -54,7 +54,7 @@ struct SettingsView: View {
                             HStack {
                                 Text("Earned screen time").foregroundStyle(Theme.text)
                                 Spacer()
-                                Text(model.earnedTime.isOn ? "\(model.earnedTime.minutes(.videos)) min" : "Off")
+                                Text(model.earnedTime.isOn ? "\(model.earnedTime.minutes(.social) + (model.earnedTime.baseLeft[.social] ?? 0)) min" : "Off")
                                     .foregroundStyle(Theme.textMuted)
                                 Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Theme.textMuted)
                             }

@@ -2,7 +2,8 @@ import ManagedSettings
 import ManagedSettingsUI
 import UIKit
 
-/// The screen over a locked app: how much time the person has earned for it, and a button to use some.
+/// The screen over a locked app: the free time left today and the time earned for it, a button to use some,
+/// and, once nothing is left, "Unlock for 10 minutes" once a week.
 final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     override func configuration(shielding application: Application) -> ShieldConfiguration {
         screen(application.token.flatMap(EarnedTime.group(app:)))
@@ -32,13 +33,28 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
                 primaryButtonBackgroundColor: green
             )
         }
-        let minutes = EarnedTime.available(group)
-        let title = minutes > 0 ? "\(minutes) min of \(group.noun) earned" : "Earn time with a workout"
-        let rate = EarnedTime.rate(group)
-        let perWorkout = Int((20 * rate).rounded())
-        let subtitle = minutes > 0
-            ? "Each unlock opens these apps for up to \(EarnedTime.block) minutes."
-            : "A 20 minute workout earns \(perWorkout) minutes of \(group.noun)."
+        let base = EarnedTime.baseLeft(group)
+        let earned = EarnedTime.available(group)
+        let minutes = base + earned
+        let escape = minutes == 0 && EarnedTime.escapeLeft()
+        let perWorkout = Int((20 * EarnedTime.rate(group)).rounded())
+        let title: String
+        let subtitle: String
+        if base > 0 {
+            title = "\(base) min of \(group.noun) left today"
+            subtitle = earned > 0
+                ? "Then \(earned) min earned from workouts. Each unlock opens up to \(EarnedTime.block) minutes."
+                : "Each unlock opens up to \(EarnedTime.block) minutes. A 20 minute workout earns \(perWorkout) more."
+        } else if earned > 0 {
+            title = "\(earned) min of \(group.noun) earned"
+            subtitle = "Today's free time is used. Each unlock opens these apps for up to \(EarnedTime.block) minutes."
+        } else {
+            title = "Earn time with a workout"
+            subtitle = "Today's free time is used. A 20 minute workout earns \(perWorkout) minutes of \(group.noun)."
+                + (escape ? " Once a week you can open them for \(EarnRules.escapeMinutes) minutes." : "")
+        }
+        let secondary: ShieldConfiguration.Label? = minutes > 0 ? .init(text: "Not now", color: green)
+            : escape ? .init(text: "Unlock for \(EarnRules.escapeMinutes) minutes", color: green) : nil
         return ShieldConfiguration(
             backgroundBlurStyle: .systemMaterial,
             icon: UIImage(systemName: "figure.run"),
@@ -46,7 +62,7 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             subtitle: .init(text: subtitle, color: .secondaryLabel),
             primaryButtonLabel: .init(text: minutes > 0 ? "Use \(min(minutes, EarnedTime.block)) min" : "Close", color: .white),
             primaryButtonBackgroundColor: green,
-            secondaryButtonLabel: minutes > 0 ? .init(text: "Not now", color: green) : nil
+            secondaryButtonLabel: secondary
         )
     }
 }

@@ -4,15 +4,38 @@ import Foundation
 import ManagedSettings
 import os
 
-/// The apps a person earns time for by working out, in two groups with their own rate.
+/// The apps a person earns time for by working out, in three groups with their own rate and daily base time.
 enum FunGroup: String, CaseIterable, Codable, Sendable, Identifiable {
-    case videos, games
+    case social, videos, games
 
     var id: String { rawValue }
-    var title: String { self == .videos ? "Videos" : "Games" }
-    var noun: String { rawValue }
+    var title: String {
+        switch self {
+        case .social: "Social"
+        case .videos: "Videos"
+        case .games: "Games"
+        }
+    }
+    var noun: String { self == .social ? "social apps" : rawValue }
     /// Minutes of this group earned per minute of workout, until the person changes it.
-    var defaultRate: Double { self == .videos ? 1 : 0.5 }
+    var defaultRate: Double { EarnRules.rates[self] ?? 1 }
+    /// Minutes of this group free each day, before any earned time is spent.
+    var baseMinutes: Int { EarnRules.baseMinutes[self] ?? 0 }
+}
+
+/// Every number of earned screen time, in one place.
+enum EarnRules {
+    /// Minutes of each group one workout minute earns: social apps 2, videos 1, games 0.5.
+    static let rates: [FunGroup: Double] = [.social: 2, .videos: 1, .games: 0.5]
+    /// Minutes of each group free every day. Each group has its own, it starts again at local
+    /// midnight, and what is left over is not carried to the next day.
+    static let baseMinutes: [FunGroup: Int] = [.social: 60, .videos: 30, .games: 30]
+    /// The most one unlock opens, in minutes.
+    static let block = EarnRules.block
+    /// "Unlock for 10 minutes": once a week, from Monday, free, when nothing else is left.
+    static let escapeMinutes = 10
+    /// Extra base minutes for every group on the day a workout is finished after a missed one.
+    static let comebackMinutes = 15
 }
 
 /// The workouts that have earned time, each counted once and kept even after Apple Health
@@ -103,6 +126,62 @@ enum EarnMath {
         calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
     }
 
+    /// What one unlock opens and what it spends.
+    struct Unlock: Equatable, Sendable {
+        var minutes: Int
+        /// Of `minutes`, how many came from the day's base time.
+        var fromBase: Int
+        /// Workout minutes of credit spent on the rest.
+        var cost: Double
+    }
+
+    /// One unlock: the day's base time first, then earned credit for the rest, up to `block` minutes in all.
+    /// Nil when neither buys a minute.
+    static func unlock(baseLeft: Int, credit: Double, rate: Double, block: Int) -> Unlock? {
+        let fromBase = min(block, max(0, baseLeft))
+        let earned = min(block - fromBase, available(credit: credit, rate: rate))
+        guard fromBase + earned >= 1 else { return nil }
+        return Unlock(minutes: fromBase + earned, fromBase: fromBase, cost: earned > 0 ? cost(minutes: earned, rate: rate) : 0)
+    }
+
+    /// The base minutes of a group left on `day`: its daily minutes, plus the comeback minutes on a comeback day,
+    /// less what was used that day. What was used on another day doesn't count.
+    static func baseLeft(_ group: FunGroup, used: [String: Int], day: String, comeback: Bool) -> Int {
+        max(0, group.baseMinutes + (comeback ? EarnRules.comebackMinutes : 0) - (used[day] ?? 0))
+    }
+
+    /// The day as YYYY-MM-DD in the calendar's time zone, so the base time starts again at local midnight.
+    static func dayKey(_ date: Date, calendar: Calendar) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    /// The Monday of the date's week, as YYYY-MM-DD: the weekly escape starts again each Monday.
+    static func weekKey(_ date: Date, calendar: Calendar) -> String {
+        var monday = calendar
+        monday.firstWeekday = 2
+        let start = monday.dateInterval(of: .weekOfYear, for: date)?.start ?? calendar.startOfDay(for: date)
+        return dayKey(start, calendar: calendar)
+    }
+
+    /// A workout finished on `today` comes back from a missed one when the last training day planned before
+    /// today wasn't done. With no planned day before today (a new week), when the last done day is more than a week back.
+    static func isComeback(today: String, planned: [String], done: [String]) -> Bool {
+        if let last = planned.filter({ $0 < today }).max() { return !done.contains(last) }
+        guard let lastDone = done.filter({ $0 < today }).max(),
+              let a = utcDay(lastDone), let b = utcDay(today) else { return false }
+        return b.timeIntervalSince(a) > 7 * 86_400
+    }
+
+    /// YYYY-MM-DD as midnight UTC, to count days between two keys.
+    private static func utcDay(_ key: String) -> Date? {
+        let parts = key.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+    }
+
     /// The groups whose unlock has run out by `now`.
     static func expired(_ openUntil: [FunGroup: Date], now: Date) -> [FunGroup] {
         FunGroup.allCases.filter { (openUntil[$0] ?? .distantFuture) <= now }
@@ -110,11 +189,11 @@ enum EarnMath {
 }
 
 /// What the app and its Screen Time extensions share through the App Group:
-/// the chosen apps, the rates, the credit, and locking and unlocking a group.
+/// the chosen apps, the rates, the credit, the day's base time, the weekly escape, and locking and unlocking a group.
 enum EarnedTime {
     static let appGroup = "group.com.evergreentraining.app"
     /// The most one unlock opens, in minutes.
-    static let block = 15
+    static let block = EarnRules.block
 
     static let log = Logger(subsystem: "com.evergreentraining.app", category: "earned-time")
 
@@ -155,6 +234,42 @@ enum EarnedTime {
 
     static func available(_ group: FunGroup) -> Int {
         EarnMath.available(credit: credit, rate: rate(group))
+    }
+
+    // MARK: The day's base time, the comeback day and the weekly escape
+
+    /// Base minutes used by day, per group. Written only by the unlock; older days are dropped.
+    static func baseUsed(_ group: FunGroup) -> [String: Int] {
+        defaults.dictionary(forKey: "earn.base.\(group.rawValue)") as? [String: Int] ?? [:]
+    }
+    private static func setBaseUsed(_ used: [String: Int], _ group: FunGroup) {
+        defaults.set(used, forKey: "earn.base.\(group.rawValue)")
+    }
+
+    /// The day a workout was finished after a missed one, YYYY-MM-DD. Written only by the app.
+    static var comebackDay: String? {
+        get { defaults.string(forKey: "earn.comeback") }
+        set { defaults.set(newValue, forKey: "earn.comeback") }
+    }
+
+    static func baseLeft(_ group: FunGroup, now: Date = Date(), calendar: Calendar = .current) -> Int {
+        let day = EarnMath.dayKey(now, calendar: calendar)
+        return EarnMath.baseLeft(group, used: baseUsed(group), day: day, comeback: comebackDay == day)
+    }
+
+    /// Everything a group can open now: base time left today plus what the credit buys.
+    static func usable(_ group: FunGroup, now: Date = Date(), calendar: Calendar = .current) -> Int {
+        baseLeft(group, now: now, calendar: calendar) + available(group)
+    }
+
+    /// The Monday of the week the escape was last used. Written only by the escape.
+    static var escapeWeek: String? {
+        get { defaults.string(forKey: "earn.escape") }
+        set { defaults.set(newValue, forKey: "earn.escape") }
+    }
+
+    static func escapeLeft(now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        escapeWeek != EarnMath.weekKey(now, calendar: calendar)
     }
 
     static func selection(_ group: FunGroup) -> FamilyActivitySelection {
@@ -225,14 +340,36 @@ enum EarnedTime {
         }
     }
 
-    /// Opens the group for up to `block` minutes, paid from the credit, and returns the minutes.
+    /// Opens the group for up to `block` minutes, from today's base time first and then the credit, and returns the minutes.
     /// The apps lock again when the time is up: a schedule starts at that moment and its
     /// start locks them (the most dependable Screen Time callback; usage thresholds can fire early).
     /// Nil when there is nothing to spend or the schedule could not be set.
     @discardableResult
     static func unlock(_ group: FunGroup, now: Date = Date(), calendar: Calendar = .current) -> Int? {
-        guard let spend = EarnMath.spend(credit: credit, rate: rate(group), block: block) else { return nil }
-        let minutes = spend.minutes
+        guard let spend = EarnMath.unlock(baseLeft: baseLeft(group, now: now, calendar: calendar), credit: credit,
+                                          rate: rate(group), block: block),
+              open(group, minutes: spend.minutes, now: now, calendar: calendar) else { return nil }
+        spent += spend.cost
+        if spend.fromBase > 0 {
+            let day = EarnMath.dayKey(now, calendar: calendar)
+            var used = baseUsed(group).filter { $0.key == day }
+            used[day, default: 0] += spend.fromBase
+            setBaseUsed(used, group)
+        }
+        return spend.minutes
+    }
+
+    /// "Unlock for 10 minutes": once a week, free, whatever is left.
+    @discardableResult
+    static func escape(_ group: FunGroup, now: Date = Date(), calendar: Calendar = .current) -> Int? {
+        guard escapeLeft(now: now, calendar: calendar),
+              open(group, minutes: EarnRules.escapeMinutes, now: now, calendar: calendar) else { return nil }
+        escapeWeek = EarnMath.weekKey(now, calendar: calendar)
+        return EarnRules.escapeMinutes
+    }
+
+    /// Takes the lock off for `minutes` and sets the schedule that puts it back.
+    private static func open(_ group: FunGroup, minutes: Int, now: Date, calendar: Calendar) -> Bool {
         let window = EarnMath.relockWindow(now: now, minutes: minutes)
         let schedule = DeviceActivitySchedule(intervalStart: EarnMath.scheduleParts(window.start, calendar: calendar),
                                               intervalEnd: EarnMath.scheduleParts(window.end, calendar: calendar),
@@ -243,12 +380,11 @@ enum EarnedTime {
             try center.startMonitoring(activity(group), during: schedule)
         } catch {
             log.error("Relock schedule for \(group.rawValue, privacy: .public) not set: \(error.localizedDescription, privacy: .public)")
-            return nil
+            return false
         }
-        spent += spend.cost
         store(group).clearAllSettings()
         setOpenUntil(window.start, group)
-        return minutes
+        return true
     }
 
     /// The unlock's time is up: lock the group again.

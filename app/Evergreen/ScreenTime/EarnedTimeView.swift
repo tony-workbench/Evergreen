@@ -1,7 +1,7 @@
 import FamilyControls
 import SwiftUI
 
-/// Earned screen time, from Settings: how much is earned, the rate for each group, and the apps it locks.
+/// Earned screen time, from Settings: how much is earned, each group's free time a day and rate, and the apps it locks.
 struct EarnedTimeView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -19,7 +19,15 @@ struct EarnedTimeView: View {
                     if !earned.isOn { turnOn }
                     block("What it locks") {
                         ForEach(FunGroup.allCases) { appsRow($0) }
-                        Text("An app goes in one group. A whole category can only be locked in one group.")
+                        Text("Social is for apps like X and Discord. An app goes in one group. A whole category can only be locked in one group.")
+                            .font(.footnote)
+                            .foregroundStyle(Theme.textMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, Theme.sm)
+                    }
+                    block("Free each day") {
+                        ForEach(FunGroup.allCases) { baseRow($0) }
+                        Text(rulesNote)
                             .font(.footnote)
                             .foregroundStyle(Theme.textMuted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -48,14 +56,14 @@ struct EarnedTimeView: View {
         }
     }
 
-    /// The one large thing on the screen: the minutes of videos, with games beside it.
+    /// The one large thing on the screen: the minutes of social apps, with videos and games beside it.
     private var statement: some View {
         VStack(alignment: .leading, spacing: Theme.sm) {
-            Text("\(earned.minutes(.videos)) min")
+            Text("\(usable(.social)) min")
                 .font(.system(size: 56, weight: .semibold))
                 .foregroundStyle(Theme.text)
-            Text(earned.isOn ? "of videos to use, or \(earned.minutes(.games)) min of games"
-                             : "of videos from this week's workouts, or \(earned.minutes(.games)) min of games")
+            Text(earned.isOn ? "of social apps to use today, \(usable(.videos)) min of videos, \(usable(.games)) min of games"
+                             : "of social apps earned this week, or \(usable(.videos)) min of videos, \(usable(.games)) min of games")
                 .font(.body)
                 .foregroundStyle(Theme.textMuted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -63,9 +71,34 @@ struct EarnedTimeView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// Once on: today's free time left plus what the credit buys. Before that: what this week earned.
+    private func usable(_ group: FunGroup) -> Int {
+        earned.minutes(group) + (earned.isOn ? earned.baseLeft[group] ?? 0 : 0)
+    }
+
+    private var rulesNote: String {
+        let escape = earned.escapeLeft ? "is still there this week" : "is used this week and comes back on Monday"
+        return "Free time is used first and starts again at midnight; what is left isn't carried over. Each unlock opens up to \(EarnRules.block) minutes. A workout after a missed day adds \(EarnRules.comebackMinutes) minutes to each that day. \"Unlock for \(EarnRules.escapeMinutes) minutes\" on the locked screen \(escape)."
+    }
+
+    private func baseRow(_ group: FunGroup) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(group.title).foregroundStyle(Theme.text)
+                Spacer()
+                Text(earned.isOn ? "\(earned.baseLeft[group] ?? 0) of \(group.baseMinutes) min left" : "\(group.baseMinutes) min")
+                    .foregroundStyle(Theme.textMuted)
+            }
+            .font(.body)
+            .frame(minHeight: 52)
+            .accessibilityElement(children: .combine)
+            rule
+        }
+    }
+
     private var turnOn: some View {
         VStack(alignment: .leading, spacing: Theme.md) {
-            Text("The apps you pick stay locked until you earn time for them. Any workout counts, and you spend the minutes from the locked app itself.")
+            Text("The apps you pick get some free time each day and stay locked once it is used, until you earn more. Any workout counts, and you spend the minutes from the locked app itself.")
                 .font(.body)
                 .foregroundStyle(Theme.text)
                 .fixedSize(horizontal: false, vertical: true)

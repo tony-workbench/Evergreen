@@ -16,4 +16,13 @@ extension AppModel {
             return true
         }
     }
+
+    /// Finishing the workout page after a missed training day gives every group its comeback minutes today.
+    func noteComeback(_ day: String) {
+        let planned = (homeWeek?.days ?? []).filter(\.trains).map(\.day)
+        let done = workoutLog.doneDays.filter { $0 != day }
+        guard EarnMath.isComeback(today: day, planned: planned, done: done) else { return }
+        earnedTime.markComeback(day)
+        log("Back after a missed day: \(EarnRules.comebackMinutes) more minutes of each locked group today")
+    }
 }

@@ -83,6 +83,7 @@ extension AppModel {
                   result.sets.contains(where: { $0 < item.low }), movement(result.movementId)?.usesBackpack == false else { continue }
             await markCannot(result.movementId)
         }
+        noteComeback(progress.day)
         let saved = onDevice ? await WorkoutWriter.saveStrength(start: progress.startedAt, end: Date()) : false
         log(saved ? "Your home workout is done and saved to Apple Health" : "Your home workout is done")
         celebration += 1
