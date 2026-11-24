@@ -5,7 +5,7 @@ SwiftUI and SwiftData, iOS 18+, iPhone portrait, Swift 6. What the product does 
 ## Run it
 
 1. Open `app/Evergreen.xcodeproj` in Xcode.
-2. Choose an iPhone simulator and press Run. For a real phone, first choose your team under Signing & Capabilities (HealthKit needs one; the project ships with none set).
+2. Choose an iPhone simulator and press Run. For a real phone, first choose your team under Signing & Capabilities for the app and its three `Earn…` extensions (the project ships with none set), and change the four bundle identifiers and the App Group `group.com.evergreentraining.app` to your own; the App Group name is also in `ScreenTimeShared/EarnedTime.swift`.
 3. A fresh install opens on the tour, asks for Health, Calendar and Notifications, shows "What I noticed", and asks for a Gemini API key ("Connect your AI"; it can be put off). Then Today.
 
 The key is kept in the Keychain. An unsigned simulator build has no Keychain, so there it is kept sealed in the app's Application Support folder (debug simulator builds only). A debug build launched with `GEMINI_API_KEY` in its environment uses that key for the run, in memory only.
@@ -19,13 +19,16 @@ Any file added under `app/Evergreen/` or `app/EvergreenTests/` is in the build a
 | `App/` | Entry point and root view |
 | `Agent/` | The model client (`LLM/`), the router, the agents (`Agents/`), the JavaScript host (`JS/`), the hand-offs (`Handoff/`), `Orchestrator.swift` |
 | `Memory/` | The memory engine's host and what the app reads from it |
-| `Model/` | App state. `AppModel` is the one object the views read; it owns `PlanStore`, `WeekSuggestions`, `AskEvergreen` and `MemoryModel`. `Storage/` is SwiftData |
+| `Model/` | App state. `AppModel` is the one object the views read; it owns `PlanStore`, `WeekSuggestions`, `AskEvergreen`, `MemoryModel` and `EarnedTimeModel`. `Storage/` is SwiftData |
 | `CalendarSync/` | The Evergreen calendar and reading busy times |
 | `Background/` | Background refresh, the rain and shoe checks (`TriggerCenter.swift`), the debug seeds |
 | `Weather/`, `Gear/`, `Health/`, `Notifications/` | The forecast, shoe mileage, Apple Health, notifications |
 | `Contract/` | The plan, workout and busy-time shapes behind the agent card |
 | `Views/`, `Design/` | Screens and the design system |
 | `Resources/` | The three engine bundles and the asset catalog |
+| `ScreenTime/` | Earned screen time: its model and screen |
+
+Earned screen time also uses folders beside `app/Evergreen/`. `ScreenTimeShared/` holds the chosen apps, the rates, the counted workouts and spent minutes, and locking and unlocking; it is built into the app and all three extensions, which share it through the App Group `group.com.evergreentraining.app`. `EarnShieldConfiguration/` draws the screen over a locked app, `EarnShieldAction/` handles its button, and `EarnActivityMonitor/` locks the apps again when the unlocked time is up. Evergreen also locks any unlock that ran out each time it opens. Their Info.plist and entitlements files are in `ExtensionSettings/`.
 
 ## How the pieces call each other
 
@@ -107,7 +110,7 @@ xcrun simctl launch booted com.evergreentraining.app -uiTest runner -uiScreen se
 
 With a seed, these also work:
 
-- `-uiScreen memory|settings|permissions|noticed|connect` opens that screen.
+- `-uiScreen memory|settings|permissions|noticed|connect|earned` opens that screen.
 - `-uiAsk "sentence"` asks Evergreen that sentence.
 - `-uiNoKey YES` stays without a key, to see the connect card.
 - `-uiAnswers YES` adds the top suggestion and says "Not now" to the next.

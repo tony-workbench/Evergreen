@@ -59,6 +59,8 @@ final class AppModel {
     var shoeCardPutOff = false
     /// Goes up each time something is worth a cheer (a workout done, a session added); the buddy watches it.
     var celebration = 0
+    /// Screen time earned by working out (ScreenTime/EarnedTimeModel.swift).
+    let earnedTime = EarnedTimeModel()
     /// Whether notifications are allowed.
     private(set) var notificationAccess: NotificationAccess = .notAsked
 
@@ -110,6 +112,7 @@ final class AppModel {
         notifier.onUndo = { [weak self] id in self?.undoMove(id) }
         Task { await refreshNotifications() }
         if persona.isReal { Task { await refreshHealth() } }
+        watchWorkoutsForEarnedTime()
         startTriggers(busy: { [weak self] in
                           guard let self else { return [] }
                           return await self.calendarSync.busyTimes(from: self.calendar.startOfDay(for: self.now))
@@ -328,6 +331,7 @@ final class AppModel {
         let changed = read.workouts != health.workouts || read.days != health.days
         health = read
         read.saveToCache()
+        refreshEarnedTime()
         if changed, persona.isReal { await tick() }
     }
 

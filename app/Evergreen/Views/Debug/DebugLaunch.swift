@@ -6,13 +6,13 @@ import SwiftUI
 /// scripted AI (no key, no network), and these arguments open a screen
 /// without tapping, for checks and screenshots:
 ///
-///   -uiScreen memory|settings|permissions|noticed|connect   open that screen
+///   -uiScreen memory|settings|permissions|noticed|connect|earned   open that screen
 ///   -uiAsk "sentence"                              ask Evergreen that sentence
 ///   -uiNoKey YES                                   stay without an AI key, to see the connect card
 ///   -uiAnswers YES                                 add the top suggestion and say not now to the next
 struct DebugLaunch: ViewModifier {
     enum Screen: String, Identifiable {
-        case memory, settings, permissions, noticed, connect
+        case memory, settings, permissions, noticed, connect, earned
         var id: String { rawValue }
     }
 
@@ -26,6 +26,7 @@ struct DebugLaunch: ViewModifier {
                 switch screen {
                 case .memory: MemoryView()
                 case .settings: SettingsView()
+                case .earned: EarnedTimeView()
                 case .permissions: PermissionsView(onContinue: {})
                 case .noticed: NoticedView(onContinue: { self.screen = nil })
                 case .connect: ConnectAIView(leave: "Not now", onDone: { self.screen = nil })

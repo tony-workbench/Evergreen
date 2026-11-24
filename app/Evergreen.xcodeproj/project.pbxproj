@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7A2000000000000000000019 /* EarnShieldConfiguration.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7A2000000000000000000010 /* EarnShieldConfiguration.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		7A2000000000000000000029 /* EarnShieldAction.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7A2000000000000000000020 /* EarnShieldAction.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		7A2000000000000000000039 /* EarnActivityMonitor.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7A2000000000000000000030 /* EarnActivityMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -17,6 +20,27 @@
 			remoteGlobalIDString = 7A1000000000000000000006;
 			remoteInfo = Evergreen;
 		};
+		7A200000000000000000001A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7A100000000000000000000A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7A2000000000000000000012;
+			remoteInfo = EarnShieldConfiguration;
+		};
+		7A200000000000000000002A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7A100000000000000000000A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7A2000000000000000000022;
+			remoteInfo = EarnShieldAction;
+		};
+		7A200000000000000000003A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7A100000000000000000000A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7A2000000000000000000032;
+			remoteInfo = EarnActivityMonitor;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -24,7 +48,26 @@
 		7A1000000000000000000010 /* Evergreen.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Evergreen.entitlements; sourceTree = "<group>"; };
 		7A1000000000000000000020 /* EvergreenTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EvergreenTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B8F1030730B0ECF60058A375 /* Evergreen.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Evergreen.xcconfig; sourceTree = "<group>"; };
+		7A2000000000000000000010 /* EarnShieldConfiguration.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = EarnShieldConfiguration.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		7A2000000000000000000020 /* EarnShieldAction.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = EarnShieldAction.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		7A2000000000000000000030 /* EarnActivityMonitor.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = EarnActivityMonitor.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7A2000000000000000000002 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				7A2000000000000000000019 /* EarnShieldConfiguration.appex in Embed Foundation Extensions */,
+				7A2000000000000000000029 /* EarnShieldAction.appex in Embed Foundation Extensions */,
+				7A2000000000000000000039 /* EarnActivityMonitor.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		7A1000000000000000000002 /* Evergreen */ = {
@@ -35,6 +78,26 @@
 		7A1000000000000000000021 /* EvergreenTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = EvergreenTests;
+			sourceTree = "<group>";
+		};
+		7A2000000000000000000001 /* ScreenTimeShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ScreenTimeShared;
+			sourceTree = "<group>";
+		};
+		7A2000000000000000000011 /* EarnShieldConfiguration */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EarnShieldConfiguration;
+			sourceTree = "<group>";
+		};
+		7A2000000000000000000021 /* EarnShieldAction */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EarnShieldAction;
+			sourceTree = "<group>";
+		};
+		7A2000000000000000000031 /* EarnActivityMonitor */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EarnActivityMonitor;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -54,6 +117,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7A2000000000000000000014 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A2000000000000000000024 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A2000000000000000000034 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -62,6 +146,10 @@
 			children = (
 				7A1000000000000000000002 /* Evergreen */,
 				7A1000000000000000000021 /* EvergreenTests */,
+				7A2000000000000000000001 /* ScreenTimeShared */,
+				7A2000000000000000000011 /* EarnShieldConfiguration */,
+				7A2000000000000000000021 /* EarnShieldAction */,
+				7A2000000000000000000031 /* EarnActivityMonitor */,
 				7A1000000000000000000010 /* Evergreen.entitlements */,
 				B8F1030430B0ECDB0058A375 /* Frameworks */,
 				B8F1030730B0ECF60058A375 /* Evergreen.xcconfig */,
@@ -74,6 +162,9 @@
 			children = (
 				7A1000000000000000000001 /* Evergreen.app */,
 				7A1000000000000000000020 /* EvergreenTests.xctest */,
+				7A2000000000000000000010 /* EarnShieldConfiguration.appex */,
+				7A2000000000000000000020 /* EarnShieldAction.appex */,
+				7A2000000000000000000030 /* EarnActivityMonitor.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,13 +186,18 @@
 				7A1000000000000000000008 /* Sources */,
 				7A1000000000000000000003 /* Frameworks */,
 				7A1000000000000000000009 /* Resources */,
+				7A2000000000000000000002 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				7A200000000000000000001B /* PBXTargetDependency */,
+				7A200000000000000000002B /* PBXTargetDependency */,
+				7A200000000000000000003B /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				7A1000000000000000000002 /* Evergreen */,
+				7A2000000000000000000001 /* ScreenTimeShared */,
 			);
 			name = Evergreen;
 			packageProductDependencies = (
@@ -133,6 +229,75 @@
 			productReference = 7A1000000000000000000020 /* EvergreenTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		7A2000000000000000000012 /* EarnShieldConfiguration */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A2000000000000000000016 /* Build configuration list for PBXNativeTarget "EarnShieldConfiguration" */;
+			buildPhases = (
+				7A2000000000000000000013 /* Sources */,
+				7A2000000000000000000014 /* Frameworks */,
+				7A2000000000000000000015 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				7A2000000000000000000011 /* EarnShieldConfiguration */,
+				7A2000000000000000000001 /* ScreenTimeShared */,
+			);
+			name = EarnShieldConfiguration;
+			packageProductDependencies = (
+			);
+			productName = EarnShieldConfiguration;
+			productReference = 7A2000000000000000000010 /* EarnShieldConfiguration.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		7A2000000000000000000022 /* EarnShieldAction */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A2000000000000000000026 /* Build configuration list for PBXNativeTarget "EarnShieldAction" */;
+			buildPhases = (
+				7A2000000000000000000023 /* Sources */,
+				7A2000000000000000000024 /* Frameworks */,
+				7A2000000000000000000025 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				7A2000000000000000000021 /* EarnShieldAction */,
+				7A2000000000000000000001 /* ScreenTimeShared */,
+			);
+			name = EarnShieldAction;
+			packageProductDependencies = (
+			);
+			productName = EarnShieldAction;
+			productReference = 7A2000000000000000000020 /* EarnShieldAction.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		7A2000000000000000000032 /* EarnActivityMonitor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A2000000000000000000036 /* Build configuration list for PBXNativeTarget "EarnActivityMonitor" */;
+			buildPhases = (
+				7A2000000000000000000033 /* Sources */,
+				7A2000000000000000000034 /* Frameworks */,
+				7A2000000000000000000035 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				7A2000000000000000000031 /* EarnActivityMonitor */,
+				7A2000000000000000000001 /* ScreenTimeShared */,
+			);
+			name = EarnActivityMonitor;
+			packageProductDependencies = (
+			);
+			productName = EarnActivityMonitor;
+			productReference = 7A2000000000000000000030 /* EarnActivityMonitor.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -149,6 +314,15 @@
 					7A1000000000000000000025 = {
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = 7A1000000000000000000006;
+					};
+					7A2000000000000000000012 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					7A2000000000000000000022 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					7A2000000000000000000032 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -170,6 +344,9 @@
 			targets = (
 				7A1000000000000000000006 /* Evergreen */,
 				7A1000000000000000000025 /* EvergreenTests */,
+				7A2000000000000000000012 /* EarnShieldConfiguration */,
+				7A2000000000000000000022 /* EarnShieldAction */,
+				7A2000000000000000000032 /* EarnActivityMonitor */,
 			);
 		};
 /* End PBXProject section */
@@ -183,6 +360,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		7A1000000000000000000024 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A2000000000000000000015 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A2000000000000000000025 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A2000000000000000000035 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -206,6 +404,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7A2000000000000000000013 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A2000000000000000000023 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A2000000000000000000033 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -213,6 +432,21 @@
 			isa = PBXTargetDependency;
 			target = 7A1000000000000000000006 /* Evergreen */;
 			targetProxy = 7A1000000000000000000027 /* PBXContainerItemProxy */;
+		};
+		7A200000000000000000001B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7A2000000000000000000012 /* EarnShieldConfiguration */;
+			targetProxy = 7A200000000000000000001A /* PBXContainerItemProxy */;
+		};
+		7A200000000000000000002B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7A2000000000000000000022 /* EarnShieldAction */;
+			targetProxy = 7A200000000000000000002A /* PBXContainerItemProxy */;
+		};
+		7A200000000000000000003B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7A2000000000000000000032 /* EarnActivityMonitor */;
+			targetProxy = 7A200000000000000000003A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -362,6 +596,174 @@
 			};
 			name = Release;
 		};
+		7A2000000000000000000017 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ExtensionSettings/EarnShieldConfiguration.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "ExtensionSettings/EarnShieldConfiguration-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = EarnShieldConfiguration;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.evergreentraining.app.earnshieldconfiguration;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		7A2000000000000000000018 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ExtensionSettings/EarnShieldConfiguration.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "ExtensionSettings/EarnShieldConfiguration-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = EarnShieldConfiguration;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.evergreentraining.app.earnshieldconfiguration;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		7A2000000000000000000027 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ExtensionSettings/EarnShieldAction.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "ExtensionSettings/EarnShieldAction-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = EarnShieldAction;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.evergreentraining.app.earnshieldaction;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		7A2000000000000000000028 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ExtensionSettings/EarnShieldAction.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "ExtensionSettings/EarnShieldAction-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = EarnShieldAction;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.evergreentraining.app.earnshieldaction;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		7A2000000000000000000037 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ExtensionSettings/EarnActivityMonitor.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "ExtensionSettings/EarnActivityMonitor-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = EarnActivityMonitor;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.evergreentraining.app.earnactivitymonitor;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		7A2000000000000000000038 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ExtensionSettings/EarnActivityMonitor.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "ExtensionSettings/EarnActivityMonitor-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = EarnActivityMonitor;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.evergreentraining.app.earnactivitymonitor;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -388,6 +790,33 @@
 			buildConfigurations = (
 				7A1000000000000000000029 /* Debug */,
 				7A100000000000000000002A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7A2000000000000000000016 /* Build configuration list for PBXNativeTarget "EarnShieldConfiguration" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A2000000000000000000017 /* Debug */,
+				7A2000000000000000000018 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7A2000000000000000000026 /* Build configuration list for PBXNativeTarget "EarnShieldAction" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A2000000000000000000027 /* Debug */,
+				7A2000000000000000000028 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7A2000000000000000000036 /* Build configuration list for PBXNativeTarget "EarnActivityMonitor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A2000000000000000000037 /* Debug */,
+				7A2000000000000000000038 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

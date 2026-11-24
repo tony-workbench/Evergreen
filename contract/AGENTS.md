@@ -10,7 +10,7 @@ One contract for the three agents and the app. Every bundle and the Swift code f
 | Memory agent (`memory-agent`) | Once a day | The person's model | Versioned memories and the daily table |
 | Recommendation agent (`recommend-agent`) | When the table or the week changes, or on request | The person's model | A proposed week |
 | Calendar agent (`calendar-planner`) | When a session is accepted, or on request | The person's model | Where a session goes in the real week |
-| App (Swift) | Always | nothing | The plan, the calendar writes, the key, the screen |
+| App (Swift) | Always | nothing | The plan, the calendar writes, the key, the screen, earned screen time |
 
 The agents never call each other. The app passes one agent's output to the next (hub and spoke), so every hand-off is a typed value that can be checked and tested.
 

@@ -35,6 +35,7 @@ struct RootView: View {
             model.refreshDay()
             Task {
                 if model.persona.isReal { await model.refreshHealth() }
+                model.refreshEarnedTime()
                 await model.tick()
                 await model.checkTriggers(foreground: true)
             }

@@ -25,10 +25,12 @@ This continues the app our team built at the Personal Agents Hackathon in Novemb
 - **Add or decline in one tap.** Add a session and it goes on your calendar; decline it and that habit is no longer planned around.
 - **Ask in a sentence.** "Find me 45 minutes to run tonight." "Move Sunday's run to the afternoon." "What do you remember about me?"
 - **See what it remembers.** A short list built once a day from your data. Stop any line, or forget a day or everything.
+- **Earn screen time by working out.** Pick the video and game apps to lock in Settings, then Earned screen time. Every workout minute earns minutes for them at a rate you set (1 minute of videos and half a minute of games by default). Open a locked app and use what you earned, up to 15 minutes at a time; it locks again when the time is up.
 
 ## What you need
 
 - A Mac with Xcode (tested with Xcode 27.2) and an iPhone simulator.
+- For Earned screen time, an iPhone: Apple's Screen Time locks run only on a device. To run on a phone, follow the signing step in [the app's README](app/README.md#run-it).
 - A Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey). The app uses `gemini-3.8-flash`; you pay Google for what you use.
 
 ## Run it

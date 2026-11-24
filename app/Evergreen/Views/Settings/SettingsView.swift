@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @State private var showMemory = false
+    @State private var showEarnedTime = false
     @State private var confirmForget = false
     @State private var usage = AIUsage.Day()
 
@@ -24,6 +25,20 @@ struct SettingsView: View {
                                 Spacer()
                                 let waiting = model.reviewRows.count
                                 Text(waiting == 0 ? "" : "\(waiting) to review").foregroundStyle(Theme.accent)
+                                Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Theme.textMuted)
+                            }
+                            .font(.body)
+                            .frame(minHeight: 44)
+                        }
+                        rule
+                    }
+                    section("Screen time") {
+                        Button { showEarnedTime = true } label: {
+                            HStack {
+                                Text("Earned screen time").foregroundStyle(Theme.text)
+                                Spacer()
+                                Text(model.earnedTime.isOn ? "\(model.earnedTime.minutes(.videos)) min" : "Off")
+                                    .foregroundStyle(Theme.textMuted)
                                 Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Theme.textMuted)
                             }
                             .font(.body)
@@ -84,6 +99,7 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .sheet(isPresented: $showMemory) { MemoryView() }
+            .sheet(isPresented: $showEarnedTime) { EarnedTimeView() }
             .confirmationDialog("Forget everything?", isPresented: $confirmForget, titleVisibility: .visible) {
                 Button("Forget everything", role: .destructive) { Task { await model.forget(.everything) } }
                 Button("Keep", role: .cancel) {}
