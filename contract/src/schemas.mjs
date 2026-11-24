@@ -996,5 +996,104 @@ export const SCHEMAS = {
         "maximum": 23
       }
     }
+  },
+  "user-rules": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "user-rules.schema.json",
+    "title": "User rules",
+    "description": "The rules the person set, as the app hands them to the plan engine (planContext, recommendWeek and checkPlan take them as `rules`). Never worked out from data. Where home is stays on the phone and is not part of this value. Every field is optional; a missing one takes its default in recommend-agent/src/rules.mjs.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "restWeekdays": {
+        "description": "Weekdays never planned, Monday 0 to Sunday 6.",
+        "type": "array",
+        "maxItems": 7,
+        "items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        }
+      },
+      "sessionMinutes": {
+        "description": "How long one home session lasts.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "min",
+          "max"
+        ],
+        "properties": {
+          "min": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 90
+          },
+          "max": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 90
+          }
+        }
+      },
+      "window": {
+        "description": "The earliest and the latest start, as HH:MM on the phone's clock.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from",
+          "to"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          }
+        }
+      },
+      "mornings": {
+        "description": "True lets a session start from 06:00. Off unless the person turns it on.",
+        "type": "boolean"
+      },
+      "equipment": {
+        "description": "What the person has to train with at home. Floor and wall are always there.",
+        "type": "array",
+        "items": {
+          "enum": [
+            "backpack",
+            "chair",
+            "table",
+            "sofa",
+            "book",
+            "step",
+            "floor",
+            "wall"
+          ]
+        }
+      },
+      "avoid": {
+        "description": "Movement ids never planned.",
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]{1,48}$"
+        }
+      },
+      "movements": {
+        "description": "Movement id to what it is to the person.",
+        "type": "object",
+        "additionalProperties": {
+          "enum": [
+            "untried",
+            "can",
+            "cannot"
+          ]
+        }
+      }
+    }
   }
 };

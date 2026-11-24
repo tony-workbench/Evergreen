@@ -809,10 +809,223 @@
     };
   }
 
+  // src/rules.mjs
+  var REST_WEEKDAYS = [2, 5, 6];
+  var SESSION_MIN = 20;
+  var SESSION_MAX = 25;
+  var WINDOW_FROM = "12:00";
+  var WINDOW_TO = "20:30";
+  var MORNING_FROM = "06:00";
+  var SLOT_MIN = 30;
+  var ALWAYS_THERE = ["floor", "wall"];
+  var EQUIPMENT = ["backpack", "chair", "table", "sofa", "book", "step", "floor", "wall"];
+  var DEFAULT_EQUIPMENT = ["backpack", "chair", "table", "sofa", "book", "step"];
+  var DAY_KINDS = ["home", "out", "rest"];
+  var MOVEMENT_STATES = ["untried", "can", "cannot"];
+  var MIN_LENGTH = 10;
+  var MAX_LENGTH = 90;
+  var ID = /^[a-z0-9_]{1,48}$/;
+  var bad = () => new InputError("bad_rules");
+  var whole = (v, fallback) => v === void 0 || v === null ? fallback : v;
+  function minutesOf(text) {
+    const m = typeof text === "string" ? /^(\d\d):(\d\d)$/.exec(text) : null;
+    if (!m || +m[1] > 23 || +m[2] > 59) return null;
+    return +m[1] * 60 + +m[2];
+  }
+  var clockText = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  function readWeekdays(list) {
+    const days = whole(list, REST_WEEKDAYS);
+    if (!Array.isArray(days) || !days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) throw bad();
+    return [...new Set(days)].sort((a, b) => a - b);
+  }
+  function readLength(length) {
+    const min = whole(length?.min, SESSION_MIN);
+    const max = whole(length?.max, SESSION_MAX);
+    if (!Number.isInteger(min) || !Number.isInteger(max) || min < MIN_LENGTH || max < min || max > MAX_LENGTH) throw bad();
+    return { min, max };
+  }
+  function readWindow(window, mornings) {
+    const from = minutesOf(whole(window?.from, WINDOW_FROM));
+    const to = minutesOf(whole(window?.to, WINDOW_TO));
+    if (from === null || to === null || to < from) throw bad();
+    return { from: mornings ? Math.min(from, minutesOf(MORNING_FROM)) : from, to };
+  }
+  function readIds(list) {
+    const ids = whole(list, []);
+    if (!Array.isArray(ids) || !ids.every((x) => typeof x === "string" && ID.test(x))) throw bad();
+    return [...new Set(ids)];
+  }
+  function readStates(map) {
+    const states = whole(map, {});
+    if (typeof states !== "object" || Array.isArray(states)) throw bad();
+    for (const [id, state] of Object.entries(states)) if (!ID.test(id) || !MOVEMENT_STATES.includes(state)) throw bad();
+    return { ...states };
+  }
+  function readRules(raw) {
+    if (raw === void 0 || raw === null) return null;
+    if (typeof raw !== "object" || Array.isArray(raw)) throw bad();
+    const mornings = raw.mornings === true;
+    const owned = readIds(whole(raw.equipment, DEFAULT_EQUIPMENT));
+    if (!owned.every((x) => EQUIPMENT.includes(x))) throw bad();
+    return {
+      restWeekdays: readWeekdays(raw.restWeekdays),
+      session: readLength(raw.sessionMinutes),
+      window: readWindow(raw.window, mornings),
+      mornings,
+      equipment: [.../* @__PURE__ */ new Set([...owned, ...ALWAYS_THERE])].sort(),
+      avoid: readIds(raw.avoid),
+      movements: readStates(raw.movements)
+    };
+  }
+  function rulesView(rules) {
+    return {
+      restWeekdays: rules.restWeekdays,
+      sessionMinutes: rules.session,
+      window: { from: clockText(rules.window.from), to: clockText(rules.window.to) },
+      mornings: rules.mornings,
+      equipment: rules.equipment,
+      avoid: rules.avoid
+    };
+  }
+  function readDayKinds(raw) {
+    const out = /* @__PURE__ */ new Map();
+    if (raw === void 0 || raw === null) return out;
+    if (typeof raw !== "object" || Array.isArray(raw)) throw new InputError("bad_day_kinds");
+    for (const [iso, kind] of Object.entries(raw)) {
+      if (!DAY_KINDS.includes(kind)) throw new InputError("bad_day_kinds");
+      let day;
+      try {
+        day = parseDay(iso);
+      } catch {
+        throw new InputError("bad_day_kinds");
+      }
+      out.set(day, kind);
+    }
+    return out;
+  }
+  function kindOf(rules, given, day) {
+    if (rules.restWeekdays.includes(weekdayOf(day))) return "rest";
+    return given.get(day) ?? "home";
+  }
+  var dayKindsView = (rules, given, firstDay, days) => Array.from({ length: days }, (_, i) => ({ day: dayISO(firstDay + i), kind: kindOf(rules, given, firstDay + i) }));
+
+  // src/homeweek.mjs
+  var LEAD_MIN = 60;
+  var TODAY_END_HOUR = 22;
+  var FALLBACK_GAP_MIN = 90;
+  var MAX_FALLBACKS = 2;
+  var ROUND_MIN = 5;
+  var SPLIT_DAYS = 4;
+  var FOCUS = ["full", "lower", "upper", "full_lower", "full_upper"];
+  var FOCUS_WORDS = { full: "full-body", lower: "lower-body", upper: "upper-body", full_lower: "full-body, more legs", full_upper: "full-body, more upper body" };
+  function homeContext({ now, calendar, rules, dayKinds, carry = [] }) {
+    return { now, today: dayOf(now), off: now.off, calendar: [...calendar].sort((x, y) => x.start.mic - y.start.mic), rules, given: dayKinds, carry };
+  }
+  function stretchesOn(h, day) {
+    if (kindOf(h.rules, h.given, day) !== "home") return [];
+    const isToday = day === h.today;
+    let from = atDay(day, h.off, 0, h.rules.window.from).mic;
+    if (isToday) from = Math.max(from, h.now.mic + LEAD_MIN * US_MIN);
+    let to = atDay(day, h.off, 0, h.rules.window.to + h.rules.session.max).mic;
+    if (isToday) to = Math.min(to, atDay(day, h.off, TODAY_END_HOUR).mic);
+    const out = [];
+    const push = (a, b) => {
+      if (b - a >= SLOT_MIN * US_MIN) out.push({ a, b });
+    };
+    for (const busy of h.calendar) {
+      if (busy.end.mic <= from || busy.start.mic >= to) continue;
+      push(from, Math.min(busy.start.mic, to));
+      from = Math.max(from, busy.end.mic);
+    }
+    if (from < to) push(from, to);
+    return out;
+  }
+  var roundUp = (mic) => Math.ceil(mic / (ROUND_MIN * US_MIN)) * ROUND_MIN * US_MIN;
+  function nextStart(h, day, stretches, after) {
+    const length = h.rules.session.max * US_MIN;
+    const latest = atDay(day, h.off, 0, h.rules.window.to).mic;
+    let best = null;
+    for (const s of stretches) {
+      const t = roundUp(Math.max(after, s.a));
+      if (t <= latest && t + length <= s.b && (best === null || t < best)) best = t;
+    }
+    return best;
+  }
+  function startsOn(h, day) {
+    const stretches = stretchesOn(h, day);
+    const first = nextStart(h, day, stretches, -Infinity);
+    if (first === null) return { first: null, fallbacks: [] };
+    const fallbacks = [];
+    let previous = first;
+    while (fallbacks.length < MAX_FALLBACKS) {
+      const t = nextStart(h, day, stretches, previous + FALLBACK_GAP_MIN * US_MIN);
+      if (t === null) break;
+      fallbacks.push(t);
+      previous = t;
+    }
+    return { first, fallbacks };
+  }
+  function splitOf(days) {
+    if (days.length >= SPLIT_DAYS) return days.map((_, i) => i % 2 === 0 ? "lower" : "upper");
+    const focus = days.map(() => "full");
+    if (days.length !== 3) return focus;
+    for (let i = 0; i + 1 < days.length; i += 1) {
+      if (days[i + 1] === days[i] + 1 && focus[i] === "full" && focus[i + 1] === "full") {
+        focus[i] = "full_lower";
+        focus[i + 1] = "full_upper";
+        i += 1;
+      }
+    }
+    return focus;
+  }
+  function withCarry(days, focus, carry) {
+    const missed = carry.filter((f) => FOCUS.includes(f));
+    if (!missed.length) return focus;
+    if (["lower", "upper"].includes(missed[0]) && days.length >= 2) {
+      const other = missed[0] === "lower" ? "upper" : "lower";
+      return days.map((_, i) => i % 2 === 0 ? missed[0] : other);
+    }
+    return [...missed, ...focus].slice(0, days.length);
+  }
+  function homeWeek(h, days = 7) {
+    const rows = [];
+    for (let i = 0; i < days; i += 1) {
+      const day = h.today + i;
+      const kind = kindOf(h.rules, h.given, day);
+      rows.push({ day, kind, focus: null, ...kind === "home" ? startsOn(h, day) : { first: null, fallbacks: [] } });
+    }
+    const training = rows.filter((r) => r.first !== null);
+    const focus = withCarry(training.map((r) => r.day), splitOf(training.map((r) => r.day)), h.carry);
+    training.forEach((r, i) => {
+      r.focus = focus[i];
+    });
+    const homeDays = rows.filter((r) => r.kind === "home").length;
+    let note = null;
+    if (training.length === 0) note = "There is no day at home with time to train this week, so nothing is planned.";
+    else if (training.length === 1) note = "This week has only one day at home with time to train, so it works the whole body once.";
+    return { days: rows, homeDays, trainingDays: training.length, note };
+  }
+  function homeWeekView(h, week) {
+    const at = (mic) => isoDT({ mic, off: h.off });
+    return {
+      days: week.days.map((r) => ({
+        day: dayISO(r.day),
+        weekday: WEEKDAY_NAMES[weekdayOf(r.day)],
+        kind: r.kind,
+        focus: r.focus,
+        first: r.first === null ? null : at(r.first),
+        fallbacks: r.fallbacks.map(at)
+      })),
+      homeDays: week.homeDays,
+      trainingDays: week.trainingDays,
+      note: week.note
+    };
+  }
+
   // src/workouts.mjs
   var DAYS = 7;
   var TODAY_LEAD_MIN = 60;
-  var TODAY_END_HOUR = 22;
+  var TODAY_END_HOUR2 = 22;
   var LOAD_GROWTH = 1.1;
   var ACWR_MAX = 1.3;
   var SLEEP_DROP_MIN = 30;
@@ -944,7 +1157,43 @@
     const shoes = a.shoes ? { boughtOn: day(a.shoes.boughtOn), startMiles: Number(a.shoes.startMiles ?? 0) } : null;
     if (shoes && (shoes.boughtOn === null || !Number.isFinite(shoes.startMiles))) throw new InputError("bad_shoes");
     const busy = (a.busy ?? a.calendar ?? []).map((b) => ({ start: parseDT(b.start), end: parseDT(b.end), title: typeof b.title === "string" ? b.title : null }));
-    return { now, shoes, newPairArrives: day(a.newPairArrives), raceDate: day(a.raceDate), busy, memory: a.memory ?? null, history: a.history ?? null, stopped: a.stopped ?? null };
+    const carry = Array.isArray(a.carry) ? a.carry.filter((f) => FOCUS.includes(f)) : [];
+    return {
+      now,
+      shoes,
+      newPairArrives: day(a.newPairArrives),
+      raceDate: day(a.raceDate),
+      busy,
+      memory: a.memory ?? null,
+      history: a.history ?? null,
+      stopped: a.stopped ?? null,
+      rules: readRules(a.rules),
+      dayKinds: readDayKinds(a.dayKinds),
+      carry
+    };
+  }
+  var HOME_EFFORT = 5;
+  function homeBuild(req, base) {
+    const h = homeContext({ now: req.now, calendar: req.busy, rules: req.rules, dayKinds: req.dayKinds, carry: req.carry });
+    const week = homeWeek(h);
+    const minutes = req.rules.session.max;
+    const sessions = week.days.filter((d) => d.focus !== null).map((d) => {
+      const start = { mic: d.first, off: req.now.off };
+      return {
+        date: d.day,
+        activityType: "TraditionalStrengthTraining",
+        usualActivity: "TraditionalStrengthTraining",
+        minutes,
+        effort: HOME_EFFORT,
+        hour: hourOf(start),
+        start,
+        end: addUs(start, minutes * US_MIN),
+        tags: [{ code: "home_day", focus: d.focus }],
+        fallbacks: d.fallbacks.map((mic) => ({ mic, off: req.now.off }))
+      };
+    });
+    base.sig.plannedLoad = pyRound(pySum(sessions.map((s) => s.effort * s.minutes)));
+    return { ...base, sessions, signals: base.sig, home: homeWeekView(h, week) };
   }
   function build(req, firstDay = 0) {
     const { now } = req;
@@ -959,6 +1208,7 @@
     const long = longDay(week);
     const hasBike = ws.some((w) => w.activityType === "Cycling");
     const tired = tiredSignals(sig);
+    if (req.rules) return homeBuild(req, { sig, condition: cond, memory: mem, memorySource: mem.given ? "phone" : null, historySource, week, long });
     let eased = false;
     let brokenIn = 0;
     const sessions = [];
@@ -1097,7 +1347,7 @@
       if (!s.race && isStopped(stopped, activityOf(s.activityType), weekdayOf(s.date), hourOf(s.start))) sessions.splice(i, 1);
     }
     if (sessions.length !== before) sig.plannedLoad = pyRound(load(sessions));
-    const tooLate = sessions.findIndex((s) => !s.race && s.date === dayOf(now) && s.end.mic > atDay(s.date, now.off, TODAY_END_HOUR).mic);
+    const tooLate = sessions.findIndex((s) => !s.race && s.date === dayOf(now) && s.end.mic > atDay(s.date, now.off, TODAY_END_HOUR2).mic);
     if (tooLate >= 0) {
       sessions.splice(tooLate, 1);
       sig.plannedLoad = pyRound(load(sessions));
@@ -1133,6 +1383,8 @@
         return { whole: "It ends late because the rest of that day is full, so skip it if that is too late." };
       case "race_day":
         return { whole: "Race day. Rest and fuel." };
+      case "home_day":
+        return { whole: `${weekday} is a day at home, so it has a ${FOCUS_WORDS[tag.focus] ?? "full-body"} strength session.` };
       default:
         return { whole: "" };
     }
@@ -1229,6 +1481,11 @@
   function summaryReasons(plan) {
     const sig = plan.signals;
     const out = [];
+    if (plan.home) {
+      const n = plan.home.trainingDays;
+      out.push({ code: "home_week", text: plan.home.note ?? `This week has ${plural(n, "day")} at home with time to train, so ${plural(n, "strength session")}.` });
+      return out;
+    }
     if (!plan.sessions.length) out.push({ code: "no_history", text: "Nothing is planned yet because there is not enough recent history to see your usual week." });
     else if (sig.loadRatio === null) out.push({ code: "load_unknown", text: "This week follows your usual pattern." });
     else if (sig.loadRatio < 0.9) {
@@ -1308,7 +1565,8 @@
       historySource: plan.historySource,
       live: false,
       source: "rules",
-      condition: plan.condition
+      condition: plan.condition,
+      ...plan.home ? { homeWeek: plan.home } : {}
     };
   }
 
@@ -1402,12 +1660,27 @@
     s.newPairArrives = day(ctx.newPairArrives ?? ctx.shoes?.newPairArrives);
     const goal = mem.rows.find((r) => r.kind === "goal" && r.data && RACE_GOAL.test(String(r.data.what ?? "")) && /^\d{4}-\d\d-\d\d/.test(String(r.data.date ?? "")));
     s.raceDate = day(ctx.raceDate ?? (goal ? goal.data.date : null));
+    applyRules(s, ctx);
     return s;
   }
+  function applyRules(s, ctx) {
+    s.rules = readRules(ctx.rules);
+    if (!s.rules) return;
+    s.dayKinds = readDayKinds(ctx.dayKinds);
+    s.home = homeContext({ now: s.now, calendar: s.calendar, rules: s.rules, dayKinds: s.dayKinds, carry: Array.isArray(ctx.carry) ? ctx.carry : [] });
+    s.homeWeek = homeWeek(s.home);
+    const n = s.homeWeek.trainingDays;
+    const minutes = n * s.rules.session.max;
+    s.maxSessions = Math.max(s.maxSessions, n);
+    if (s.minutes.limit !== null) s.minutes = { ...s.minutes, limit: Math.max(s.minutes.limit, minutes) };
+    if (s.loadCap !== null) s.loadCap = Math.max(s.loadCap, s.unit === "minutes" ? minutes : minutes * EFFORT_OF.steady);
+    s.streak = DAYS;
+  }
   function freeOn(s, dayNum) {
+    if (s.rules) return stretchesOn(s.home, dayNum).map((x) => ({ day: dayISO(dayNum), start: isoDT({ mic: x.a, off: s.now.off }), end: isoDT({ mic: x.b, off: s.now.off }) }));
     const today = dayNum === s.today;
     let from = Math.max(atDay(dayNum, s.now.off, DAY_START_HOUR).mic, today ? s.now.mic + TODAY_LEAD_MIN * US_MIN : 0);
-    const to = atDay(dayNum, s.now.off, today ? TODAY_END_HOUR : DAY_END_HOUR).mic;
+    const to = atDay(dayNum, s.now.off, today ? TODAY_END_HOUR2 : DAY_END_HOUR).mic;
     const out = [];
     const push = (a, b) => {
       if (b - a >= MIN_SESSION * US_MIN) out.push({ day: dayISO(dayNum), start: isoDT({ mic: a, off: s.now.off }), end: isoDT({ mic: b, off: s.now.off }) });
@@ -1461,7 +1734,12 @@
       usuallyHardDays: [...s.week].filter(([, u]) => u.effort !== null && u.effort >= HARD_EFFORT).map(([wd]) => wd).sort((a, b) => a - b),
       activities: ACTIVITIES,
       intensities: INTENSITIES,
-      limits: { minMinutes: MIN_MINUTES, maxMinutes: MAX_MINUTES, shortestSession: MIN_SESSION, wornShoeRunMin: WORN_RUN_MAX_MIN, breakInRunMin: BREAK_IN_MIN }
+      limits: { minMinutes: MIN_MINUTES, maxMinutes: MAX_MINUTES, shortestSession: MIN_SESSION, wornShoeRunMin: WORN_RUN_MAX_MIN, breakInRunMin: BREAK_IN_MIN },
+      ...s.rules ? {
+        rules: rulesView(s.rules),
+        days: dayKindsView(s.rules, s.dayKinds, s.today, DAYS),
+        homeWeek: homeWeekView(s.home, s.homeWeek)
+      } : {}
     };
   }
   var ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
@@ -1473,7 +1751,7 @@
     const c = planContext(args?.context ?? args);
     const lines = [];
     const today = c.window.from;
-    lines.push(`Plan from today, ${dayWords(today)}, through ${dayWords(c.window.to)}; today nothing starts before ${timeWords(c.window.earliestStart)} or ends after ${clock(TODAY_END_HOUR)}.`);
+    lines.push(`Plan from today, ${dayWords(today)}, through ${dayWords(c.window.to)}; today nothing starts before ${timeWords(c.window.earliestStart)} or ends after ${clock(TODAY_END_HOUR2)}.`);
     lines.push("Use only activities the app knows, and give each session a day, a start time and a length.");
     lines.push(`Every session lasts between ${MIN_MINUTES} and ${MAX_MINUTES} minutes, and no two sessions overlap.`);
     const groups = /* @__PURE__ */ new Map();
@@ -1510,6 +1788,7 @@
     const arrives = c.newPairArrives;
     if (c.shoe && c.shoe.status === "replace") lines.push(`The running shoes are nearly worn out: no run longer than ${WORN_RUN_MAX_MIN} minutes${arrives ? ` until the new pair arrives on ${dayWords(arrives)}` : ""}.`);
     if (arrives) lines.push(`The first two runs after the new pair arrives on ${dayWords(arrives)} are easy and at most ${BREAK_IN_MIN} minutes.`);
+    if (c.rules) rulesBrief(c, lines);
     const byDay = /* @__PURE__ */ new Map();
     for (const f of c.freeSlots) {
       if (!byDay.has(f.day)) byDay.set(f.day, []);
@@ -1517,12 +1796,29 @@
     }
     for (let d = parseDay(today); d <= parseDay(c.window.to); d += 1) {
       const free = byDay.get(dayISO(d));
+      const kind = c.days?.find((x) => x.day === dayISO(d))?.kind;
+      if (kind === "rest" || kind === "out") {
+        lines.push(`${dayWords(dayISO(d))} is ${kind === "rest" ? "a rest day by the person's rules" : "a day out"}: plan nothing.`);
+        continue;
+      }
       lines.push(free ? `Free on ${dayWords(dayISO(d))}: ${free.join(", ")}.` : `Nothing is free on ${dayWords(dayISO(d))}.`);
     }
     lines.push("Say a session comes from a habit only when that habit is in the memory you were given.");
     for (const x of c.stoppedSlots) lines.push(`Do not plan ${x.activity === "other" ? x.label || "sessions" : PLURAL[x.activity]} on ${WEEKDAY_NAMES[x.weekday]} at ${clock(x.hour)}.`);
     if (c.stoppedKeys.length) lines.push("Do not bring back any habit that was stopped.");
     return { lines };
+  }
+  var listWords = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} or ${xs[xs.length - 1]}`;
+  var ruleClock = (text) => clock(Number(text.slice(0, 2)), Number(text.slice(3, 5)));
+  function rulesBrief(c, lines) {
+    const r = c.rules;
+    const never = r.restWeekdays.map((wd) => WEEKDAY_NAMES[wd]);
+    lines.push(`The person's own rules: never plan on ${never.length ? `${listWords(never)}, or on ` : ""}a day they are out.`);
+    lines.push(`Every day at home with time to train has exactly one strength session of ${r.sessionMinutes.min} to ${r.sessionMinutes.max} minutes, starting between ${ruleClock(r.window.from)} and ${ruleClock(r.window.to)}.`);
+    for (const d of c.homeWeek.days) {
+      if (d.focus) lines.push(`${dayWords(d.day)} is at home: a ${FOCUS_WORDS[d.focus]} strength session, first free at ${timeWords(d.first)}.`);
+    }
+    if (c.homeWeek.note) lines.push(c.homeWeek.note);
   }
   function readSession(a, index, s) {
     if (!a || typeof a !== "object") return { index, error: "invalid_session" };
@@ -1582,14 +1878,14 @@
     items.sort((a, b) => a.start.mic - b.start.mic || a.index - b.index);
     const windowEnd = atDay(s.today + DAYS, s.now.off).mic;
     const earliest = s.now.mic + TODAY_LEAD_MIN * US_MIN;
-    const todayEnd = atDay(s.today, s.now.off, TODAY_END_HOUR).mic;
+    const todayEnd = atDay(s.today, s.now.off, TODAY_END_HOUR2).mic;
     for (const x of items) {
       if (x.minutes < MIN_MINUTES) add("bad_duration", x, `${what(x)} is shorter than ${MIN_MINUTES} minutes.`, `lengthen to \u2265${MIN_MINUTES} min`);
       else if (x.minutes > MAX_MINUTES) add("bad_duration", x, `${what(x)} is longer than ${MAX_MINUTES} minutes.`, `shorten to \u2264${MAX_MINUTES} min`);
       if (x.start.mic < s.now.mic) add("outside_window", x, `${what(x)} is in the past.`, `move to ${hhmm({ mic: earliest, off: s.now.off })} or later`);
       else if (x.start.mic >= windowEnd) add("outside_window", x, `${what(x)} is outside the ${DAYS} days that start today.`, `move to ${dayISO(s.today + DAYS - 1)} or earlier`);
       else if (x.start.mic < earliest) add("outside_window", x, `${what(x)} starts too soon to get ready for.`, `move to ${hhmm({ mic: earliest, off: s.now.off })} or later`);
-      else if (x.day === s.today && x.end.mic > todayEnd) add("outside_window", x, `${what(x)} would end too late tonight.`, `end by ${TODAY_END_HOUR}:00 or move to tomorrow`);
+      else if (x.day === s.today && x.end.mic > todayEnd) add("outside_window", x, `${what(x)} would end too late tonight.`, `end by ${TODAY_END_HOUR2}:00 or move to tomorrow`);
       const busy = s.calendar.find((b) => b.start.mic < x.end.mic && x.start.mic < b.end.mic);
       if (busy) add("calendar_conflict", x, `${what(x)} overlaps ${busy.title ? `"${busy.title}"` : "something"} on your calendar.`, `move after ${hhmm({ mic: busy.end.mic, off: s.now.off })}`);
       if (isStopped(s.stopped, x.activity, weekdayOf(x.day), hourOf(x.start))) {
@@ -1666,6 +1962,7 @@
     for (const [d, x] of hardDays) {
       if (hardDays.has(d - 1) && !(usuallyHard(d) && usuallyHard(d - 1))) add("back_to_back_hard", x, `${what(x)} is hard and so is the day before.`, "make it easy or move it a day later");
     }
+    if (s.rules) checkRules(s, items, add);
     found.sort((a, b) => (a.action ?? 1e9) - (b.action ?? 1e9));
     const where = (v) => ({ ...v.action === null ? {} : { action: v.action }, ...v.sessionId ? { sessionId: v.sessionId } : {} });
     return {
@@ -1674,6 +1971,29 @@
       hints: found.map((v) => ({ code: v.code, ...where(v), fix: v.fix })),
       load: { unit: s.unit, planned: pyRound(planned), cap: s.loadCap }
     };
+  }
+  function checkRules(s, items, add) {
+    const r = s.rules;
+    const at = (minutes) => clock(Math.floor(minutes / 60), minutes % 60);
+    for (const x of items) {
+      const kind = kindOf(r, s.dayKinds, x.day);
+      if (kind === "rest") add("rest_day_rule", x, `${dayName(x.day)} is a day you never train.`, "remove this session");
+      else if (kind === "out") add("out_day_rule", x, `You are out on ${dayName(x.day)}, so nothing is planned that day.`, "remove this session");
+      else if (x.activity === "strength") {
+        const minute = (x.start.mic - atDay(x.day, s.now.off).mic) / US_MIN;
+        if (minute < r.window.from || minute > r.window.to) add("outside_rule_hours", x, `${what(x)} starts outside the hours you allow.`, `start between ${at(r.window.from)} and ${at(r.window.to)}`);
+        if (x.minutes < r.session.min || x.minutes > r.session.max) add("session_length_rule", x, `${what(x)} is not ${r.session.min} to ${r.session.max} minutes long.`, `make it ${r.session.max} min`);
+      }
+    }
+    for (const d of s.homeWeek.days) {
+      if (d.first === null || items.some((x) => x.day === d.day && x.activity === "strength")) continue;
+      add(
+        "home_day_missing",
+        null,
+        `${dayName(d.day)} is a day at home, and every day at home has a workout.`,
+        `add a ${r.session.max}-minute strength session on ${dayISO(d.day)} at ${hhmm({ mic: d.first, off: s.now.off })}`
+      );
+    }
   }
   function explainAction(args) {
     const action = args?.action ?? args?.session;
@@ -1756,6 +2076,8 @@
     bad_context: "The context is missing.",
     bad_plan: "The plan has no list of sessions.",
     bad_action: "There is no session to explain.",
+    bad_rules: "Your rules could not be read.",
+    bad_day_kinds: "A day is marked as something other than home, out or rest.",
     missing_history: "There is no workout history to plan from.",
     internal: "Something went wrong while working this out."
   };

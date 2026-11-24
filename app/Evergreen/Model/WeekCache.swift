@@ -12,10 +12,13 @@ struct WeekCache: Codable, Equatable, Sendable {
     static let storeKey = "planned_week"
 
     /// What a week depends on, as one short string.
-    static func key(day: String, rows: [MemoryRow], busy: [Busy]) -> String {
+    static func key(day: String, rows: [MemoryRow], busy: [Busy], rules: String = "") -> String {
         let memory = rows.map { "\($0.key)|\($0.state)|\($0.statement)|\($0.data.text)" }.sorted().joined(separator: "\n")
         let calendar = busy.map { "\(Int($0.start.timeIntervalSince1970))-\(Int($0.end.timeIntervalSince1970))" }.sorted().joined(separator: ",")
-        let digest = SHA256.hash(data: Data("\(memory)\n#\n\(calendar)".utf8))
+        // The rules and each day's kind: a changed rule or a day that became a day out plans the week again.
+        // Without rules this adds nothing, so a week kept before rules existed still matches.
+        let text = rules.isEmpty ? "\(memory)\n#\n\(calendar)" : "\(memory)\n#\n\(calendar)\n#\n\(rules)"
+        let digest = SHA256.hash(data: Data(text.utf8))
         return day + ":" + digest.prefix(8).map { String(format: "%02x", $0) }.joined()
     }
 

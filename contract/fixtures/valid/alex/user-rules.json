@@ -1,0 +1,31 @@
+{
+  "restWeekdays": [
+    2,
+    5,
+    6
+  ],
+  "sessionMinutes": {
+    "min": 20,
+    "max": 25
+  },
+  "window": {
+    "from": "12:00",
+    "to": "20:30"
+  },
+  "mornings": false,
+  "equipment": [
+    "backpack",
+    "chair",
+    "table",
+    "sofa",
+    "book",
+    "step"
+  ],
+  "avoid": [
+    "jump_squat"
+  ],
+  "movements": {
+    "split_squat": "can",
+    "push_up": "untried"
+  }
+}

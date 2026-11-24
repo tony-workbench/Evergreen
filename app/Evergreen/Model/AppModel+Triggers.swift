@@ -39,6 +39,8 @@ extension AppModel {
     func checkTriggers(foreground: Bool) async {
         guard onDevice, triggers.isSetUp, onboarded, deviceUnlocked else { return }
         if !foreground { await tick() }
+        // With the app open: a phone far from home makes today a day out (needs a home set in My rules).
+        if foreground { await checkFarFromHome() }
         // Each check runs only while its switch in Settings is on.
         if Automatic.rain.isOn(settings) { await triggers.checkRain(now: now, mayAsk: foreground) }
         if Automatic.shoes.isOn(settings) { await triggers.checkShoes(now: now) }

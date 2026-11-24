@@ -9,6 +9,8 @@ import { workoutIdeas } from './data.mjs';
 import { readMemory, slotFor, activityOf, labelOf, readStopped, isStopped } from './memory.mjs';
 import { readHistory } from './history.mjs';
 import { condition } from './condition.mjs';
+import { readRules, readDayKinds } from './rules.mjs';
+import { homeContext, homeWeek, homeWeekView, FOCUS, FOCUS_WORDS } from './homeweek.mjs';
 
 export const DAYS = 7;               // the week is 7 local days starting today
 export const TODAY_LEAD_MIN = 60;    // a session today starts at least this long after now
@@ -157,7 +159,30 @@ export function parseRequest(a) {
   const shoes = a.shoes ? { boughtOn: day(a.shoes.boughtOn), startMiles: Number(a.shoes.startMiles ?? 0) } : null;
   if (shoes && (shoes.boughtOn === null || !Number.isFinite(shoes.startMiles))) throw new InputError('bad_shoes');
   const busy = (a.busy ?? a.calendar ?? []).map((b) => ({ start: parseDT(b.start), end: parseDT(b.end), title: typeof b.title === 'string' ? b.title : null }));
-  return { now, shoes, newPairArrives: day(a.newPairArrives), raceDate: day(a.raceDate), busy, memory: a.memory ?? null, history: a.history ?? null, stopped: a.stopped ?? null };
+  const carry = Array.isArray(a.carry) ? a.carry.filter((f) => FOCUS.includes(f)) : [];
+  return {
+    now, shoes, newPairArrives: day(a.newPairArrives), raceDate: day(a.raceDate), busy, memory: a.memory ?? null, history: a.history ?? null, stopped: a.stopped ?? null,
+    rules: readRules(a.rules), dayKinds: readDayKinds(a.dayKinds), carry,
+  };
+}
+
+const HOME_EFFORT = 5;   // a home strength session counts as steady
+
+/** With rules: one strength session on every day at home, at its first free time, and nothing on rest or out days. */
+function homeBuild(req, base) {
+  const h = homeContext({ now: req.now, calendar: req.busy, rules: req.rules, dayKinds: req.dayKinds, carry: req.carry });
+  const week = homeWeek(h);
+  const minutes = req.rules.session.max;
+  const sessions = week.days.filter((d) => d.focus !== null).map((d) => {
+    const start = { mic: d.first, off: req.now.off };
+    return {
+      date: d.day, activityType: 'TraditionalStrengthTraining', usualActivity: 'TraditionalStrengthTraining', minutes, effort: HOME_EFFORT,
+      hour: hourOf(start), start, end: addUs(start, minutes * US_MIN), tags: [{ code: 'home_day', focus: d.focus }],
+      fallbacks: d.fallbacks.map((mic) => ({ mic, off: req.now.off })),
+    };
+  });
+  base.sig.plannedLoad = pyRound(pySum(sessions.map((s) => s.effort * s.minutes)));
+  return { ...base, sessions, signals: base.sig, home: homeWeekView(h, week) };
 }
 
 /**
@@ -177,6 +202,7 @@ export function build(req, firstDay = 0) {
   const long = longDay(week);
   const hasBike = ws.some((w) => w.activityType === 'Cycling');
   const tired = tiredSignals(sig);
+  if (req.rules) return homeBuild(req, { sig, condition: cond, memory: mem, memorySource: mem.given ? 'phone' : null, historySource, week, long });
   let eased = false;
   let brokenIn = 0;
   const sessions = [];
@@ -345,6 +371,7 @@ function wording(tag, s) {
     case 'calendar_moved': return { part: `moved to ${tag.to} because your calendar is busy before that` };
     case 'no_free_slot': return { whole: 'It ends late because the rest of that day is full, so skip it if that is too late.' };
     case 'race_day': return { whole: 'Race day. Rest and fuel.' };
+    case 'home_day': return { whole: `${weekday} is a day at home, so it has a ${FOCUS_WORDS[tag.focus] ?? 'full-body'} strength session.` };
     default: return { whole: '' };
   }
 }
@@ -439,6 +466,11 @@ export function citations(s) {
 export function summaryReasons(plan) {
   const sig = plan.signals;
   const out = [];
+  if (plan.home) {
+    const n = plan.home.trainingDays;
+    out.push({ code: 'home_week', text: plan.home.note ?? `This week has ${plural(n, 'day')} at home with time to train, so ${plural(n, 'strength session')}.` });
+    return out;
+  }
   if (!plan.sessions.length) out.push({ code: 'no_history', text: 'Nothing is planned yet because there is not enough recent history to see your usual week.' });
   else if (sig.loadRatio === null) out.push({ code: 'load_unknown', text: 'This week follows your usual pattern.' });
   else if (sig.loadRatio < 0.9) {
@@ -500,5 +532,6 @@ export function recommendWeek(args, firstDay = 0) {
     sessions, reasons: reasonsById, notes, summary: sentence(summary), summaryReasons: summary, signals: plan.signals,
     actions, suggestions: suggestions(req, plan, ids, firstDay), memoryUsed: [...new Set(sessions.flatMap((x) => x.basedOn))],
     memorySource: plan.memorySource, historySource: plan.historySource, live: false, source: 'rules', condition: plan.condition,
+    ...(plan.home ? { homeWeek: plan.home } : {}),
   };
 }

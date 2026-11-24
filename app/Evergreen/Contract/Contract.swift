@@ -20,6 +20,14 @@ struct Slot: Codable, Hashable {
 struct Busy: Codable, Hashable {
     var start: Date
     var end: Date
+    /// Where the event is, when it says: used on the phone to tell a day out from a day at home, and never sent anywhere.
+    var place: EventPlace? = nil
+}
+
+/// An event's place: the coordinate the calendar keeps for it, or only the text the person typed.
+enum EventPlace: Codable, Hashable, Sendable {
+    case coordinate(Coordinate)
+    case text(String)
 }
 
 /// One workout on the plan: something the person added, or the tour's fixed week.

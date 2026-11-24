@@ -89,6 +89,7 @@ struct TodayView: View {
                         .frame(minHeight: 44)
                     }
                 }
+                GoingOutRow()
                 if let problem = model.planProblem, model.aiConnected {
                     Text(problem)
                         .font(.footnote)

@@ -11,6 +11,7 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     @State private var showMemory = false
     @State private var showEarnedTime = false
+    @State private var showRules = false
     @State private var confirmForget = false
     @State private var usage = AIUsage.Day()
 
@@ -18,6 +19,22 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.lg) {
+                    section("My rules") {
+                        Button { showRules = true } label: {
+                            VStack(alignment: .leading, spacing: 0) {
+                                ruleLine("Never plan on", model.userRules.isOn ? model.userRules.restDaysText : "Off")
+                                if model.userRules.isOn {
+                                    ruleLine("Days I go out", "No workout")
+                                    ruleLine("Days I'm home all day", "Always plan one")
+                                    ruleLine("Session length", model.userRules.lengthText)
+                                    ruleLine("Plan between", model.userRules.windowText)
+                                    ruleLine("Equipment", model.userRules.equipmentText)
+                                    ruleLine("Movements to avoid", "\(model.userRules.avoid.count)")
+                                }
+                            }
+                        }
+                        rule
+                    }
                     section("Your memory") {
                         Button { showMemory = true } label: {
                             HStack {
@@ -100,6 +117,7 @@ struct SettingsView: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .sheet(isPresented: $showMemory) { MemoryView() }
             .sheet(isPresented: $showEarnedTime) { EarnedTimeView() }
+            .sheet(isPresented: $showRules) { MyRulesView() }
             .confirmationDialog("Forget everything?", isPresented: $confirmForget, titleVisibility: .visible) {
                 Button("Forget everything", role: .destructive) { Task { await model.forget(.everything) } }
                 Button("Keep", role: .cancel) {}
@@ -111,6 +129,16 @@ struct SettingsView: View {
     }
 
     private var rule: some View { Rectangle().fill(Theme.rule).frame(height: 1) }
+
+    private func ruleLine(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title).foregroundStyle(Theme.text)
+            Spacer()
+            Text(value).foregroundStyle(Theme.textMuted)
+        }
+        .font(.body)
+        .frame(minHeight: 36)
+    }
 
     private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 0) {

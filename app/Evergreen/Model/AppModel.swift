@@ -61,6 +61,10 @@ final class AppModel {
     var celebration = 0
     /// Screen time earned by working out (ScreenTime/EarnedTimeModel.swift).
     let earnedTime = EarnedTimeModel()
+    /// The rules the person set (Model/UserRules.swift); off until they answer "How you train" or import a profile.
+    var userRules = UserRules()
+    /// Each of the next seven days as home, out or rest, worked out on the phone (AppModel+Rules.swift).
+    var dayKinds: [String: DayKind] = [:]
     /// Whether notifications are allowed.
     private(set) var notificationAccess: NotificationAccess = .notAsked
 
@@ -107,6 +111,7 @@ final class AppModel {
         }
         save()
         guard onDevice else { return }
+        userRules = UserRules.load(from: settings)
         self.calendarSync.onChange = { [weak self] in self?.calendarChanged() }
         notifier.onOpen = { [weak self] in Task { await self?.tick() } }
         notifier.onUndo = { [weak self] id in self?.undoMove(id) }
@@ -301,9 +306,10 @@ final class AppModel {
         await scheduleNotifications()
     }
 
-    private func scheduleNotifications() async {
+    func scheduleNotifications() async {
         guard onDevice, deviceUnlocked else { return }
-        let upcoming = plan.filter { completion(for: $0) == nil }
+        // A day out has no reminders: the person said they're out, or the phone was far from home when the app opened.
+        let upcoming = plan.filter { completion(for: $0) == nil && !isDayOut($0.slot.start) }
         await notifier.scheduleReminders(for: upcoming)
     }
 

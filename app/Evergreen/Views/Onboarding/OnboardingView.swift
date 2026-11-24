@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// Onboarding: the tour, the three permissions on one page, what Evergreen
+/// Onboarding: the tour, the three permissions on one page, "How you train"
+/// (five skippable questions that become the person's rules), what Evergreen
 /// noticed (worked out on the phone, the pay-off for the permissions), then
 /// "Connect your AI" (which can be put off), and straight into Today, where
 /// the first week is being planned.
 struct OnboardingView: View {
-    enum Step { case tour, permissions, noticed, connect }
+    enum Step { case tour, permissions, howYouTrain, noticed, connect }
 
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -17,7 +18,10 @@ struct OnboardingView: View {
             case .tour:
                 TourView(onDone: { step = .permissions })
             case .permissions:
-                PermissionsView(onContinue: { step = .noticed })
+                PermissionsView(onContinue: { step = .howYouTrain })
+                    .transition(.move(edge: .trailing))
+            case .howYouTrain:
+                HowYouTrainView(onContinue: { step = .noticed })
                     .transition(.move(edge: .trailing))
             case .noticed:
                 NoticedView(onContinue: { if model.aiConnected { model.completeOnboarding() } else { step = .connect } })

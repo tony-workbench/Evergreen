@@ -7,6 +7,10 @@
 //   explainAction({ action, memory })                                                                 -> { ok, text, basedOn, memory }
 //   checkWeek({ sessions, calendar })                                                                 -> { ok, conflicts }
 //   planBrief({ context })                                                                            -> { ok, lines: [string] }   the week's constraints as plain sentences for the model
+//
+// Every context may also carry the person's `rules` ({ restWeekdays, sessionMinutes, window, mornings, equipment, avoid,
+// movements }), `dayKinds` ({ "YYYY-MM-DD": "home" | "out" | "rest" }) and `carry` (what a missed session worked). With
+// `rules`, every day at home with time to train gets one strength session and the context carries `homeWeek`.
 import { recommendWeek } from '../workouts.mjs';
 import { planContext, checkPlan, explainAction, checkWeek, planBrief } from '../plan.mjs';
 
@@ -21,6 +25,8 @@ const TEXT = {
   bad_context: 'The context is missing.',
   bad_plan: 'The plan has no list of sessions.',
   bad_action: 'There is no session to explain.',
+  bad_rules: 'Your rules could not be read.',
+  bad_day_kinds: 'A day is marked as something other than home, out or rest.',
   missing_history: 'There is no workout history to plan from.',
   internal: 'Something went wrong while working this out.',
 };

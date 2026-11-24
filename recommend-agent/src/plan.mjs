@@ -11,6 +11,8 @@ import {
   signals, tiredSignals, usualWeek, longDay, intensityOf, sessionLimit, minutesBudget, HIGH_LOAD_RATIO, TODAY_LEAD_MIN, TODAY_END_HOUR, LONG_RUN_MIN,
   DAYS, LOAD_GROWTH, ACWR_MAX, SLEEP_DROP_MIN, RHR_RISE, TAPER_DAYS, WORN_RUN_MAX_MIN, BREAK_IN_MIN, MIN_SESSION, HARD_EFFORT, EASY_EFFORT,
 } from './workouts.mjs';
+import { readRules, readDayKinds, rulesView, kindOf, dayKindsView } from './rules.mjs';
+import { homeContext, homeWeek, homeWeekView, stretchesOn, FOCUS_WORDS } from './homeweek.mjs';
 
 export const MIN_MINUTES = 10;
 export const MAX_MINUTES = 180;
@@ -108,11 +110,31 @@ export function situation(ctx) {
   s.newPairArrives = day(ctx.newPairArrives ?? ctx.shoes?.newPairArrives);
   const goal = mem.rows.find((r) => r.kind === 'goal' && r.data && RACE_GOAL.test(String(r.data.what ?? '')) && /^\d{4}-\d\d-\d\d/.test(String(r.data.date ?? '')));
   s.raceDate = day(ctx.raceDate ?? (goal ? goal.data.date : null));
+  applyRules(s, ctx);
   return s;
+}
+
+/**
+ * With the person's rules, every day at home with time to train gets one session, so the limits that come from the
+ * usual week (how many sessions, how many minutes, how many days in a row) never stand in its way.
+ */
+function applyRules(s, ctx) {
+  s.rules = readRules(ctx.rules);
+  if (!s.rules) return;
+  s.dayKinds = readDayKinds(ctx.dayKinds);
+  s.home = homeContext({ now: s.now, calendar: s.calendar, rules: s.rules, dayKinds: s.dayKinds, carry: Array.isArray(ctx.carry) ? ctx.carry : [] });
+  s.homeWeek = homeWeek(s.home);
+  const n = s.homeWeek.trainingDays;
+  const minutes = n * s.rules.session.max;
+  s.maxSessions = Math.max(s.maxSessions, n);
+  if (s.minutes.limit !== null) s.minutes = { ...s.minutes, limit: Math.max(s.minutes.limit, minutes) };
+  if (s.loadCap !== null) s.loadCap = Math.max(s.loadCap, s.unit === 'minutes' ? minutes : minutes * EFFORT_OF.steady);
+  s.streak = DAYS;
 }
 
 // The free stretches of one day between 06:00 and 21:00, at least 20 minutes long. Today: from an hour after `now`, until 22:00.
 function freeOn(s, dayNum) {
+  if (s.rules) return stretchesOn(s.home, dayNum).map((x) => ({ day: dayISO(dayNum), start: isoDT({ mic: x.a, off: s.now.off }), end: isoDT({ mic: x.b, off: s.now.off }) }));
   const today = dayNum === s.today;
   let from = Math.max(atDay(dayNum, s.now.off, DAY_START_HOUR).mic, today ? s.now.mic + TODAY_LEAD_MIN * US_MIN : 0);
   const to = atDay(dayNum, s.now.off, today ? TODAY_END_HOUR : DAY_END_HOUR).mic;
@@ -157,6 +179,11 @@ export function planContext(ctx) {
     usuallyHardDays: [...s.week].filter(([, u]) => u.effort !== null && u.effort >= HARD_EFFORT).map(([wd]) => wd).sort((a, b) => a - b),
     activities: ACTIVITIES, intensities: INTENSITIES,
     limits: { minMinutes: MIN_MINUTES, maxMinutes: MAX_MINUTES, shortestSession: MIN_SESSION, wornShoeRunMin: WORN_RUN_MAX_MIN, breakInRunMin: BREAK_IN_MIN },
+    ...(s.rules ? {
+      rules: rulesView(s.rules),
+      days: dayKindsView(s.rules, s.dayKinds, s.today, DAYS),
+      homeWeek: homeWeekView(s.home, s.homeWeek),
+    } : {}),
   };
 }
 
@@ -219,6 +246,7 @@ export function planBrief(args) {
   if (c.shoe && c.shoe.status === 'replace') lines.push(`The running shoes are nearly worn out: no run longer than ${WORN_RUN_MAX_MIN} minutes${arrives ? ` until the new pair arrives on ${dayWords(arrives)}` : ''}.`);
   if (arrives) lines.push(`The first two runs after the new pair arrives on ${dayWords(arrives)} are easy and at most ${BREAK_IN_MIN} minutes.`);
 
+  if (c.rules) rulesBrief(c, lines);
   const byDay = new Map();
   for (const f of c.freeSlots) {
     if (!byDay.has(f.day)) byDay.set(f.day, []);
@@ -226,6 +254,8 @@ export function planBrief(args) {
   }
   for (let d = parseDay(today); d <= parseDay(c.window.to); d += 1) {
     const free = byDay.get(dayISO(d));
+    const kind = c.days?.find((x) => x.day === dayISO(d))?.kind;
+    if (kind === 'rest' || kind === 'out') { lines.push(`${dayWords(dayISO(d))} is ${kind === 'rest' ? 'a rest day by the person\'s rules' : 'a day out'}: plan nothing.`); continue; }
     lines.push(free ? `Free on ${dayWords(dayISO(d))}: ${free.join(', ')}.` : `Nothing is free on ${dayWords(dayISO(d))}.`);
   }
 
@@ -233,6 +263,21 @@ export function planBrief(args) {
   for (const x of c.stoppedSlots) lines.push(`Do not plan ${x.activity === 'other' ? x.label || 'sessions' : PLURAL[x.activity]} on ${WEEKDAY_NAMES[x.weekday]} at ${clock(x.hour)}.`);
   if (c.stoppedKeys.length) lines.push('Do not bring back any habit that was stopped.');
   return { lines };
+}
+
+const listWords = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} or ${xs[xs.length - 1]}`);
+const ruleClock = (text) => clock(Number(text.slice(0, 2)), Number(text.slice(3, 5)));
+
+// The person's rules as sentences. Only home, out and rest reach the model: never where an event is or what it is called.
+function rulesBrief(c, lines) {
+  const r = c.rules;
+  const never = r.restWeekdays.map((wd) => WEEKDAY_NAMES[wd]);
+  lines.push(`The person's own rules: never plan on ${never.length ? `${listWords(never)}, or on ` : ''}a day they are out.`);
+  lines.push(`Every day at home with time to train has exactly one strength session of ${r.sessionMinutes.min} to ${r.sessionMinutes.max} minutes, starting between ${ruleClock(r.window.from)} and ${ruleClock(r.window.to)}.`);
+  for (const d of c.homeWeek.days) {
+    if (d.focus) lines.push(`${dayWords(d.day)} is at home: a ${FOCUS_WORDS[d.focus]} strength session, first free at ${timeWords(d.first)}.`);
+  }
+  if (c.homeWeek.note) lines.push(c.homeWeek.note);
 }
 
 // One proposed session { id?, day, start, minutes, activity, intensity?, basedOn? } (start: ISO with offset, or HH:MM on `day`),
@@ -399,6 +444,8 @@ export function checkPlan(args) {
     if (hardDays.has(d - 1) && !(usuallyHard(d) && usuallyHard(d - 1))) add('back_to_back_hard', x, `${what(x)} is hard and so is the day before.`, 'make it easy or move it a day later');
   }
 
+  if (s.rules) checkRules(s, items, add);
+
   found.sort((a, b) => (a.action ?? 1e9) - (b.action ?? 1e9));
   const where = (v) => ({ ...(v.action === null ? {} : { action: v.action }), ...(v.sessionId ? { sessionId: v.sessionId } : {}) });
   return {
@@ -407,6 +454,28 @@ export function checkPlan(args) {
     hints: found.map((v) => ({ code: v.code, ...where(v), fix: v.fix })),
     load: { unit: s.unit, planned: pyRound(planned), cap: s.loadCap },
   };
+}
+
+// The person's rules: nothing on a rest day or a day out, home sessions within their hours and length, and no day at
+// home with time to train left without one.
+function checkRules(s, items, add) {
+  const r = s.rules;
+  const at = (minutes) => clock(Math.floor(minutes / 60), minutes % 60);
+  for (const x of items) {
+    const kind = kindOf(r, s.dayKinds, x.day);
+    if (kind === 'rest') add('rest_day_rule', x, `${dayName(x.day)} is a day you never train.`, 'remove this session');
+    else if (kind === 'out') add('out_day_rule', x, `You are out on ${dayName(x.day)}, so nothing is planned that day.`, 'remove this session');
+    else if (x.activity === 'strength') {
+      const minute = (x.start.mic - atDay(x.day, s.now.off).mic) / US_MIN;
+      if (minute < r.window.from || minute > r.window.to) add('outside_rule_hours', x, `${what(x)} starts outside the hours you allow.`, `start between ${at(r.window.from)} and ${at(r.window.to)}`);
+      if (x.minutes < r.session.min || x.minutes > r.session.max) add('session_length_rule', x, `${what(x)} is not ${r.session.min} to ${r.session.max} minutes long.`, `make it ${r.session.max} min`);
+    }
+  }
+  for (const d of s.homeWeek.days) {
+    if (d.first === null || items.some((x) => x.day === d.day && x.activity === 'strength')) continue;
+    add('home_day_missing', null, `${dayName(d.day)} is a day at home, and every day at home has a workout.`,
+      `add a ${r.session.max}-minute strength session on ${dayISO(d.day)} at ${hhmm({ mic: d.first, off: s.now.off })}`);
+  }
 }
 
 /** Why one session is in the week, in plain words, with the memory rows it rests on. */

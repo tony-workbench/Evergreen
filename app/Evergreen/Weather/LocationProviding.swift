@@ -21,10 +21,11 @@ final class DeviceLocation: NSObject, LocationProviding, CLLocationManagerDelega
     private var permissionWaiters: [CheckedContinuation<Void, Never>] = []
     private var fixWaiters: [CheckedContinuation<Coordinate?, Never>] = []
 
-    override init() {
+    /// A kilometre is all the forecast needs; setting home asks for a hundred metres, since home is a 200 m circle.
+    init(accuracy: CLLocationAccuracy = kCLLocationAccuracyKilometer) {
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyKilometer
+        manager.desiredAccuracy = accuracy
     }
 
     var permission: LocationPermission {

@@ -14,6 +14,8 @@ extension AppModel {
     @discardableResult
     func refreshBusy() async -> [Busy] {
         busyCache = onDevice ? await calendarSync.busyTimes(from: storyDay) : []
+        // An event away from home makes its day a day out, so the days are worked out again with the calendar.
+        await refreshDayKinds()
         return busyCache
     }
 
@@ -21,7 +23,8 @@ extension AppModel {
     var planRules: BundlePlanRules? {
         Optional(Self.planBundle).map {
             BundlePlanRules(bundle: $0, history: HistoryPayload(workouts: workouts, days: health.days, cal: calendar),
-                            busy: busyNow, timeZone: calendar.timeZone)
+                            busy: busyNow, timeZone: calendar.timeZone,
+                            rules: userRules.isOn ? userRules : nil, dayKinds: dayKinds, carry: carry)
         }
     }
 

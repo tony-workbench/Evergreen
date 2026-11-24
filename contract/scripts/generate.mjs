@@ -46,6 +46,12 @@ const { loadBundles, STUBS } = await import('../tests/host.mjs');
 const { runWeek } = await import('../tests/week-scenario.mjs');
 const { assertValid } = await import('../src/validate.mjs');
 const good = {};
+// The rules each person set: written by hand, since no stand-in bundle makes them. Made-up people, generic answers.
+const RULES = {
+  sam: { restWeekdays: [5, 6], sessionMinutes: { min: 15, max: 20 }, window: { from: '10:00', to: '18:00' }, mornings: false, equipment: ['chair', 'wall', 'floor'], avoid: [], movements: {} },
+  alex: { restWeekdays: [2, 5, 6], sessionMinutes: { min: 20, max: 25 }, window: { from: '12:00', to: '20:30' }, mornings: false, equipment: ['backpack', 'chair', 'table', 'sofa', 'book', 'step'], avoid: ['jump_squat'], movements: { split_squat: 'can', push_up: 'untried' } },
+  jordan: { restWeekdays: [4], sessionMinutes: { min: 30, max: 40 }, window: { from: '06:00', to: '20:00' }, mornings: true, equipment: ['backpack', 'step'], avoid: [], movements: { pike_push_up: 'cannot' } },
+};
 for (const p of PEOPLE) {
   const S = await runWeek(loadBundles(STUBS), p, async (title, needs, fn) => { await fn(); });
   const row = S.table.rows.find((r) => r.kind === 'usual_slot');
@@ -53,6 +59,7 @@ for (const p of PEOPLE) {
     activity: S.accepted.activity, 'memory-row': row, 'memory-table': S.table, session: S.accepted, plan: S.plan, 'plan-check': S.check,
     'calendar-intent': S.intent, 'preview-block': S.block, 'calendar-result': S.calendarResult, outcome: S.outcomes.find((o) => o.done), error: S.error, 'stopped-slot': S.stopped[0],
   };
+  values['user-rules'] = RULES[p.persona];
   for (const [name, value] of Object.entries(values)) write(`fixtures/valid/${p.persona}/${name}.json`, assertValid(name, value));
   write(`fixtures/valid/${p.persona}/plan-check.rejected.json`, assertValid('plan-check', S.staleCheck));
   write(`fixtures/valid/${p.persona}/outcome.missed.json`, assertValid('outcome', S.outcomes.find((o) => !o.done)));
@@ -192,6 +199,18 @@ const bad = {
     'hour-as-clock-text': change(g['stopped-slot'], (v) => { v.hour = '18:00'; }),
     'activity-as-health-name': change(g['stopped-slot'], (v) => { v.activity = 'Walking'; }),
     'whole-row-instead-of-its-slot': g['memory-row'],
+  },
+  'user-rules': {
+    'rest-weekday-7': change(g['user-rules'], (v) => { v.restWeekdays = [7]; }),
+    'rest-weekday-as-name': change(g['user-rules'], (v) => { v.restWeekdays = ['sat']; }),
+    'session-minutes-as-one-number': change(g['user-rules'], (v) => { v.sessionMinutes = 20; }),
+    'session-minutes-below-10': change(g['user-rules'], (v) => { v.sessionMinutes = { min: 5, max: 20 }; }),
+    'window-as-hour-numbers': change(g['user-rules'], (v) => { v.window = { from: 12, to: 20 }; }),
+    'window-clock-25': change(g['user-rules'], (v) => { v.window = { from: '12:00', to: '25:00' }; }),
+    'equipment-not-on-the-list': change(g['user-rules'], (v) => { v.equipment = ['barbell']; }),
+    'movement-state-not-on-the-list': change(g['user-rules'], (v) => { v.movements = { squat: 'maybe' }; }),
+    'avoid-id-with-a-space': change(g['user-rules'], (v) => { v.avoid = ['jump squat']; }),
+    'home-is-not-a-field': change(g['user-rules'], (v) => { v.home = { latitude: 1, longitude: 2 }; }),
   },
   error: {
     'error-is-a-name-not-an-object': { ok: false, error: 'BadJSON' },

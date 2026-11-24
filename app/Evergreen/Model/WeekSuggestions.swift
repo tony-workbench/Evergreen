@@ -243,6 +243,8 @@ final class WeekSuggestions {
         plannedSessions = week.sessions
         let plan = WeekPlan(week)
         weekPlan = plan
+        // Each day at home's focus, kept so a missed one can move to the next day at home.
+        await app.rememberHomeWeek()
         if settles, !settledFirst { settleMemoryAfterwards(loop, plannedFrom: key) }
         return plan
     }
@@ -250,7 +252,7 @@ final class WeekSuggestions {
     /// What a planned week depends on: the day, what is remembered, and the busy times near the hours a workout could go.
     func weekKey(rows: [MemoryRow], busy: [Busy]) -> String {
         WeekCache.key(day: LocalTime(app.now, in: app.calendar.timeZone).day, rows: rows,
-                      busy: WeekCache.planning(busy, now: app.now, calendar: app.calendar))
+                      busy: WeekCache.planning(busy, now: app.now, calendar: app.calendar), rules: app.rulesCacheText)
     }
 
     /// The day's memory update, with what it did written to the log. Returns the rows as they are afterwards.

@@ -1,7 +1,7 @@
 import Foundation
 
 /// A place on the map, in degrees.
-struct Coordinate: Codable, Equatable, Sendable {
+struct Coordinate: Codable, Hashable, Sendable {
     var latitude: Double
     var longitude: Double
 

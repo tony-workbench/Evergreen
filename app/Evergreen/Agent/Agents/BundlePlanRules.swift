@@ -13,6 +13,12 @@ struct BundlePlanRules: PlanRules {
     /// Busy times on the person's calendars: start and end only.
     var busy: [Busy]
     var timeZone: TimeZone
+    /// The person's own rules; nil (or not turned on) keeps the usual week.
+    var rules: UserRules? = nil
+    /// Each day's kind from the phone ("home" or "out"); rest weekdays come from the rules.
+    var dayKinds: [String: DayKind] = [:]
+    /// What each session missed since the last plan worked ("lower", "upper", "full"…), so the week picks it up again.
+    var carry: [String] = []
 
     /// What every call is given: `planContext`'s input, which `checkPlan` takes as its `context`.
     func input(rows: [MemoryRow], now: Date) -> JSONValue {
@@ -29,6 +35,12 @@ struct BundlePlanRules: PlanRules {
         if let race = rows.filter({ $0.kind == "goal" && $0.isUsable }).compactMap({ $0.data["date"]?.string }).filter({ $0 >= today }).min(),
            case .object(var fields) = input {
             fields["raceDate"] = .string(race)
+            input = .object(fields)
+        }
+        if let rules, rules.isOn, case .object(var fields) = input {
+            fields["rules"] = rules.engineValue
+            fields["dayKinds"] = DayKinds.engineValue(dayKinds)
+            if !carry.isEmpty { fields["carry"] = .array(carry.map { .string($0) }) }
             input = .object(fields)
         }
         return input
