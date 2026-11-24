@@ -2,13 +2,16 @@ import SwiftUI
 
 /// The week the rules make, as one table: each day's kind in words (never only
 /// a colour), the first time, what it works and the later times. Today's row
-/// opens the workout page; another day's row shows what it will hold.
+/// opens the workout page; another day's row shows what it will hold. Under a day
+/// with more than one later time, one can be picked ahead: only it reminds then.
 struct WeekTableView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var state: LoadState = .loading
     @State private var workout = false
     @State private var preview: HomeWeek.Day?
+    /// The later time picked ahead for each day, read from the model on load (it lives in settings, which the view doesn't watch).
+    @State private var picks: [String: String] = [:]
 
     enum LoadState: Equatable { case loading, failed, ready }
 
@@ -45,6 +48,7 @@ struct WeekTableView: View {
         state = .loading
         if model.homeWeek == nil || model.homeWeek?.madeOn != model.todayISO { await model.refreshHomeWeek() }
         if model.homeWeekContent.isEmpty { await model.fillHomeWeek() }
+        picks = model.pickedLater
         state = model.homeWeek == nil ? .failed : .ready
     }
 
@@ -61,7 +65,10 @@ struct WeekTableView: View {
                 }
             }
             Section {
-                ForEach(week.days) { day in row(day) }
+                ForEach(week.days) { day in
+                    row(day)
+                    laterPicker(day)
+                }
             }
         }
         .refreshable { await model.refreshHomeWeek(); await load() }
@@ -73,9 +80,32 @@ struct WeekTableView: View {
         return "\(home), \(week.trainingDays) planned, \(done) done."
     }
 
+    /// Picks one later time ahead for a day still to train; then only that later time reminds. "Any later time" keeps them all.
+    @ViewBuilder private func laterPicker(_ day: HomeWeek.Day) -> some View {
+        let done = model.workoutLog.didHomeSession(on: day.day) || model.trainedStrength(on: day.day)
+        if day.trains, day.fallbacks.count > 1, !done, !model.workoutLog.didSkip(day.day) {
+            let picked = picks[day.day].flatMap { clock in day.fallbacks.contains { $0.clock == clock } ? clock : nil }
+            Picker("Later time", selection: Binding(
+                get: { picked },
+                set: { clock in
+                    picks[day.day] = clock
+                    Task { await model.pickLater(clock, day: day.day) }
+                }
+            )) {
+                Text("Any later time").tag(String?.none)
+                ForEach(day.fallbacks, id: \.self) { time in Text(time.clock).tag(Optional(time.clock)) }
+            }
+            .pickerStyle(.menu)
+            .frame(minHeight: 44)
+            .accessibilityHint("Picks the one later time this day reminds you at")
+        }
+    }
+
     @ViewBuilder private func row(_ day: HomeWeek.Day) -> some View {
         let isToday = day.day == model.todayISO
-        let line = DayLine(day: day, isToday: isToday, movements: model.movementLine(day.day),
+        // With a later time picked ahead, the line shows only that one.
+        let line = DayLine(day: WorkoutReminders.keeping(day, picked: picks[day.day]), isToday: isToday,
+                           movements: model.movementLine(day.day),
                            done: model.workoutLog.didHomeSession(on: day.day) || model.trainedStrength(on: day.day))
         if day.trains {
             Button { if isToday { workout = true } else { preview = day } } label: { line }

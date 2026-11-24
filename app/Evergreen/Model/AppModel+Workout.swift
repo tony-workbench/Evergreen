@@ -89,13 +89,15 @@ extension AppModel {
         if saved { await refreshHealth() }
     }
 
-    /// "I did it another way": today counts as done, so nothing is carried and today's reminders go. Nothing is written to Health.
-    func doneAnotherWay() async {
-        workoutLog.markDone(todayISO)
+    /// "I did it another way" on Today, or "I already trained" on a reminder: the day counts as done, so nothing is carried
+    /// and the rest of that day's reminders go; other days' stay. Nothing is written to Health.
+    func doneAnotherWay(day: String? = nil) async {
+        let day = day ?? todayISO
+        workoutLog.markDone(day)
         workoutLog.save(to: settings)
-        WorkoutProgress.clear(from: settings)
-        log("You did today’s workout another way")
-        if onDevice { await notifier.cancelHomeReminders(day: todayISO) }
+        if day == todayISO { WorkoutProgress.clear(from: settings) }
+        log(day == todayISO ? "You did today’s workout another way" : "You did the workout of \(day) another way")
+        if onDevice { await notifier.cancelHomeReminders(day: day) }
     }
 }
 

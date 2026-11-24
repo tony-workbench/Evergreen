@@ -24,6 +24,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     enum WorkoutAction: String, Sendable {
         case start
         case later
+        case alreadyDone = "already_done"
         case skipOut = "skip_out"
         case skipUnwell = "skip_unwell"
         case skipNotToday = "skip_not_today"
@@ -40,7 +41,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    /// The categories: Start · Later today, Start · Skip today (with its reason), Start now, and I'm going out tomorrow.
+    /// The categories: Start · Later today · I already trained, Start · I already trained · Skip today (with its reason),
+    /// Start now · I already trained, and I'm going out tomorrow.
     nonisolated static let workoutCategory = "workout"
     nonisolated static let workoutLastCategory = "workout_last"
     nonisolated static let workoutMovedCategory = "workout_moved"
@@ -53,15 +55,17 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let start = UNNotificationAction(identifier: WorkoutAction.start.rawValue, title: "Start", options: [.foreground])
         let startNow = UNNotificationAction(identifier: WorkoutAction.start.rawValue, title: "Start now", options: [.foreground])
         let later = UNNotificationAction(identifier: WorkoutAction.later.rawValue, title: "Later today", options: [])
+        // Marks the day done and takes off the rest of its reminders, so it needs the phone unlocked too.
+        let done = UNNotificationAction(identifier: WorkoutAction.alreadyDone.rawValue, title: "I already trained", options: [.authenticationRequired])
         let skips = [(WorkoutAction.skipOut, "Skip today: I’m out"), (.skipUnwell, "Skip today: not feeling well"), (.skipNotToday, "Skip today: not today")]
             // Skipping a day needs the phone unlocked, so a tap in a pocket can't do it; Today can take it back.
             .map { UNNotificationAction(identifier: $0.0.rawValue, title: $0.1, options: [.authenticationRequired]) }
         let goingOut = UNNotificationAction(identifier: WorkoutAction.goingOut.rawValue, title: "I’m going out tomorrow", options: [])
         center.setNotificationCategories([
             UNNotificationCategory(identifier: Self.movedCategory, actions: [undo], intentIdentifiers: []),
-            UNNotificationCategory(identifier: Self.workoutCategory, actions: [start, later], intentIdentifiers: []),
-            UNNotificationCategory(identifier: Self.workoutLastCategory, actions: [start] + skips, intentIdentifiers: []),
-            UNNotificationCategory(identifier: Self.workoutMovedCategory, actions: [startNow], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.workoutCategory, actions: [start, later, done], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.workoutLastCategory, actions: [start, done] + skips, intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.workoutMovedCategory, actions: [startNow, done], intentIdentifiers: []),
             UNNotificationCategory(identifier: Self.tomorrowCategory, actions: [goingOut], intentIdentifiers: []),
         ])
     }

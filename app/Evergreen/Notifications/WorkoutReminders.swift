@@ -10,7 +10,9 @@ import Foundation
 ///   the last time                "Last time today"                    Start · Skip today
 ///
 /// At most six for a day and none from 22:00. With "Keep reminding me until I've trained" off, only the first three.
-/// Finishing the workout takes off what is left of that day's (`Notifier.cancelHomeReminders`).
+/// A later time picked ahead in the week table is the only later time kept (`keeping(_:picked:)`).
+/// Whichever time the session is done at, the rest of that day's go: finishing the workout, "I already trained"
+/// on a reminder, or a strength workout in Health (`Notifier.cancelHomeReminders`, `AppModel.homeReminders`).
 struct WorkoutReminder: Equatable, Sendable {
     enum Kind: String, Sendable {
         case evening, soon, now, moved, later, last
@@ -68,6 +70,15 @@ enum WorkoutReminders {
                                    title: entry.copy.title, body: entry.copy.body, day: day.day)
         }
         return Array(reminders.prefix(maxPerDay))
+    }
+
+    /// The day with only the later time picked ahead for it, by its clock ("18:10"). No pick, or a pick that is no
+    /// longer one of the day's later times (the week was worked out again), keeps them all.
+    static func keeping(_ day: HomeWeek.Day, picked: String?) -> HomeWeek.Day {
+        guard let picked, day.fallbacks.contains(where: { $0.clock == picked }) else { return day }
+        var day = day
+        day.fallbacks = day.fallbacks.filter { $0.clock == picked }
+        return day
     }
 
     /// Which of `ids` are the reminders of the session on `day`, and only those.

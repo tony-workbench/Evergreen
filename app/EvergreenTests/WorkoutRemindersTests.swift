@@ -3,7 +3,7 @@ import Testing
 @testable import Evergreen
 
 /// A day at home's reminders (the evening before, before, at, after and at each later time, at most six and none
-/// from 22:00) and the short breaks of a rainy afternoon at home. Thursday 19 November 2026, Los Angeles.
+/// from 22:00), a later time picked ahead, "I already trained", and the short breaks of a rainy afternoon at home. Thursday 19 November 2026, Los Angeles.
 struct WorkoutRemindersTests {
     private let cal = Fixture.calendar
     private let session = WorkoutReminders.Session(focusWords: "full-body", minutes: 22, movements: 4)
@@ -122,6 +122,75 @@ struct WorkoutRemindersTests {
         let pending = ["reminder-home-2026-11-19-2", "reminder-home-2026-11-19-3", "reminder-home-2026-11-20-1",
                        "reminder-walk-1763600000", "week-ahead"]
         #expect(WorkoutReminders.ids(pending, day: "2026-11-19") == ["reminder-home-2026-11-19-2", "reminder-home-2026-11-19-3"])
+    }
+
+    @Test func aLaterTimePickedAheadIsTheOnlyLaterTime() {
+        let picked = WorkoutReminders.keeping(usual, picked: "19:40")
+        let reminders = WorkoutReminders.plan(day: picked, session: session, keepReminding: true, now: eveningBefore, calendar: cal)
+        #expect(reminders.map(\.kind) == [.evening, .soon, .now, .moved, .last])
+        #expect(reminders.map(\.fires).suffix(2) == [Fixture.at(17, 0), Fixture.at(19, 40)])
+        #expect(reminders[3].title == NotificationCopy.homeMoved(to: Fixture.at(19, 40)).title)
+        // "Later today" goes straight to it, past the 18:10 that was not picked.
+        #expect(WorkoutReminders.nextLater(picked, after: Fixture.at(16, 45)) == Fixture.at(19, 40))
+        // No pick, or a time that is no longer one of the day's, keeps them all.
+        #expect(WorkoutReminders.keeping(usual, picked: nil) == usual)
+        #expect(WorkoutReminders.keeping(usual, picked: "20:15") == usual)
+    }
+
+    // MARK: The reminders of the whole app
+
+    private func homeDay(_ iso: String, weekday: String, at hour: Int, dayOffset: Int) -> HomeWeek.Day {
+        HomeWeek.Day(day: iso, weekday: weekday, kind: .home, focus: "full",
+                     first: LocalTime(Fixture.at(hour, 40, dayOffset: dayOffset), in: cal.timeZone),
+                     fallbacks: [18, 19].map { LocalTime(Fixture.at($0, 10, dayOffset: dayOffset), in: cal.timeZone) })
+    }
+
+    /// Thursday 19 November at 9:00, rules on, today and Friday at home with a session at 16:40 and later times 18:10 and 19:10.
+    @MainActor private func twoDaysAtHome() throws -> AppRig {
+        let rig = try AppRig(now: Clocks.morning)
+        rig.model.userRules.isOn = true
+        rig.model.homeWeek = HomeWeek(days: [homeDay("2026-11-19", weekday: "Thursday", at: 16, dayOffset: 0),
+                                             homeDay("2026-11-20", weekday: "Friday", at: 16, dayOffset: 1)],
+                                      homeDays: 2, trainingDays: 2, madeOn: rig.model.todayISO)
+        return rig
+    }
+
+    @MainActor @Test func pickingALaterTimeAheadKeepsOnlyThatOneForThatDay() async throws {
+        let rig = try twoDaysAtHome()
+        #expect(rig.model.homeReminders().filter { $0.day == "2026-11-20" }.map(\.kind) == [.evening, .soon, .now, .moved, .later, .last])
+        await rig.model.pickLater("19:10", day: "2026-11-20")
+        let friday = rig.model.homeReminders().filter { $0.day == "2026-11-20" }
+        #expect(friday.map(\.kind) == [.evening, .soon, .now, .moved, .last])
+        #expect(friday.last?.fires == Fixture.at(19, 10, dayOffset: 1))
+        // Today's are untouched, and the pick can be taken back.
+        #expect(rig.model.homeReminders().filter { $0.day == "2026-11-19" }.count == 5)
+        await rig.model.pickLater(nil, day: "2026-11-20")
+        #expect(rig.model.homeReminders().filter { $0.day == "2026-11-20" }.count == 6)
+    }
+
+    @MainActor @Test func alreadyTrainedOnAReminderEndsThatDaysRemindersOnly() async throws {
+        let rig = try twoDaysAtHome()
+        #expect(!rig.model.homeReminders().filter { $0.day == "2026-11-19" }.isEmpty)
+        await rig.model.handleWorkoutAction(.alreadyDone, day: "2026-11-19")
+        #expect(rig.model.workoutLog.didHomeSession(on: "2026-11-19"))
+        #expect(WorkoutLog.load(from: rig.settings).didHomeSession(on: "2026-11-19"))
+        let left = rig.model.homeReminders()
+        #expect(!left.contains { $0.day == "2026-11-19" })
+        #expect(left.filter { $0.day == "2026-11-20" }.count == 6)
+        #expect(Notifier.WorkoutAction(rawValue: "already_done") == .alreadyDone && Notifier.WorkoutAction.alreadyDone.skipReason == nil)
+    }
+
+    @MainActor @Test func onceAnyTimeIsMetTheOtherTimesThatDayAreSilent() async throws {
+        let rig = try twoDaysAtHome()
+        // Done at the first time, 16:40: nothing at 17:00, 18:10 or 19:10 that day.
+        rig.clock.now = Fixture.at(17, 5)
+        #expect(rig.model.homeReminders().filter { $0.day == "2026-11-19" }.map(\.kind) == [.later, .last])
+        rig.model.workoutLog.markDone("2026-11-19")
+        #expect(!rig.model.homeReminders().contains { $0.day == "2026-11-19" })
+        // Done at a later time instead, on Friday at 18:10: the 19:10 doesn't fire either. Thursday's are still gone.
+        rig.clock.now = Fixture.at(18, 30, dayOffset: 1)
+        rig.model.workoutLog.markDone("2026-11-20")
+        #expect(rig.model.homeReminders().isEmpty)
     }
 
     @Test func theWeekEndsOnSunday() {
