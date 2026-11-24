@@ -19,4 +19,37 @@ enum NotificationCopy {
 
     /// Sunday evening, for the person who plans by their rules.
     static let weekAhead = (title: "Your week ahead", body: "Open Evergreen to see which days are at home and what each one holds.")
+
+    // MARK: A day at home (see WorkoutReminders)
+
+    /// 21:00 the evening before.
+    static func homeTomorrow(_ session: WorkoutReminders.Session, at start: Date) -> (title: String, body: String) {
+        ("Tomorrow at home", "\(session.focusWords.capitalizedFirst) at \(start.clock), about \(session.minutes) minutes.")
+    }
+
+    /// Ten minutes before.
+    static func homeSoon(_ session: WorkoutReminders.Session) -> (title: String, body: String) {
+        ("In 10 minutes", "\(session.movements) movements, about \(session.minutes) minutes.")
+    }
+
+    /// At the time, at each later time, and the last time of the day.
+    static func homeNow(_ session: WorkoutReminders.Session, last: Bool, at start: Date) -> (title: String, body: String) {
+        last ? ("Last time today", "\(session.focusWords.capitalizedFirst) at \(start.clock). Start now, or skip today and pick it up next time.")
+             : ("Time for your workout", "\(session.focusWords.capitalizedFirst), about \(session.minutes) minutes. Start when you’re ready.")
+    }
+
+    /// Twenty minutes after the time with nothing started: the later time it now waits for.
+    static func homeMoved(to next: Date) -> (title: String, body: String) {
+        ("Moved to \(next.clock)", "No rush. Your workout waits for \(next.clock), or start now if you have the time.")
+    }
+
+    /// Rain all afternoon on a day at home.
+    static func rainSnacks(count: Int, minutes: Int) -> (title: String, body: String) {
+        ("Rain this afternoon", "\(count) short breaks of \(minutes) minutes could stand in for a walk. Open Evergreen to add them.")
+    }
 }
+
+private extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+}
+

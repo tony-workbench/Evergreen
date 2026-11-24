@@ -7,6 +7,7 @@ enum Automatic: String, CaseIterable, Identifiable, Sendable {
     case rain = "auto_rain"
     case shoes = "auto_shoes"
     case meetings = "auto_meetings"
+    case keepReminding = "auto_keep_reminding"
 
     var id: String { rawValue }
 
@@ -17,6 +18,7 @@ enum Automatic: String, CaseIterable, Identifiable, Sendable {
         case .rain: "Rain check"
         case .shoes: "Shoe mileage check"
         case .meetings: "Move workouts around new meetings"
+        case .keepReminding: "Keep reminding me until I’ve trained"
         }
     }
 
@@ -28,6 +30,7 @@ enum Automatic: String, CaseIterable, Identifiable, Sendable {
         case .rain: "For outdoor workouts in the next two days. No AI."
         case .shoes: "From your runs in Apple Health. No AI."
         case .meetings: "To the nearest free time, with Undo. No AI."
+        case .keepReminding: "On a day at home: at the time and at each later time, up to six a day, none after 22:00. No AI."
         }
     }
 

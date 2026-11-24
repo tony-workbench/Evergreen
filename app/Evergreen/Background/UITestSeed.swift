@@ -12,8 +12,8 @@ import SwiftData
 ///   -uiTest runner   four weeks of morning runs, shoes at 212 km
 ///   -uiTest rain     the same, with rain due on tomorrow's run, a dry afternoon and three gyms nearby
 ///   -uiTest shoes    the same, with 492 km on the shoes
-///   -uiTest home     training at home by the rules: nothing to train with, the usual rest weekdays, the next
-///                    training day out, and rain through the afternoon on the day at home after it
+///   -uiTest home     training at home by the rules: nothing to train with, the usual rest weekdays, rain through
+///                    the afternoon on the first training day from today, and the training day after it out
 ///
 /// Release builds don't contain this file's code, and the argument does nothing there.
 @MainActor
@@ -63,7 +63,8 @@ enum UITestSeed {
                                     wetHours: name == .home ? 12..<20 : 6..<12, calendar: calendar),
             location: FixedLocation(), places: FixedPlaces(),
             distance: FixedDistance(km: name == .shoes ? 492 : 212),
-            notify: { _, _ in }, busy: { [] }, plan: { [weak model] in model?.plan ?? [] }, calendar: calendar
+            notify: { _, _ in }, busy: { [] }, plan: { [weak model] in model?.plan ?? [] }, calendar: calendar,
+            homeDays: { [weak model] in model?.rainHomeDays ?? [] }
         ))
         // As if the person had added tomorrow's usual run: nothing is on a plan by itself.
         if name == .runner || name == .rain || name == .shoes,
@@ -82,13 +83,14 @@ enum UITestSeed {
         return (container, model)
     }
 
-    /// The first training day after today goes out; the training day after that has rain. Both within the coming week.
+    /// The first training day from today has rain in the afternoon (the short breaks show when that is today or
+    /// tomorrow); the training day after it goes out.
     static func homeDays(today: Date, calendar: Calendar) -> (out: Date, rain: Date)? {
         let rest = UserRules().restWeekdays
-        let training = (1...13).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+        let training = (0...13).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
             .filter { !rest.contains(UserRules.weekdayIndex($0, calendar: calendar)) }
         guard training.count >= 2 else { return nil }
-        return (training[0], training[1])
+        return (training[1], training[0])
     }
 
     /// Rules on, with nothing to train with, kept in a settings store of their own so the device's rules are untouched.

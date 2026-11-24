@@ -14,16 +14,54 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     var onOpen: (@MainActor () -> Void)?
     /// The person tapped "Undo" on a notification about a move; the value is the move's id.
     var onUndo: (@MainActor (String) -> Void)?
+    /// A button on a day-at-home reminder; the value is the workout's day (YYYY-MM-DD).
+    var onWorkoutAction: (@MainActor (WorkoutAction, String) -> Void)?
 
     nonisolated static let movedCategory = "moved"
     nonisolated static let undoAction = "undo"
+
+    /// The buttons on a day-at-home reminder. "Start" opens the app on the workout page; the others work without opening it.
+    enum WorkoutAction: String, Sendable {
+        case start
+        case later
+        case skipOut = "skip_out"
+        case skipUnwell = "skip_unwell"
+        case skipNotToday = "skip_not_today"
+        case goingOut = "going_out"
+
+        /// Why a day was skipped, as kept in the workout log; nil for the actions that aren't a skip.
+        var skipReason: String? {
+            switch self {
+            case .skipOut: "out"
+            case .skipUnwell: "unwell"
+            case .skipNotToday: "not_today"
+            default: nil
+            }
+        }
+    }
+
+    /// The categories: Start · Later today, Start · Skip today (with its reason), Start now, and I'm going out tomorrow.
+    nonisolated static let workoutCategory = "workout"
+    nonisolated static let workoutLastCategory = "workout_last"
+    nonisolated static let workoutMovedCategory = "workout_moved"
+    nonisolated static let tomorrowCategory = "home_tomorrow"
 
     override init() {
         super.init()
         center.delegate = self
         let undo = UNNotificationAction(identifier: Self.undoAction, title: "Undo", options: [])
+        let start = UNNotificationAction(identifier: WorkoutAction.start.rawValue, title: "Start", options: [.foreground])
+        let startNow = UNNotificationAction(identifier: WorkoutAction.start.rawValue, title: "Start now", options: [.foreground])
+        let later = UNNotificationAction(identifier: WorkoutAction.later.rawValue, title: "Later today", options: [])
+        let skips = [(WorkoutAction.skipOut, "Skip today: I’m out"), (.skipUnwell, "Skip today: not feeling well"), (.skipNotToday, "Skip today: not today")]
+            .map { UNNotificationAction(identifier: $0.0.rawValue, title: $0.1, options: []) }
+        let goingOut = UNNotificationAction(identifier: WorkoutAction.goingOut.rawValue, title: "I’m going out tomorrow", options: [])
         center.setNotificationCategories([
-            UNNotificationCategory(identifier: Self.movedCategory, actions: [undo], intentIdentifiers: [])
+            UNNotificationCategory(identifier: Self.movedCategory, actions: [undo], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.workoutCategory, actions: [start, later], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.workoutLastCategory, actions: [start] + skips, intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.workoutMovedCategory, actions: [startNow], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.tomorrowCategory, actions: [goingOut], intentIdentifiers: []),
         ])
     }
 
@@ -55,7 +93,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     func scheduleReminders(for items: [PlanItem]) async {
         guard access == .on else { return }
         let pending = await center.pendingNotificationRequests().map(\.identifier)
-        center.removePendingNotificationRequests(withIdentifiers: pending.filter { $0.hasPrefix("reminder-") })
+        center.removePendingNotificationRequests(withIdentifiers: pending.filter { $0.hasPrefix("reminder-") && !$0.hasPrefix(WorkoutReminders.prefix) })
         let horizon = Date.now.addingTimeInterval(7 * 24 * 3600)
         for item in items {
             let at = item.slot.start.addingTimeInterval(-Self.reminderLead)
@@ -65,6 +103,35 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             await add("reminder-\(item.id)-\(Int(item.slot.start.timeIntervalSince1970))", copy,
                       trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false))
         }
+    }
+
+    /// The reminders for the days at home (`WorkoutReminders`), replaced as a whole on every change.
+    func scheduleHomeReminders(_ reminders: [WorkoutReminder], calendar: Calendar = .current) async {
+        let pending = await center.pendingNotificationRequests().map(\.identifier)
+        center.removePendingNotificationRequests(withIdentifiers: pending.filter { $0.hasPrefix(WorkoutReminders.prefix) })
+        guard access == .on else { return }
+        for reminder in reminders {
+            let category = switch reminder.kind {
+            case .evening: Self.tomorrowCategory
+            case .moved: Self.workoutMovedCategory
+            case .last: Self.workoutLastCategory
+            case .soon, .now, .later: Self.workoutCategory
+            }
+            let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: reminder.fires)
+            await add(reminder.id, (reminder.title, reminder.body), trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false),
+                      category: category, info: ["day": reminder.day, "kind": reminder.kind.rawValue])
+        }
+    }
+
+    /// "Later today": the reminders of `day` that would fire before `time` go, so the next one is at the later time.
+    func dropHomeReminders(day: String, before time: Date) async {
+        let pending = await center.pendingNotificationRequests()
+        let ids = pending.filter { request in
+            guard request.identifier.hasPrefix(WorkoutReminders.prefix + day),
+                  let fires = (request.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate() else { return false }
+            return fires < time
+        }.map(\.identifier)
+        center.removePendingNotificationRequests(withIdentifiers: ids)
     }
 
     /// Every Sunday at 20:00, "Your week ahead is ready", while the person plans by their rules. The week is worked out
@@ -105,12 +172,14 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     static let movePrefix = "defend-"
 
     private func add(_ id: String, _ copy: (title: String, body: String), trigger: UNNotificationTrigger,
-                     undoes move: String? = nil) async {
+                     undoes move: String? = nil, category: String? = nil, info: [String: String] = [:]) async {
         let content = UNMutableNotificationContent()
         content.title = copy.title
         content.body = copy.body
         content.sound = .default
         content.userInfo = ["open": "today"]
+        for (key, value) in info { content.userInfo[key] = value }
+        if let category { content.categoryIdentifier = category }
         if let move {
             content.categoryIdentifier = Self.movedCategory
             content.userInfo["move"] = move
@@ -136,8 +205,12 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     ) async {
         let undone = response.actionIdentifier == Self.undoAction
             ? response.notification.request.content.userInfo["move"] as? String : nil
+        let workout = WorkoutAction(rawValue: response.actionIdentifier)
+        let day = response.notification.request.content.userInfo["day"] as? String
         await MainActor.run {
-            if let undone { self.onUndo?(undone) } else { self.onOpen?() }
+            if let undone { self.onUndo?(undone) }
+            else if let workout, let day { self.onWorkoutAction?(workout, day) }
+            else { self.onOpen?() }
         }
     }
 }

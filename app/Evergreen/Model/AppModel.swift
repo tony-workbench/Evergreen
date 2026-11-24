@@ -73,6 +73,8 @@ final class AppModel {
     var homeWeekNote: String?
     /// What the person did on the workout page (Model/WorkoutLog.swift).
     var workoutLog = WorkoutLog()
+    /// Set by "Start" on a reminder: Today opens the workout page and sets it back.
+    var workoutRequested = false
     /// Every movement's words, read from the engine once (AppModel+Workout.swift).
     var movements: [Movement] = []
     /// Whether notifications are allowed.
@@ -127,6 +129,7 @@ final class AppModel {
         self.calendarSync.onChange = { [weak self] in self?.calendarChanged() }
         notifier.onOpen = { [weak self] in Task { await self?.tick() } }
         notifier.onUndo = { [weak self] id in self?.undoMove(id) }
+        notifier.onWorkoutAction = { [weak self] action, day in Task { await self?.handleWorkoutAction(action, day: day) } }
         Task { await refreshNotifications() }
         if persona.isReal { Task { await refreshHealth() } }
         watchWorkoutsForEarnedTime()
@@ -321,8 +324,10 @@ final class AppModel {
     func scheduleNotifications() async {
         guard onDevice, deviceUnlocked else { return }
         // A day out has no reminders: the person said they're out, or the phone was far from home when the app opened.
-        let upcoming = plan.filter { completion(for: $0) == nil && !isDayOut($0.slot.start) }
+        // A session on a day at home has reminders of its own (AppModel+Reminders.swift), not the one 30 minutes before.
+        let upcoming = plan.filter { completion(for: $0) == nil && !isDayOut($0.slot.start) && !isHomeSession($0) }
         await notifier.scheduleReminders(for: upcoming)
+        await notifier.scheduleHomeReminders(homeReminders(), calendar: calendar)
         await notifier.scheduleWeekAhead(userRules.isOn)
     }
 

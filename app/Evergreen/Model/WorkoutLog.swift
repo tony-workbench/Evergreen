@@ -29,6 +29,8 @@ struct WorkoutLog: Codable, Equatable, Sendable {
     var lastFeeling: WorkoutFeeling?
     /// How many home sessions were built, so the core movement takes turns.
     var turn = 0
+    /// Days skipped from a reminder, with the reason: "out", "unwell" or "not_today". Optional so an older log still reads.
+    var skipped: [String: String]?
 
     static func load(from defaults: UserDefaults) -> WorkoutLog {
         defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(WorkoutLog.self, from: $0) } ?? WorkoutLog()
@@ -49,6 +51,15 @@ struct WorkoutLog: Codable, Equatable, Sendable {
     }
 
     func didHomeSession(on day: String) -> Bool { doneDays.contains(day) }
+
+    func didSkip(_ day: String) -> Bool { skipped?[day] != nil }
+
+    /// "Skip today" with its reason. Only the last sixty days are kept.
+    mutating func skip(_ day: String, reason: String) {
+        var all = skipped ?? [:]
+        all[day] = reason
+        skipped = Dictionary(uniqueKeysWithValues: all.sorted { $0.key < $1.key }.suffix(60).map { ($0.key, $0.value) })
+    }
 
     /// Records a finished session: each movement's sets, the soreness answer and the day.
     mutating func record(day: String, results: [WorkoutResult], pain: Int?) {

@@ -14,7 +14,8 @@ extension AppModel {
         triggers.setUp(TriggerCenter.Parts(
             store: FileTriggerStore(), forecast: ForecastClient(), location: DeviceLocation(), places: MapPlaceSearch(),
             distance: HealthRunningDistance(), notify: notify, busy: busy,
-            plan: { [weak self] in self?.plan ?? [] }, calendar: calendar
+            plan: { [weak self] in self?.plan ?? [] }, calendar: calendar,
+            homeDays: { [weak self] in self?.rainHomeDays ?? [] }
         ))
         let center = NotificationCenter.default
         // The model lives as long as the app, so these are never removed.
@@ -97,6 +98,51 @@ extension AppModel {
             placement = Placement(sessionKey: nil, result: result)
             triggers.dismiss(ask)
         }
+    }
+}
+
+/// A rainy afternoon at home: short breaks through the day, in place of a walk.
+extension AppModel {
+    /// Today and tomorrow when they are days at home by the rules, with each day's home session if it has one.
+    var rainHomeDays: [RainHomeDay] {
+        guard userRules.isOn, let week = homeWeek else { return [] }
+        return (0...1).compactMap { offset -> RainHomeDay? in
+            let iso = dayISO(offset: offset)
+            guard dayKinds[iso] == .home || week.day(iso)?.kind == .home, let date = PlannedDays.date(iso, calendar: calendar) else { return nil }
+            let session = week.day(iso)?.first?.date.map { DateInterval(start: $0, duration: TimeInterval(userRules.sessionMax * 60)) }
+            return RainHomeDay(day: date, session: session)
+        }
+    }
+
+    /// "Short breaks through the day": each break goes on the plan and the calendar as its own short block.
+    /// They aren't strength sessions: they don't count towards the week's sets or unlock screen time.
+    func addRainSnacks(_ snacks: RainSnacks) {
+        let zone = calendar.timeZone
+        let day = LocalTime(snacks.day, in: zone).day
+        let blocks = snacks.blocks.enumerated().map { index, block in
+            PreviewBlock(id: "snack-\(day)-\(index + 1)", sessionId: nil, activity: .other, title: RainSnacks.title,
+                         start: LocalTime(block.start, in: zone), end: LocalTime(block.end, in: zone),
+                         minutes: snacks.minutes, status: "new", reason: "Rain all afternoon: a few minutes of moving instead of a walk.")
+        }
+        if write(blocks) {
+            log("Added \(blocks.count) short breaks for the rain")
+            celebration += 1
+        }
+        triggers.dismiss(snacks)
+        Task { await tick() }
+    }
+
+    /// Two movements for a break, taking turns through the day; only ones the person has the equipment for and hasn't left out.
+    func snackMovements(turn: Int) -> [Movement] {
+        let owned = Set(userRules.equipment.map(\.rawValue) + ["floor", "wall"])
+        let all = movements.filter { $0.pattern == "snack" && Set($0.equipment).isSubset(of: owned) && !userRules.avoid.contains($0.id) }
+        guard !all.isEmpty else { return [] }
+        return (0..<min(2, all.count)).map { all[(turn * 2 + $0) % all.count] }
+    }
+
+    /// The short breaks on today's plan, for Today.
+    var snacksToday: [PlanItem] {
+        plan.filter { $0.id.hasPrefix("snack-\(todayISO)") && completion(for: $0) == nil }.sorted { $0.slot.start < $1.slot.start }
     }
 }
 

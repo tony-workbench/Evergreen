@@ -2,13 +2,16 @@ import SwiftUI
 
 /// Rain on an outdoor workout, in Today's hero: "Rain at 8:30 tomorrow.
 /// Move to 2 PM, or go indoors?" Move asks the calendar for the dry time;
-/// Indoors lists up to three gyms nearby with "Open in Maps"; Keep leaves
-/// the workout where it is. Nothing is bought and nothing has a price.
+/// Indoors lists up to three gyms nearby with "Open in Maps"; on a day at home
+/// with the afternoon wet, "Short breaks through the day" adds a few short
+/// breaks instead; Keep leaves the workout where it is. Nothing is bought and nothing has a price.
 struct RainCard: View {
     let ask: RainAsk
     var now = Date()
     let onMove: () -> Void
     let onKeep: () -> Void
+    /// "Short breaks through the day"; shown only when the ask has breaks to add.
+    var onSnacks: (() -> Void)?
     /// Starts with the places open (the tour and screenshots).
     var showsPlaces = false
 
@@ -62,6 +65,11 @@ struct RainCard: View {
             Button("Indoors") { withAnimation(.easeInOut(duration: 0.2)) { indoors = true } }
                 .buttonStyle(GhostButtonStyle())
                 .accessibilityHint("Shows gyms nearby")
+        }
+        if ask.snacks != nil, let onSnacks {
+            Button("Short breaks through the day", action: onSnacks)
+                .buttonStyle(GhostButtonStyle())
+                .accessibilityHint("Adds a few short breaks through the afternoon instead")
         }
         Button("Keep", action: onKeep)
             .buttonStyle(GhostButtonStyle())

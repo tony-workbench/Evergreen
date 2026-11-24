@@ -82,7 +82,7 @@ struct HomeWeekTests {
         #expect(model.userRules.isOn && model.userRules.equipment.isEmpty && model.userRules.restWeekdays == [2, 5, 6])
         #expect(model.settings != .standard && model.goingOutDays.count == 1)
         let days = try #require(UITestSeed.homeDays(today: Fixture.storyDay, calendar: Fixture.calendar))
-        #expect(days.out < days.rain)
+        #expect(days.rain < days.out)
         for day in [days.out, days.rain] { #expect(![2, 5, 6].contains(UserRules.weekdayIndex(day, calendar: Fixture.calendar))) }
     }
     #endif

@@ -63,8 +63,11 @@ struct TodayView: View {
                 } else if model.ask != .idle {
                     AskCard()
                 } else if let rain = model.triggers.rainAsks.first {
-                    RainCard(ask: rain, now: model.now, onMove: { Task { await model.moveForRain(rain) } }, onKeep: { model.triggers.dismiss(rain) })
+                    RainCard(ask: rain, now: model.now, onMove: { Task { await model.moveForRain(rain) } }, onKeep: { model.triggers.dismiss(rain) },
+                             onSnacks: rain.snacks.map { snacks -> () -> Void in { model.addRainSnacks(snacks); model.triggers.dismiss(rain) } })
                     FirstTimeLine(kind: .rain)
+                } else if let snacks = model.triggers.rainSnacks.first {
+                    RainSnackCard(snacks: snacks, onAdd: { model.addRainSnacks(snacks) }, onNotNow: { model.triggers.dismiss(snacks) })
                 } else if let shoes = model.shoesDue {
                     ShoeCard(status: shoes, advice: model.shoeAdvice,
                              onNewPair: { model.shoeAdvice = nil; model.gotNewShoes() }, onLater: { model.shoeCardPutOff = true })
@@ -99,6 +102,7 @@ struct TodayView: View {
                 }
                 GoingOutRow()
                 HomeWorkoutRow()
+                SnacksTodayRow()
                 if let problem = model.planProblem, model.aiConnected {
                     Text(problem)
                         .font(.footnote)

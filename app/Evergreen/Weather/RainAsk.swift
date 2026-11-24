@@ -22,6 +22,8 @@ struct RainAsk: Equatable, Sendable, Identifiable {
     var places: [IndoorPlace] = []
     /// One per workout and day, so it is said once.
     var key: String
+    /// On a day at home with the afternoon wet: short breaks to add instead ("Short breaks through the day").
+    var snacks: RainSnacks?
 
     var id: String { key }
 

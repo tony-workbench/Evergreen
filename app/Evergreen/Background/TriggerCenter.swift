@@ -22,6 +22,8 @@ final class TriggerCenter {
         /// The plan as it stands.
         var plan: @MainActor () -> [PlanItem]
         var calendar: Calendar = .current
+        /// The days at home in the next two days, with their session, while the person plans by their rules.
+        var homeDays: @MainActor () -> [RainHomeDay] = { [] }
     }
 
     static let locationAskedKey = "location-asked"
@@ -31,6 +33,8 @@ final class TriggerCenter {
 
     /// Rain asks for the next 48 hours that the person hasn't put away.
     private(set) var rainAsks: [RainAsk] = []
+    /// Short breaks for a rainy afternoon at home, that the person hasn't added or put away.
+    private(set) var rainSnacks: [RainSnacks] = []
     /// The current running shoes; nil until the person answers the one question.
     private(set) var shoeLog: ShoeLog?
     /// The shoes and the distance on them, once it has been read.
@@ -66,14 +70,17 @@ final class TriggerCenter {
     /// Outdoor workouts in the next 48 hours against the forecast for where the person is.
     func checkRain(now: Date, mayAsk: Bool) async {
         guard let parts, let cache else { return }
-        guard !RainCheck.outdoorSessions(parts.plan(), now: now).isEmpty else {
+        let homeDays = parts.homeDays()
+        guard !RainCheck.outdoorSessions(parts.plan(), now: now).isEmpty || !homeDays.isEmpty else {
             rainAsks = []
+            rainSnacks = []
             return
         }
         switch parts.location.permission {
         case .denied:
             // Off, silently, and never asked for again.
             rainAsks = []
+            rainSnacks = []
             return
         case .notAsked:
             // Asked once, the first time an outdoor workout is this close.
@@ -81,6 +88,7 @@ final class TriggerCenter {
             parts.store.save(true, for: Self.locationAskedKey)
             guard await parts.location.request() else {
                 rainAsks = []
+                rainSnacks = []
                 return
             }
         case .allowed:
@@ -93,8 +101,16 @@ final class TriggerCenter {
               let forecast = try? await cache.forecast(at: here, now: now) else { return }
 
         let dismissed = Set(parts.store.value([String].self, for: Self.dismissedRainKey) ?? [])
-        var asks = RainCheck.asks(plan: parts.plan(), forecast: forecast, busy: await parts.busy(), now: now, calendar: parts.calendar)
+        let busy = await parts.busy()
+        var asks = RainCheck.asks(plan: parts.plan(), forecast: forecast, busy: busy, now: now, calendar: parts.calendar)
             .filter { !dismissed.contains($0.key) }
+        let snacks = RainCheck.snacks(days: homeDays, plan: parts.plan(), forecast: forecast, busy: busy, now: now, calendar: parts.calendar)
+            .filter { !dismissed.contains($0.key) }
+        // An outdoor workout on a rainy day at home offers the breaks as a third answer.
+        for index in asks.indices {
+            asks[index].snacks = snacks.first { parts.calendar.isDate($0.day, inSameDayAs: asks[index].session.slot.start) }
+        }
+        rainSnacks = snacks.filter { day in !asks.contains { $0.snacks?.key == day.key } }
         if !asks.isEmpty {
             let nearby = IndoorPlace.nearest(await gyms(near: here, now: now), to: here)
             for index in asks.indices { asks[index].places = nearby }
@@ -104,6 +120,9 @@ final class TriggerCenter {
         let ledger = NotifiedLedger(store: parts.store)
         for ask in asks where ledger.firstTime(ask.key, now: now) {
             await parts.notify(NotificationCopy.rain(ask, now: now, calendar: parts.calendar), ask.key)
+        }
+        for day in rainSnacks where ledger.firstTime(day.key, now: now) {
+            await parts.notify(NotificationCopy.rainSnacks(count: day.blocks.count, minutes: day.minutes), day.key)
         }
     }
 
@@ -149,6 +168,17 @@ final class TriggerCenter {
         if !dismissed.contains(ask.key) { dismissed.append(ask.key) }
         parts.store.save(Array(dismissed.suffix(50)), for: Self.dismissedRainKey)
         rainAsks.removeAll { $0.key == ask.key }
+        if let snacks = ask.snacks { dismiss(snacks) }
+    }
+
+    /// "Not now" on a rainy afternoon's breaks, or once they are on the plan: not offered again for that day.
+    func dismiss(_ snacks: RainSnacks) {
+        guard let parts else { return }
+        var dismissed = parts.store.value([String].self, for: Self.dismissedRainKey) ?? []
+        if !dismissed.contains(snacks.key) { dismissed.append(snacks.key) }
+        parts.store.save(Array(dismissed.suffix(50)), for: Self.dismissedRainKey)
+        rainSnacks.removeAll { $0.key == snacks.key }
+        for index in rainAsks.indices where rainAsks[index].snacks?.key == snacks.key { rainAsks[index].snacks = nil }
     }
 
     /// The answer to "When did you start using your current running shoes?"
