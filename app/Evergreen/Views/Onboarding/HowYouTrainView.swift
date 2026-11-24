@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Onboarding, after the permissions: "How you train", five short questions
-/// whose answers become the person's rules. Every one can be skipped; skipping
+/// whose answers become the person's rules; the fifth opens the list of movements to leave out. Every one can be skipped; skipping
 /// the screen turns on the usual defaults (home, no gym equipment, Wednesday,
 /// Saturday and Sunday off, 20–25 minutes), which Settings › My rules can change.
 /// "Somewhere else" keeps the usual week, built from the days they already train.
@@ -11,6 +11,7 @@ struct HowYouTrainView: View {
     @Environment(AppModel.self) private var model
     @State private var rules = UserRules()
     @State private var atHome = true
+    @State private var pickingAvoid = false
 
     private static let lengths: [(min: Int, max: Int)] = [(15, 20), (20, 25), (30, 40)]
 
@@ -55,7 +56,9 @@ struct HowYouTrainView: View {
                             .pickerStyle(.segmented)
                         }
                         question("Anything to avoid?") {
-                            Text("You can pick movements to leave out in Settings › My rules, once you’ve seen them.")
+                            Button(rules.avoid.isEmpty ? "Pick movements to leave out" : "\(rules.avoid.count) left out. Change") { pickingAvoid = true }
+                                .buttonStyle(TapTargetButtonStyle())
+                            Text("None is fine. You can change it later in Settings › My rules.")
                                 .font(.footnote).foregroundStyle(Theme.textMuted)
                         }
                     } else {
@@ -92,6 +95,12 @@ struct HowYouTrainView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(Theme.surface)
         .onAppear { rules = model.userRules }
+        .sheet(isPresented: $pickingAvoid) {
+            NavigationStack {
+                AvoidMovementsView(rules: $rules)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { pickingAvoid = false } } }
+            }
+        }
     }
 
     private func question(_ title: String, @ViewBuilder content: () -> some View) -> some View {

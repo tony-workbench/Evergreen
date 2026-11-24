@@ -92,4 +92,15 @@ struct WorkoutContentTests {
         log.settleLoads([WorkoutResult(movementId: "backpack_press", sets: [10], load: 11)], feeling: .easy)
         #expect(log.loads["backpack_press"] == 12)     // no more than a backpack holds
     }
+
+    @Test func tooEasyOnOneBackpackMovementRaisesOnlyThatOne() {
+        var log = WorkoutLog()
+        var easy = WorkoutResult(movementId: "backpack_row", sets: [15, 15], load: 5)
+        easy.tooEasy = true                             // the page already added two kilograms: 3 became 5
+        log.settleLoads([easy, WorkoutResult(movementId: "backpack_squat", sets: [10], load: 4)], feeling: .right)
+        #expect(log.loads["backpack_row"] == 5)
+        #expect(log.loads["backpack_squat"] == nil, "the other backpack movement isn't raised")
+        log.settleLoads([easy], feeling: .easy)
+        #expect(log.loads["backpack_row"] == 5, "the end-of-session answer doesn't add two more on top")
+    }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// The person's own rules and the kind of each day, wired to the plan: saving a
 /// rule, a day out ("I'm going out today", an event away from home, the phone far
@@ -9,8 +10,12 @@ extension AppModel {
     static let stayingHomeKey = "staying_home_days"
     static let farDayKey = "far_from_home_day"
     static let homeFocusKey = "home_week_focus"
+    /// Missed days whose focus was already passed on to the week, so working the week out again doesn't pass it on twice.
+    static let carriedKey = "home_carried_days"
     /// A missed session older than this isn't carried: the week has moved on.
     static let carryDays = 3
+    /// Past days whose planned focus and carry are kept: a week.
+    static let keptDays = 7
 
     var todayISO: String { LocalTime(now, in: calendar.timeZone).day }
 
@@ -49,6 +54,9 @@ extension AppModel {
         if out { going.insert(day); staying.remove(day) } else { going.remove(day); staying.insert(day) }
         settings.set(going.sorted(), forKey: Self.goingOutKey)
         settings.set(staying.sorted(), forKey: Self.stayingHomeKey)
+        // A day out loses its reminders now, before anything else: from the lock screen the rest may wait for the phone
+        // to be unlocked, and the reminders must not fire meanwhile.
+        if out, onDevice { await notifier.cancelHomeReminders(day: day) }
         if !out, day == todayISO, settings.string(forKey: Self.farDayKey) == day { settings.removeObject(forKey: Self.farDayKey) }
         // "I'm home" takes back a "Skip today: I'm out" too, so the day trains with its reminders again.
         if !out, workoutLog.skipped?[day] == "out" {
@@ -61,7 +69,9 @@ extension AppModel {
     /// When the app comes forward: a phone far from home makes today a day out, and what is left of today's reminders goes.
     /// Needs a home and When In Use location, so it only works with the app open.
     func checkFarFromHome() async {
-        guard onDevice, userRules.isOn, let home = userRules.home, settings.string(forKey: Self.farDayKey) != todayISO else { return }
+        // "I'm home" said today stands: being far again later the same day doesn't make it a day out again.
+        guard onDevice, userRules.isOn, let home = userRules.home, settings.string(forKey: Self.farDayKey) != todayISO,
+              !stayingHomeDays.contains(todayISO) else { return }
         let location = DeviceLocation()
         guard location.permission == .allowed, let here = await location.current(),
               home.isFar(here, kilometres: userRules.farKilometres) else { return }
@@ -82,7 +92,10 @@ extension AppModel {
     private func replanForRules() async {
         await refreshDayKinds()
         await scheduleNotifications()
-        _ = try? await loadWeekPlan(quiet: true)
+        do { _ = try await loadWeekPlan(quiet: true) } catch {
+            // With no AI key the rules' own week stands, which is the usual case; engines that didn't load are a fault.
+            if error == .unavailable { Logger.workout.error("The plan engines didn't load when the rules changed") }
+        }
         await rememberHomeWeek()
     }
 
@@ -91,7 +104,7 @@ extension AppModel {
         guard userRules.isOn else { return "" }
         let kinds = dayKinds.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value.rawValue)" }.joined(separator: ",")
         let planned = queue.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ",")
-        return userRules.cacheText + "#" + kinds + "#" + carry.joined(separator: ",") + "#" + planned
+        return userRules.cacheText + "#" + kinds + "#" + carry.joined(separator: ",") + "#" + planned + (homeDoneToday ? "#done" : "")
     }
 
     // MARK: Carrying a missed session
@@ -110,11 +123,12 @@ extension AppModel {
         else { return }
         homeWeek = week
         week.save(to: settings)
-        var kept = homeFocus.filter { $0.key >= dayISO(offset: -7) }
+        var kept = homeFocus.filter { $0.key >= dayISO(offset: -Self.keptDays) }
         for day in week.days {
             if let focus = day.focus { kept[day.day] = focus } else { kept.removeValue(forKey: day.day) }
         }
         settings.set(kept, forKey: Self.homeFocusKey)
+        markCarried()
         var planned = PlannedDays.load(from: settings)
         planned.update(with: week, today: todayISO)
         planned.save(to: settings)
@@ -122,31 +136,74 @@ extension AppModel {
     }
 
     /// The focus of each day at home in the last three days that had a session planned and no strength workout done,
-    /// oldest first. The engine moves it to the next day at home.
+    /// oldest first, and not passed on yet. The engine moves it to the next day at home.
     var carry: [String] {
-        guard userRules.isOn else { return [] }
         let focus = homeFocus
-        return (1...Self.carryDays).reversed().compactMap { back -> String? in
-            let day = dayISO(offset: -back)
-            guard let wanted = focus[day], !trainedStrength(on: day), !workoutLog.didHomeSession(on: day) else { return nil }
-            return wanted
+        return missedDays.compactMap { focus[$0] }
+    }
+
+    /// The days behind `carry`.
+    var missedDays: [String] {
+        guard userRules.isOn else { return [] }
+        let focus = homeFocus, carried = carriedDays
+        return (1...Self.carryDays).reversed().map { dayISO(offset: -$0) }.filter { day in
+            focus[day] != nil && !carried.contains(day) && !trainedStrength(on: day) && !workoutLog.didHomeSession(on: day)
         }
     }
 
+    /// Missed days already passed on, from the last week.
+    var carriedDays: Set<String> {
+        Set((settings.stringArray(forKey: Self.carriedKey) ?? []).filter { $0 >= dayISO(offset: -Self.keptDays) })
+    }
+
+    /// Once the week is kept with a missed day's focus passed on, that focus is part of what each day was planned to work
+    /// (`queue`): it is passed on once, and the rest of the week doesn't shift again each time the week is worked out.
+    func markCarried() {
+        let missed = missedDays
+        guard !missed.isEmpty else { return }
+        settings.set(carriedDays.union(missed).sorted(), forKey: Self.carriedKey)
+    }
+
     /// What each day at home from today to Sunday was last planned to work, so the week's split stays as it was planned
-    /// and a day that drops out passes its focus on. Today is left out once it's done.
+    /// and a day that drops out passes its focus on. Today keeps its own once done too, so working the week out again
+    /// later that day doesn't give today another focus or move the days after it.
     var queue: [String: String] {
         guard userRules.isOn else { return [:] }
         let today = todayISO
         let sunday = dayISO(offset: Self.daysToSunday(now, calendar: calendar))
-        let doneToday = trainedStrength(on: today) || workoutLog.didHomeSession(on: today)
-        return homeFocus.filter { $0.key >= today && $0.key <= sunday && !($0.key == today && doneToday) }
+        return homeFocus.filter { $0.key >= today && $0.key <= sunday }
+    }
+
+    /// A day at home earlier this Monday-to-Sunday week that had a session planned, and how it went, so the week table
+    /// keeps the whole week and its count once those days have passed.
+    struct EarlierDay: Identifiable, Equatable {
+        enum Outcome: Equatable { case done, skipped, missed }
+        let day: String
+        let focus: String?
+        let outcome: Outcome
+        var id: String { day }
+    }
+
+    var earlierThisWeek: [EarlierDay] {
+        guard userRules.isOn else { return [] }
+        let today = todayISO
+        let monday = dayISO(offset: Self.daysToSunday(now, calendar: calendar) - (Self.daysInWeek - 1))
+        let focus = homeFocus
+        return PlannedDays.load(from: settings).days.filter { $0 >= monday && $0 < today }.map { day in
+            let outcome: EarlierDay.Outcome = workoutLog.didHomeSession(on: day) || trainedStrength(on: day) ? .done
+                : workoutLog.didSkip(day) ? .skipped : .missed
+            return EarlierDay(day: day, focus: focus[day], outcome: outcome)
+        }
     }
 
     /// Days from `date` to the Sunday that ends its Monday-to-Sunday week: 0 on a Sunday, 6 on a Monday.
     nonisolated static func daysToSunday(_ date: Date, calendar: Calendar) -> Int {
-        (8 - calendar.component(.weekday, from: date)) % 7
+        // Calendar weekdays run 1 (Sunday) to 7 (Saturday): Monday, 2, is six days from Sunday.
+        (sunday + daysInWeek - calendar.component(.weekday, from: date)) % daysInWeek
     }
+
+    private nonisolated static let sunday = 1
+    private nonisolated static let daysInWeek = 7
 
     /// A strength workout in Apple Health (or logged here) on that day.
     func trainedStrength(on day: String) -> Bool {

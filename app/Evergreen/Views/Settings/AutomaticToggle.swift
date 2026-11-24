@@ -21,6 +21,10 @@ struct AutomaticToggle: View {
             Rectangle().fill(Theme.rule).frame(height: 1)
         }
         .onAppear { isOn = what.isOn(model.settings) }
-        .onChange(of: isOn) { _, on in model.settings.set(on, forKey: what.rawValue) }
+        .onChange(of: isOn) { _, on in
+            guard on != what.isOn(model.settings) else { return }
+            model.settings.set(on, forKey: what.rawValue)
+            if what.changesReminders { Task { await model.scheduleHomeNotifications() } }
+        }
     }
 }

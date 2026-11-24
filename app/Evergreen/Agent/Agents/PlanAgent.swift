@@ -20,8 +20,8 @@ struct PlanAgent: Sendable {
     /// A fixed offset in minutes instead (tests).
     var offsetMinutes: Int? = nil
 
-    /// One repair at most; then the rules' own week. Each round is one request.
-    static let maxRevisions = 1
+    /// Three rounds at most (the first answer and two repairs); then the rules' own week. Each round is one request.
+    static let maxRevisions = 2
     /// A week is seven short sessions at most: this is room to spare, and stops a runaway answer.
     static let maxOutput = 2000
     /// The limits are worked out by code, so the model only has to arrange them: no thinking, and a firm time limit.

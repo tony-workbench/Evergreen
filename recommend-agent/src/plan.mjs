@@ -123,7 +123,7 @@ function applyRules(s, ctx) {
   if (!s.rules) return;
   s.dayKinds = readDayKinds(ctx.dayKinds);
   s.home = homeContext({ now: s.now, calendar: s.calendar, rules: s.rules, dayKinds: s.dayKinds, carry: Array.isArray(ctx.carry) ? ctx.carry : [],
-    queue: readQueue(ctx.queue) });
+    queue: readQueue(ctx.queue), doneToday: ctx.doneToday === true });
   s.homeWeek = homeWeek(s.home);
   const n = s.homeWeek.trainingDays;
   const minutes = n * s.rules.session.max;

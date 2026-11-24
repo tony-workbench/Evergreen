@@ -8,6 +8,9 @@ struct EarnedTimeView: View {
     @State private var picking: FunGroup?
     @State private var selection = FamilyActivitySelection()
     @State private var turningOn = false
+    /// "Turn on" and "Turn off" are asked once more, saying what they do, before they do it.
+    @State private var confirmingOn = false
+    @State private var confirmingOff = false
 
     private var earned: EarnedTimeModel { model.earnedTime }
 
@@ -37,10 +40,13 @@ struct EarnedTimeView: View {
                         ForEach(FunGroup.allCases) { rateRow($0) }
                     }
                     if earned.isOn {
-                        Button("Turn off") { earned.turnOff() }
-                            .font(.body)
-                            .foregroundStyle(Theme.warning)
-                            .frame(minHeight: 44)
+                        Button("Turn off") { confirmingOff = true }
+                            .buttonStyle(TapTargetButtonStyle(color: Theme.warning))
+                            .confirmationDialog("Turn off earned screen time?", isPresented: $confirmingOff, titleVisibility: .visible) {
+                                Button("Turn off and unlock the apps", role: .destructive) { earned.turnOff() }
+                            } message: {
+                                Text("The apps unlock now. What you’ve earned stays, and you can turn it on again here.")
+                            }
                     }
                 }
                 .padding(.horizontal, Theme.md)
@@ -60,7 +66,7 @@ struct EarnedTimeView: View {
     private var statement: some View {
         VStack(alignment: .leading, spacing: Theme.sm) {
             Text("\(usable(.social)) min")
-                .font(.system(size: 56, weight: .semibold))
+                .agentFont(56, relativeTo: .largeTitle)
                 .foregroundStyle(Theme.text)
             Text(earned.isOn ? "of social apps to use today, \(usable(.videos)) min of videos, \(usable(.games)) min of games"
                              : "of social apps earned this week, or \(usable(.videos)) min of videos, \(usable(.games)) min of games")
@@ -102,14 +108,19 @@ struct EarnedTimeView: View {
                 .font(.body)
                 .foregroundStyle(Theme.text)
                 .fixedSize(horizontal: false, vertical: true)
-            Button(turningOn ? "Turning on" : "Turn on") {
-                turningOn = true
-                Task {
-                    await earned.turnOn(workouts: model.workouts, now: model.now, calendar: model.calendar)
-                    turningOn = false
-                }
-            }
+            Button(turningOn ? "Turning on" : "Turn on") { confirmingOn = true }
             .buttonStyle(PrimaryButtonStyle())
+            .confirmationDialog("Lock these apps?", isPresented: $confirmingOn, titleVisibility: .visible) {
+                Button("Turn on") {
+                    turningOn = true
+                    Task {
+                        await earned.turnOn(workouts: model.workouts, now: model.now, calendar: model.calendar)
+                        turningOn = false
+                    }
+                }
+            } message: {
+                Text(lockSummary)
+            }
             .disabled(nothingPicked || turningOn)
             .opacity(nothingPicked ? 0.4 : 1)
             if let problem = earned.problem {
@@ -118,6 +129,15 @@ struct EarnedTimeView: View {
                 Text("Pick the apps below first.").font(.footnote).foregroundStyle(Theme.textMuted)
             }
         }
+    }
+
+    /// What turning on locks and when, in words: each group, how many apps, and its free time a day.
+    private var lockSummary: String {
+        let groups = FunGroup.allCases.filter { earned.picked($0) > 0 }.map { group in
+            let count = earned.picked(group)
+            return "\(group.title): \(count == 1 ? "1 app or category" : "\(count) apps or categories"), free for \(group.baseMinutes) min a day"
+        }
+        return groups.joined(separator: "\n") + "\n\nEach locks once its free time is used, until you earn more with a workout. The free time starts again at midnight."
     }
 
     private var nothingPicked: Bool { FunGroup.allCases.allSatisfy { earned.picked($0) == 0 } }
@@ -181,7 +201,7 @@ struct EarnedTimeView: View {
     }
 
     /// 1, 0.5, 1.25: no trailing zeros.
-    static func number(_ value: Double) -> String {
+    nonisolated static func number(_ value: Double) -> String {
         value.formatted(.number.precision(.fractionLength(0...2)))
     }
 }

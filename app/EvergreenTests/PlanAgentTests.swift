@@ -33,12 +33,12 @@ struct PlanAgentTests {
         #expect(second.messages[2]["content"]?.string?.contains("The week is 290 minutes; the cap is 240.") == true)
     }
 
-    @Test func afterOneFailedRevisionTheRulesWeekIsUsed() async {
+    @Test func afterThreeFailedRoundsTheRulesWeekIsUsed() async {
         let over = F.answer([("2026-11-29", "08:00", "long_run", 300, ["k1"])])
         let model = ScriptedModel([over, over, over, over])
         let week = await F.agent(model).week()
         #expect(week.source == .rules && week.sessions == CapRules().fallback)
-        #expect(await model.requests.count == 2)
+        #expect(await model.requests.count == 3)
     }
 
     @Test func whenTheModelCannotBeReachedOrAnswersNonsenseTheRulesWeekIsUsed() async {

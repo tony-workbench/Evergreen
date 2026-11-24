@@ -96,8 +96,10 @@ struct SnackView: View {
                 if let startedAt {
                     let end = startedAt.addingTimeInterval(TimeInterval(minutes * 60))
                     Text(timerInterval: startedAt...end, countsDown: true)
-                        .font(.system(size: 56, weight: .semibold).monospacedDigit())
+                        .agentFont(56, relativeTo: .largeTitle)
+                        .monospacedDigit()
                         .foregroundStyle(Theme.text)
+                        .accessibilityLabel("Time left")
                         .frame(maxWidth: .infinity)
                         .task {
                             try? await Task.sleep(for: .seconds(max(0, end.timeIntervalSinceNow)))

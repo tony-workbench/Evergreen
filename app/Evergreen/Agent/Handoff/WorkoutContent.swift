@@ -78,8 +78,13 @@ struct Movement: Codable, Equatable, Sendable, Identifiable {
 enum BackpackWater {
     /// What a backpack holds safely, in kilograms (the engine's LOAD_MAX_KG).
     static let maxKg: Double = 12
-    /// "Too easy" at the end of a session: this many more kilograms next time.
+    /// What a backpack movement starts with when the library gives no weight.
+    static let startKg: Double = 2
+    /// "Too easy" on a backpack movement, or at the end of a session: this many more kilograms.
     static let easierStepKg: Double = 2
+    /// "Too hard" on a backpack movement: this many fewer kilograms, down to `leastKg`.
+    static let harderStepKg: Double = 1
+    static let leastKg: Double = 1
 
     static func words(_ kg: Double) -> String {
         let litres = kg.formatted(.number.precision(.fractionLength(0...1)))

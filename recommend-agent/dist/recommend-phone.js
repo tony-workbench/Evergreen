@@ -918,7 +918,7 @@
   var SPLIT_DAYS = 4;
   var FOCUS = ["full", "lower", "upper", "full_lower", "full_upper"];
   var FOCUS_WORDS = { full: "full-body", lower: "lower-body", upper: "upper-body", full_lower: "full-body, more legs", full_upper: "full-body, more upper body" };
-  function homeContext({ now, calendar, rules, dayKinds, carry = [], queue = /* @__PURE__ */ new Map() }) {
+  function homeContext({ now, calendar, rules, dayKinds, carry = [], queue = /* @__PURE__ */ new Map(), doneToday = false }) {
     return {
       now,
       today: dayOf(now),
@@ -927,7 +927,8 @@
       rules,
       given: dayKinds,
       carry,
-      queue: new Map([...queue].filter(([, f]) => FOCUS.includes(f)))
+      queue: new Map([...queue].filter(([, f]) => FOCUS.includes(f))),
+      doneToday: doneToday === true
     };
   }
   function readQueue(raw) {
@@ -1018,9 +1019,10 @@
     const waiting = h.carry.filter((f) => FOCUS.includes(f));
     let row = 0;
     for (let day = h.today; day <= sunday && row < rows.length; day += 1) {
-      if (h.queue.has(day)) waiting.push(h.queue.get(day));
+      const doneDay = h.doneToday && day === h.today;
+      if (h.queue.has(day) && !doneDay) waiting.push(h.queue.get(day));
       if (rows[row].day !== day) continue;
-      rows[row].focus = waiting.shift() ?? fresh[row];
+      rows[row].focus = (doneDay ? h.queue.get(day) : waiting.shift()) ?? fresh[row];
       row += 1;
     }
   }
@@ -1717,7 +1719,8 @@
       rules: s.rules,
       dayKinds: s.dayKinds,
       carry: Array.isArray(ctx.carry) ? ctx.carry : [],
-      queue: readQueue(ctx.queue)
+      queue: readQueue(ctx.queue),
+      doneToday: ctx.doneToday === true
     });
     s.homeWeek = homeWeek(s.home);
     const n = s.homeWeek.trainingDays;
@@ -3976,6 +3979,10 @@
     const times = history.filter((h) => h.movementId === id && h.load !== null);
     return times.length ? times[times.length - 1].load : null;
   }
+  function toppedLastTime(history, m) {
+    const last = history.filter((h) => h.movementId === m.id).at(-1);
+    return Boolean(last) && last.sets.length >= m.dose.sets && last.sets.every((n) => n >= top(m));
+  }
   function itemFor(m, history, loads, sets) {
     const item = { movementId: m.id, sets, rest: m.rest, isNew: false };
     if (m.dose.reps) item.reps = [...m.dose.reps];
@@ -3984,7 +3991,7 @@
       const set = Number.isFinite(loads[m.id]) ? loads[m.id] : null;
       const last = lastLoad(history, m.id);
       let load = set ?? last ?? m.load ?? 2;
-      if (set === null && last !== null && mastered(history, m.id)) load += LOAD_STEP_KG;
+      if (set === null && last !== null && toppedLastTime(history, m)) load += LOAD_STEP_KG;
       item.load = Math.min(LOAD_MAX_KG, Math.max(1, load));
     }
     return item;

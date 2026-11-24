@@ -16,6 +16,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     var onUndo: (@MainActor (String) -> Void)?
     /// A button on a day-at-home reminder; the value is the workout's day (YYYY-MM-DD).
     var onWorkoutAction: (@MainActor (WorkoutAction, String) -> Void)?
+    /// "Only at …" or "Move to …" on a day-at-home reminder: the time picked ("18:10") and the workout's day.
+    var onPickTime: (@MainActor (String, String) -> Void)?
 
     nonisolated static let movedCategory = "moved"
     nonisolated static let undoAction = "undo"
@@ -41,33 +43,95 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    /// The categories: Start · Later today · I already trained, Start · I already trained · Skip today (with its reason),
-    /// Start now · I already trained, and I'm going out tomorrow.
+    /// The categories: Start · Later today · Already done, Start · Already done · Skip today (with its reason),
+    /// Start now · Already done, and I'm going out tomorrow (with "Only at …" when the reminder names times).
     nonisolated static let workoutCategory = "workout"
     nonisolated static let workoutLastCategory = "workout_last"
     nonisolated static let workoutMovedCategory = "workout_moved"
     nonisolated static let tomorrowCategory = "home_tomorrow"
 
+    /// The evening reminder with its "Only at …" buttons, and the question twenty minutes after a picked time with its
+    /// "Move to …": their buttons name times, so they get a category for each set of times ("home_tomorrow|16:40,18:10").
+    nonisolated static let askCategory = "workout_ask"
+    nonisolated static let pickPrefix = "pick|"
+
+    /// The buttons that are the same on every notification of their kind.
+    private let fixedCategories: Set<UNNotificationCategory>
+
+    /// Notification changes one after another, so a button pressed while the reminders are being planned again can't be
+    /// undone by them: whatever is planned is worked out when its turn comes, from what is true then.
+    private var queue: Task<Void, Never>?
+
     override init() {
-        super.init()
-        center.delegate = self
         let undo = UNNotificationAction(identifier: Self.undoAction, title: "Undo", options: [])
         let start = UNNotificationAction(identifier: WorkoutAction.start.rawValue, title: "Start", options: [.foreground])
         let startNow = UNNotificationAction(identifier: WorkoutAction.start.rawValue, title: "Start now", options: [.foreground])
         let later = UNNotificationAction(identifier: WorkoutAction.later.rawValue, title: "Later today", options: [])
-        // Marks the day done and takes off the rest of its reminders, so it needs the phone unlocked too.
-        let done = UNNotificationAction(identifier: WorkoutAction.alreadyDone.rawValue, title: "I already trained", options: [.authenticationRequired])
         let skips = [(WorkoutAction.skipOut, "Skip today: I’m out"), (.skipUnwell, "Skip today: not feeling well"), (.skipNotToday, "Skip today: not today")]
             // Skipping a day needs the phone unlocked, so a tap in a pocket can't do it; Today can take it back.
             .map { UNNotificationAction(identifier: $0.0.rawValue, title: $0.1, options: [.authenticationRequired]) }
-        let goingOut = UNNotificationAction(identifier: WorkoutAction.goingOut.rawValue, title: "I’m going out tomorrow", options: [])
-        center.setNotificationCategories([
+        fixedCategories = [
             UNNotificationCategory(identifier: Self.movedCategory, actions: [undo], intentIdentifiers: []),
-            UNNotificationCategory(identifier: Self.workoutCategory, actions: [start, later, done], intentIdentifiers: []),
-            UNNotificationCategory(identifier: Self.workoutLastCategory, actions: [start, done] + skips, intentIdentifiers: []),
-            UNNotificationCategory(identifier: Self.workoutMovedCategory, actions: [startNow, done], intentIdentifiers: []),
-            UNNotificationCategory(identifier: Self.tomorrowCategory, actions: [goingOut], intentIdentifiers: []),
-        ])
+            UNNotificationCategory(identifier: Self.workoutCategory, actions: [start, later, Self.doneAction], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.workoutLastCategory, actions: [start, Self.doneAction] + skips, intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.workoutMovedCategory, actions: [startNow, Self.doneAction], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.tomorrowCategory, actions: [Self.goingOutAction], intentIdentifiers: []),
+        ]
+        super.init()
+        center.delegate = self
+        center.setNotificationCategories(fixedCategories)
+    }
+
+    /// Marks the day done and takes off the rest of its reminders, so it needs the phone unlocked; Today can take it back.
+    private static var doneAction: UNNotificationAction {
+        UNNotificationAction(identifier: WorkoutAction.alreadyDone.rawValue, title: "Already done", options: [.authenticationRequired])
+    }
+
+    private static var goingOutAction: UNNotificationAction {
+        UNNotificationAction(identifier: WorkoutAction.goingOut.rawValue, title: "I’m going out tomorrow", options: [])
+    }
+
+    /// The category of a day-at-home reminder: its buttons.
+    nonisolated static func category(of reminder: WorkoutReminder) -> String {
+        switch reminder.kind {
+        case .evening: reminder.choices.isEmpty ? tomorrowCategory : tomorrowCategory + "|" + reminder.choices.joined(separator: ",")
+        case .ask: askCategory + "|" + reminder.choices.joined(separator: ",")
+        case .moved: workoutMovedCategory
+        case .last: workoutLastCategory
+        case .soon, .now, .later: workoutCategory
+        }
+    }
+
+    /// The button of a picked time, and the time a button picks ("pick|18:10" → "18:10").
+    nonisolated static func pickAction(_ clock: String) -> String { pickPrefix + clock }
+    nonisolated static func pickedClock(_ action: String) -> String? {
+        action.hasPrefix(pickPrefix) ? String(action.dropFirst(pickPrefix.count)) : nil
+    }
+
+    /// The categories whose buttons name times, for the reminders about to be scheduled.
+    private func timedCategories(_ reminders: [WorkoutReminder]) -> Set<UNNotificationCategory> {
+        Set(reminders.filter { ($0.kind == .evening && !$0.choices.isEmpty) || $0.kind == .ask }.map { reminder in
+            let picks = reminder.choices.map { clock in
+                UNNotificationAction(identifier: Self.pickAction(clock),
+                                     title: reminder.kind == .ask ? "Move to \(clock)" : "Only at \(clock)", options: [])
+            }
+            let rest = reminder.kind == .ask
+                ? [Self.doneAction, UNNotificationAction(identifier: WorkoutAction.skipNotToday.rawValue, title: "Skip today",
+                                                         options: [.authenticationRequired])]
+                : [Self.goingOutAction]
+            return UNNotificationCategory(identifier: Self.category(of: reminder), actions: picks + rest, intentIdentifiers: [])
+        })
+    }
+
+    /// Runs notification changes in the order they were asked for.
+    private func inTurn(_ work: @escaping @MainActor @Sendable () async -> Void) async {
+        let before = queue
+        let mine = Task { @MainActor in
+            await before?.value
+            await work()
+        }
+        queue = mine
+        await mine.value
     }
 
     // MARK: Access
@@ -110,33 +174,21 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    /// The reminders for the days at home (`WorkoutReminders`), replaced as a whole on every change.
-    func scheduleHomeReminders(_ reminders: [WorkoutReminder], calendar: Calendar = .current) async {
-        let pending = await center.pendingNotificationRequests().map(\.identifier)
-        center.removePendingNotificationRequests(withIdentifiers: pending.filter { $0.hasPrefix(WorkoutReminders.prefix) })
-        guard access == .on else { return }
-        for reminder in reminders {
-            let category = switch reminder.kind {
-            case .evening: Self.tomorrowCategory
-            case .moved: Self.workoutMovedCategory
-            case .last: Self.workoutLastCategory
-            case .soon, .now, .later: Self.workoutCategory
+    /// The reminders for the days at home (`WorkoutReminders`), replaced as a whole on every change. `reminders` is asked
+    /// when this change's turn comes, so a button pressed meanwhile is already part of it.
+    func scheduleHomeReminders(calendar: Calendar = .current, _ reminders: @escaping @MainActor @Sendable () -> [WorkoutReminder]) async {
+        await inTurn { [self] in
+            let pending = await center.pendingNotificationRequests().map(\.identifier)
+            center.removePendingNotificationRequests(withIdentifiers: pending.filter { $0.hasPrefix(WorkoutReminders.prefix) })
+            guard access == .on else { return }
+            let list = reminders()
+            center.setNotificationCategories(fixedCategories.union(timedCategories(list)))
+            for reminder in list {
+                let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: reminder.fires)
+                await add(reminder.id, (reminder.title, reminder.body), trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false),
+                          category: Self.category(of: reminder), info: ["day": reminder.day, "kind": reminder.kind.rawValue])
             }
-            let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: reminder.fires)
-            await add(reminder.id, (reminder.title, reminder.body), trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false),
-                      category: category, info: ["day": reminder.day, "kind": reminder.kind.rawValue])
         }
-    }
-
-    /// "Later today": the reminders of `day` that would fire before `time` go, so the next one is at the later time.
-    func dropHomeReminders(day: String, before time: Date) async {
-        let pending = await center.pendingNotificationRequests()
-        let ids = pending.filter { request in
-            guard request.identifier.hasPrefix(WorkoutReminders.prefix + day),
-                  let fires = (request.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate() else { return false }
-            return fires < time
-        }.map(\.identifier)
-        center.removePendingNotificationRequests(withIdentifiers: ids)
     }
 
     /// Every Sunday at 20:00, "Your week ahead is ready", while the person plans by their rules. The week is worked out
@@ -153,8 +205,10 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     /// Takes off what is left of one day's home workout reminders, once its session is done or skipped. Only that day's:
     /// another day's reminders, the evening one about tomorrow and the other notifications stay.
     func cancelHomeReminders(day: String) async {
-        let pending = await center.pendingNotificationRequests().map(\.identifier)
-        center.removePendingNotificationRequests(withIdentifiers: WorkoutReminders.ids(pending, day: day))
+        await inTurn { [self] in
+            let pending = await center.pendingNotificationRequests().map(\.identifier)
+            center.removePendingNotificationRequests(withIdentifiers: WorkoutReminders.ids(pending, day: day))
+        }
     }
 
     // MARK: Now
@@ -204,14 +258,35 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
     ) async {
-        let undone = response.actionIdentifier == Self.undoAction
-            ? response.notification.request.content.userInfo["move"] as? String : nil
-        let workout = WorkoutAction(rawValue: response.actionIdentifier)
-        let day = response.notification.request.content.userInfo["day"] as? String
+        let info = response.notification.request.content.userInfo
+        let route = Self.route(action: response.actionIdentifier, day: info["day"] as? String, kind: info["kind"] as? String,
+                               move: info["move"] as? String)
         await MainActor.run {
-            if let undone { self.onUndo?(undone) }
-            else if let workout, let day { self.onWorkoutAction?(workout, day) }
-            else { self.onOpen?() }
+            switch route {
+            case .undo(let move): self.onUndo?(move)
+            case .pick(let clock, let day): self.onPickTime?(clock, day)
+            case .workout(let action, let day): self.onWorkoutAction?(action, day)
+            case .open: self.onOpen?()
+            }
         }
+    }
+
+    /// Where a tap on a notification goes.
+    enum Route: Equatable, Sendable {
+        case undo(String)
+        case pick(String, day: String)
+        case workout(WorkoutAction, day: String)
+        case open
+    }
+
+    /// A button does what it says. A tap on the body of a reminder of the day's session opens the workout page (Start);
+    /// on the evening reminder, or any other notification, it opens Today.
+    nonisolated static func route(action: String, day: String?, kind: String?, move: String?) -> Route {
+        if action == undoAction, let move { return .undo(move) }
+        if let clock = pickedClock(action), let day { return .pick(clock, day: day) }
+        if let workout = WorkoutAction(rawValue: action), let day { return .workout(workout, day: day) }
+        let sameDay = kind.flatMap(WorkoutReminder.Kind.init(rawValue:)).map { $0 != .evening } ?? false
+        if action == UNNotificationDefaultActionIdentifier, sameDay, let day { return .workout(.start, day: day) }
+        return .open
     }
 }

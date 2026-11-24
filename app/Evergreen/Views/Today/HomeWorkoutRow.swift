@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// On a day at home with a session: what it works and how long, "Start" to
+/// On a day at home with a session: what it works and how long, "Start" (the main button, 56 points) to
 /// open the workout page, "I did it another way", and "Not now" (later today, or
-/// skip today with a reason, as on the reminders). Once done, one line says so.
+/// skip today with a reason, as on the reminders). Once done, one line says so; a day done
+/// another way (here or "Already done" on a reminder) can be taken back, like a skip.
 /// "Start" on a reminder opens the workout page from here too.
 struct HomeWorkoutRow: View {
     @Environment(AppModel.self) private var model
@@ -17,25 +18,28 @@ struct HomeWorkoutRow: View {
                         .foregroundStyle(Theme.textMuted)
                         .frame(minHeight: 44, alignment: .leading)
                     Button("Train today after all") { Task { await model.unskipDay(model.todayISO) } }
-                        .font(.body)
-                        .foregroundStyle(Theme.accent)
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
+                        .buttonStyle(TapTargetButtonStyle())
                 } else if model.homeDoneToday {
-                    Text("Today’s home workout is done.")
+                    Text(model.workoutLog.didOtherWay(model.todayISO) ? "Today’s home workout is done another way." : "Today’s home workout is done.")
                         .font(.body)
                         .foregroundStyle(Theme.success)
                         .frame(minHeight: 44, alignment: .leading)
+                    if model.workoutLog.didOtherWay(model.todayISO) {
+                        Button("Undo: I haven’t trained yet") { Task { await model.undoDoneAnotherWay() } }
+                            .buttonStyle(TapTargetButtonStyle())
+                            .accessibilityHint("Brings back today’s workout and its reminders")
+                    }
                 } else {
                     Text("Today at home: \(HomeWorkoutRow.words[focus] ?? "full-body"), about \(model.homeMinutesToday) minutes.")
                         .font(.body)
                         .foregroundStyle(Theme.text)
                         .fixedSize(horizontal: false, vertical: true)
+                    Button("Start") { open = true }
+                        .buttonStyle(PrimaryButtonStyle.tall)
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: Theme.lg) { actions }
-                        VStack(alignment: .leading, spacing: Theme.xs) { actions }
+                        VStack(alignment: .leading, spacing: Theme.sm) { actions }
                     }
-                    .frame(minHeight: 44)
                 }
             }
             .fullScreenCover(isPresented: $open) { WorkoutSessionView() }
@@ -45,28 +49,23 @@ struct HomeWorkoutRow: View {
     }
 
     @ViewBuilder private var actions: some View {
-        Button("Start") { open = true }
-            .font(.body.weight(.semibold))
-            .foregroundStyle(Theme.accent)
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Rectangle())
         Button("I did it another way") { Task { await model.doneAnotherWay() } }
-            .font(.body)
-            .foregroundStyle(Theme.textMuted)
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
-        Menu("Not now") {
+            .buttonStyle(TapTargetButtonStyle(color: Theme.textMuted))
+            .accessibilityHint("Marks today done. You can undo it.")
+        Menu {
             Button("Later today") { Task { await model.laterToday() } }
             Section("Skip today") {
                 Button("I’m out") { Task { await model.skipDay(model.todayISO, reason: "out") } }
                 Button("Not feeling well") { Task { await model.skipDay(model.todayISO, reason: "unwell") } }
                 Button("Not today") { Task { await model.skipDay(model.todayISO, reason: "not_today") } }
             }
+        } label: {
+            Text("Not now")
+                .font(.body)
+                .foregroundStyle(Theme.textMuted)
+                .frame(minWidth: TapTargetButtonStyle.minSide, minHeight: TapTargetButtonStyle.minSide)
+                .contentShape(Rectangle())
         }
-        .font(.body)
-        .foregroundStyle(Theme.textMuted)
-        .frame(minHeight: 44)
-        .contentShape(Rectangle())
     }
 
     private func openIfAsked() {

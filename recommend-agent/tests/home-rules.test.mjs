@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { planContext, planBrief, checkPlan } from '../src/plan.mjs';
 import { recommendWeek } from '../src/workouts.mjs';
 import { readRules } from '../src/rules.mjs';
+import { readFileSync } from 'node:fs';
 
 const MONDAY = '2026-11-30';
 const at = (day, time) => `${day}T${time}:00-08:00`;
@@ -138,8 +139,24 @@ test('a day at home that turns into a day out passes its focus on to the next da
   assert.deepEqual(weekOf(out).filter((d) => d.focus && d.day <= DAYS[6]).map((d) => d.focus), ['upper', 'lower']);
 });
 
+test('a session done today keeps its focus to today and passes nothing on to the days after it', () => {
+  const queue = { [DAYS[1]]: 'upper', [DAYS[3]]: 'lower', [DAYS[4]]: 'upper' };
+  const late = (doneToday) => weekOf(base({ now: at(DAYS[1], '21:30'), queue, doneToday }))
+    .filter((d) => d.focus && d.day <= DAYS[6]).map((d) => [d.day, d.focus]);
+  assert.deepEqual(late(true), [[DAYS[3], 'lower'], [DAYS[4], 'upper']]);
+  assert.deepEqual(late(false), [[DAYS[3], 'upper'], [DAYS[4], 'lower']]);   // not done: today's focus moves on
+  const morning = weekOf(base({ now: at(DAYS[1], '08:00'), queue, doneToday: true }));
+  assert.deepEqual(morning.filter((d) => d.focus && d.day <= DAYS[6]).map((d) => d.focus), ['upper', 'lower', 'upper']);
+});
+
 test('next week seen from midweek takes its place in that whole week’s split', () => {
   const thursday = base({ now: at(DAYS[3], '08:00') });
   const monday = weekOf(thursday).find((d) => d.day === '2026-12-07');
   assert.equal(monday.focus, 'lower');
+});
+
+test('every home-days value in the contract is taken as it is', () => {
+  const values = JSON.parse(readFileSync(new URL('../../contract/fixtures/swift/home-days.json', import.meta.url), 'utf8'));
+  assert.ok(values.length >= 3);
+  for (const value of values) assert.ok(planContext(base({ now: at('2026-11-09', '08:00'), ...value })).homeWeek.days.length === 7);
 });

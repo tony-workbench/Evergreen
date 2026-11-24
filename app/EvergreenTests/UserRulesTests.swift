@@ -48,10 +48,13 @@ struct UserRulesTests {
         #expect(rules.farKilometres == 25)
     }
 
-    @Test func aProfileWithAValueThatCantBeUsedChangesNothing() {
+    @Test func aProfileWithAValueThatCantBeUsedChangesNothing() throws {
         #expect(throws: UserRules.ImportError.unreadable) { try UserRules().importing(Data("not json".utf8)) }
         #expect(throws: UserRules.ImportError.outOfRange) { try UserRules().importing(Data(#"{"restWeekdays":[7]}"#.utf8)) }
         #expect(throws: UserRules.ImportError.outOfRange) { try UserRules().importing(Data(#"{"equipment":["barbell"]}"#.utf8)) }
+        // A movement id that isn't in the library is refused, not kept.
+        #expect(throws: UserRules.ImportError.outOfRange) { try UserRules().importing(Data(#"{"avoid":["made_up"]}"#.utf8), library: ["glute_bridge"]) }
+        #expect(try UserRules().importing(Data(#"{"avoid":["glute_bridge"]}"#.utf8), library: ["glute_bridge"]).avoid == ["glute_bridge"])
         #expect(throws: UserRules.ImportError.outOfRange) { try UserRules().importing(Data(#"{"window":{"from":"21:00","to":"12:00"}}"#.utf8)) }
     }
 

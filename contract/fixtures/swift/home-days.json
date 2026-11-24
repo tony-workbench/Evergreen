@@ -1,0 +1,31 @@
+[
+  {
+    "dayKinds": {
+      "2026-11-12": "home"
+    },
+    "carry": [
+      "lower"
+    ],
+    "queue": {
+      "2026-11-11": "upper",
+      "2026-11-13": "full"
+    },
+    "doneToday": false
+  },
+  {
+    "dayKinds": {},
+    "queue": {
+      "2026-11-09": "full_lower",
+      "2026-11-11": "full_upper"
+    },
+    "doneToday": true
+  },
+  {
+    "dayKinds": {
+      "2026-11-10": "out"
+    },
+    "carry": [],
+    "queue": {},
+    "doneToday": false
+  }
+]

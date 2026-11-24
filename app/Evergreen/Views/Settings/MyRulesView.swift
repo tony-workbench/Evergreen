@@ -94,6 +94,7 @@ struct MyRulesView: View {
             }
             .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in importProfile(result) }
             .onAppear { rules = model.userRules }
+            .task { await model.loadMovements() }
         }
     }
 
@@ -102,7 +103,8 @@ struct MyRulesView: View {
         let opened = url.startAccessingSecurityScopedResource()
         defer { if opened { url.stopAccessingSecurityScopedResource() } }
         do {
-            rules = try rules.importing(try Data(contentsOf: url))
+            // Every movement the profile names has to be in the library; the library is read when this screen opens.
+            rules = try rules.importing(try Data(contentsOf: url), library: Set(model.movements.map(\.id)))
             importProblem = nil
         } catch UserRules.ImportError.outOfRange {
             importProblem = "That profile has a value I can’t use, so nothing was changed."
@@ -171,7 +173,7 @@ struct WeekdayChips: View {
     @Binding var selected: [Int]
 
     var body: some View {
-        HStack(spacing: Theme.xs) {
+        HStack(spacing: Theme.sm) {
             ForEach(0..<7, id: \.self) { day in
                 let on = selected.contains(day)
                 Button {

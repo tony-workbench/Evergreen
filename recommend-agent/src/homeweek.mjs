@@ -14,13 +14,14 @@ export const FOCUS = ['full', 'lower', 'upper', 'full_lower', 'full_upper'];
 export const FOCUS_WORDS = { full: 'full-body', lower: 'lower-body', upper: 'upper-body', full_lower: 'full-body, more legs', full_upper: 'full-body, more upper body' };
 
 /**
- * What the week is built from: { now, calendar: [{ start, end }], rules, dayKinds: Map, carry: [focus], queue: Map }.
+ * What the week is built from: { now, calendar: [{ start, end }], rules, dayKinds: Map, carry: [focus], queue: Map, doneToday }.
  * `queue` holds what each day at home left in this Monday-to-Sunday week was last planned to work (day number -> focus),
  * so the split stays as it was planned and a day that drops out passes its focus on to the next day at home.
+ * `doneToday` says today's session is already done: today's focus is then never passed on to a later day.
  */
-export function homeContext({ now, calendar, rules, dayKinds, carry = [], queue = new Map() }) {
+export function homeContext({ now, calendar, rules, dayKinds, carry = [], queue = new Map(), doneToday = false }) {
   return { now, today: dayOf(now), off: now.off, calendar: [...calendar].sort((x, y) => x.start.mic - y.start.mic), rules, given: dayKinds, carry,
-    queue: new Map([...queue].filter(([, f]) => FOCUS.includes(f))) };
+    queue: new Map([...queue].filter(([, f]) => FOCUS.includes(f))), doneToday: doneToday === true };
 }
 
 /** Reads `queue` ({ "YYYY-MM-DD": focus }); a day or focus it can't read is left out, since the week works without it. */
@@ -109,16 +110,18 @@ function withCarry(days, focus, carry) {
 }
 
 // Each day at home left this week takes what was planned for it, or what an earlier day that dropped out was planned to
-// work; a missed session (carry) goes first. A day with nothing planned yet takes the split of the days left.
+// work; a missed session (carry) goes first. A day with nothing planned yet takes the split of the days left. Today, once
+// done, keeps what it was planned to work and passes nothing on.
 function thisWeekFocus(h, rows, sunday) {
   const fresh = withCarry(rows.map((r) => r.day), splitOf(rows.map((r) => r.day)), h.carry);
   if (!h.queue.size) { rows.forEach((r, i) => { r.focus = fresh[i]; }); return; }
   const waiting = h.carry.filter((f) => FOCUS.includes(f));
   let row = 0;
   for (let day = h.today; day <= sunday && row < rows.length; day += 1) {
-    if (h.queue.has(day)) waiting.push(h.queue.get(day));
+    const doneDay = h.doneToday && day === h.today;
+    if (h.queue.has(day) && !doneDay) waiting.push(h.queue.get(day));
     if (rows[row].day !== day) continue;
-    rows[row].focus = waiting.shift() ?? fresh[row];
+    rows[row].focus = (doneDay ? h.queue.get(day) : waiting.shift()) ?? fresh[row];
     row += 1;
   }
 }

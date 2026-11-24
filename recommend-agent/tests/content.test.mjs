@@ -85,6 +85,14 @@ test('"I can do this" skips the wait, "can\'t do" and the avoid list stop the ch
   assert.ok(!avoided.items.some((i) => chainOf(i.movementId) === 'wall_push_up'));
 });
 
+test('a backpack movement done at the top once gets one more kilogram next time, and not otherwise', () => {
+  const rowOf = (history) => workoutContent({ sessionId: 's', focus: 'upper', rules: rules(), history }).content.items
+    .find((i) => i.movementId === 'backpack_row');
+  assert.equal(rowOf([allTop('backpack_row', '2026-11-23', 4)]).load, 5);
+  const short = { ...allTop('backpack_row', '2026-11-23', 4), sets: [12, 12, 9] };
+  assert.equal(rowOf([short]).load, 4);
+});
+
 test('a backpack movement done at the top twice gets one more kilogram, up to what a backpack holds', () => {
   const history = [allTop('backpack_row', '2026-11-20', 4), allTop('backpack_row', '2026-11-23', 4)];
   const row = workoutContent({ sessionId: 's', focus: 'upper', rules: rules(), history }).content.items.find((i) => i.movementId === 'backpack_row');
@@ -120,6 +128,9 @@ test('checkContent: each code fails when it should, and a built session passes',
   assert.deepEqual(codes(one('backpack_row', { rules: rules({ equipment: [] }) })), ['equipment_not_owned']);
   assert.deepEqual(codes(one('glute_bridge', { rules: rules({ avoid: ['glute_bridge'] }) })), ['avoided_movement']);
   assert.deepEqual(codes(one('push_up')), ['gated_movement']);
+  for (const sets of [0, 7, 2.5, '3']) {
+    assert.deepEqual(codes(checkContent({ content: { items: [{ movementId: 'glute_bridge', sets }] }, rules: rules() })), ['bad_dose']);
+  }
   const fresh = checkContent({ content: { items: [{ movementId: 'knee_push_up', sets: 3 }, { movementId: 'reverse_lunge', sets: 3 }] },
     rules: rules({ movements: {} }), history: [allTop('table_push_up', 'a'), allTop('table_push_up', 'b'), allTop('wall_split_squat', 'a'), allTop('wall_split_squat', 'b')] });
   assert.deepEqual(codes(fresh), ['too_many_new']);

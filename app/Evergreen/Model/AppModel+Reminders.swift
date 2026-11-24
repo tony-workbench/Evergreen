@@ -1,57 +1,69 @@
 import Foundation
 
-/// The reminders of a day at home and their buttons: Start, Later today, I already trained, Skip today with a reason,
-/// and "I'm going out tomorrow" the evening before. A later time can be picked ahead in the week table. What they say is in WorkoutReminders and NotificationCopy.
+/// The reminders of a day at home and their buttons: Start, Later today, Already done, Skip today with a reason,
+/// and on the evening before "Only at …" (one time picked) and "I'm going out tomorrow". A time can also be picked in the
+/// week table; once picked, only that time reminds. What they say is in WorkoutReminders and NotificationCopy.
 extension AppModel {
-    /// Days whose reminders wait until a later time: "Later today" on a reminder or on Today. By day, the time it waits for.
-    static let remindAfterKey = "home_remind_after"
-    /// The one later time picked ahead for a day in the week table, by day: its clock ("18:10").
-    static let pickedLaterKey = "home_picked_later"
-
     /// Whether a plan item is the session of a day at home, which has the reminders here.
     func isHomeSession(_ item: PlanItem) -> Bool {
         guard userRules.isOn, ActivityKind(healthType: item.slot.activityType) == .strength else { return false }
         return homeWeek?.day(LocalTime(item.slot.start, in: calendar.timeZone).day)?.trains == true
     }
 
+    /// The session of a day at home on the plan, not yet done there.
+    func homeSessionItem(_ day: String) -> PlanItem? {
+        plan.first { isHomeSession($0) && LocalTime($0.slot.start, in: calendar.timeZone).day == day && completion(for: $0) == nil }
+    }
+
     /// What a day's reminders say about its session: the words for its focus, its minutes and how many movements.
     func reminderSession(_ day: HomeWeek.Day) -> WorkoutReminders.Session {
         let content = homeWeekContent[day.day]
-        return WorkoutReminders.Session(focusWords: HomeWorkoutRow.words[day.focus ?? "full"] ?? "full-body",
-                                        minutes: content?.minutes ?? userRules.sessionMax, movements: content?.items.count ?? 4)
+        let focus = day.focus ?? Self.wholeBody
+        return WorkoutReminders.Session(focusWords: HomeWorkoutRow.words[focus] ?? HomeWorkoutRow.words[Self.wholeBody] ?? focus,
+                                        minutes: content?.minutes ?? userRules.sessionMax,
+                                        movements: content?.items.count ?? Self.usualMovements)
     }
 
-    /// Every reminder of the coming days at home that is still to do: not done, not skipped, not a day out.
+    /// The focus a day takes when the week gives none.
+    static let wholeBody = "full"
+    /// How many movements a session has before its content is worked out (four or five).
+    static let usualMovements = 4
+
+    /// How a day's reminders go: the two switches in Settings and the time picked for it.
+    func reminderChoice(_ day: String) -> WorkoutReminders.Choice {
+        WorkoutReminders.Choice(keepReminding: Automatic.keepReminding.isOn(settings), pickEachDay: Automatic.pickEachDay.isOn(settings),
+                                picked: pickedTimes[day])
+    }
+
+    /// Every reminder of the coming days at home that is still to do: not done any way, not skipped, not a day out.
     func homeReminders() -> [WorkoutReminder] {
         guard userRules.isOn, let week = homeWeek else { return [] }
-        let keep = Automatic.keepReminding.isOn(settings)
-        let after = remindAfter
-        return week.days.filter { $0.day >= todayISO && $0.kind == .home && $0.trains }
+        let out = goingOutDays
+        return week.days.filter { $0.day >= todayISO && $0.kind == .home && $0.trains && !out.contains($0.day) }
             .filter { !workoutLog.didHomeSession(on: $0.day) && !trainedStrength(on: $0.day) && !workoutLog.didSkip($0.day) }
-            .map { WorkoutReminders.keeping($0, picked: pickedLater[$0.day]) }
             .flatMap { day in
-                WorkoutReminders.plan(day: day, session: reminderSession(day), keepReminding: keep, now: now, calendar: calendar)
-                    .filter { reminder in after[day.day].map { reminder.kind == .evening || reminder.fires >= $0 } ?? true }
+                WorkoutReminders.plan(day: day, session: reminderSession(day), choice: reminderChoice(day.day), now: now, calendar: calendar)
             }
     }
 
-    /// The later time picked ahead for each day from today on.
-    var pickedLater: [String: String] {
-        (settings.dictionary(forKey: Self.pickedLaterKey) as? [String: String] ?? [:]).filter { $0.key >= todayISO }
+    /// Plans the days-at-home reminders again. Needs nothing the locked phone keeps from the app, so a button on a reminder
+    /// pressed on the lock screen takes effect at once.
+    func scheduleHomeNotifications() async {
+        guard onDevice else { return }
+        await notifier.scheduleHomeReminders(calendar: calendar) { [weak self] in self?.homeReminders() ?? [] }
     }
 
-    /// Picks the one later time for a day ahead, or with nil keeps them all again. Its reminders are planned again.
-    func pickLater(_ clock: String?, day: String) async {
-        var picked = pickedLater
-        picked[day] = clock
-        settings.set(picked, forKey: Self.pickedLaterKey)
-        log(clock.map { "On \(day), only the later time \($0) is kept" } ?? "On \(day), every later time is kept")
-        await scheduleNotifications()
-    }
+    /// The time picked for each day from today on.
+    var pickedTimes: [String: String] { ChosenSlot.all(in: settings, from: todayISO) }
 
-    private var remindAfter: [String: Date] {
-        let raw = settings.dictionary(forKey: Self.remindAfterKey) as? [String: Double] ?? [:]
-        return raw.filter { $0.key >= todayISO }.mapValues { Date(timeIntervalSince1970: $0) }
+    /// Keeps one time for a day (any of its times, the first included), or with nil every time again. The session on the
+    /// plan moves to it, and the reminders are planned again.
+    func pickTime(_ clock: String?, day: String) async {
+        ChosenSlot.set(clock, day: day, from: todayISO, in: settings)
+        let target = (clock ?? homeWeek?.day(day)?.first?.clock).flatMap { WorkoutReminders.date(day, clock: $0, calendar: calendar) }
+        if let target, let item = homeSessionItem(day), item.slot.start != target, target > now { move(item, to: target) }
+        log(clock.map { "On \(day) only \($0) reminds you" } ?? "On \(day) every time reminds you again")
+        await scheduleHomeNotifications()
     }
 
     /// A button on a reminder, or the same choice on Today.
@@ -71,20 +83,14 @@ extension AppModel {
         }
     }
 
-    /// "Later today": the session waits for the next later time that day, and so do its reminders. Nothing moves when none is left.
+    /// "Later today": the next time after the one kept (or after now) is picked, so only it reminds and the session moves
+    /// to it. Nothing moves when none is left.
     func laterToday(_ day: String? = nil) async {
         let day = day ?? todayISO
-        guard let week = homeWeek?.day(day), let next = WorkoutReminders.nextLater(WorkoutReminders.keeping(week, picked: pickedLater[day]), after: now) else { return }
-        var raw = settings.dictionary(forKey: Self.remindAfterKey) as? [String: Double] ?? [:]
-        raw = raw.filter { $0.key >= todayISO }
-        raw[day] = next.timeIntervalSince1970
-        settings.set(raw, forKey: Self.remindAfterKey)
-        if let item = plan.first(where: { isHomeSession($0) && LocalTime($0.slot.start, in: calendar.timeZone).day == day && completion(for: $0) == nil }),
-           item.slot.start < next {
-            move(item, to: next)
-        }
-        if onDevice { await notifier.dropHomeReminders(day: day, before: next) }
-        log("Your home workout waits until \(next.clock)")
+        guard let planned = homeWeek?.day(day) else { return }
+        let kept = WorkoutReminders.keptTime(planned, choice: reminderChoice(day), calendar: calendar)
+        guard let next = WorkoutReminders.nextLater(planned, after: max(now, kept?.date ?? now)) else { return }
+        await pickTime(next.clock, day: day)
     }
 
     /// "Skip today" with a reason. "I'm out" also makes the day a day out, so the week is worked out again without it.
@@ -102,6 +108,6 @@ extension AppModel {
         workoutLog.skipped?.removeValue(forKey: day)
         workoutLog.save(to: settings)
         log("You’re training on \(day) after all")
-        if reason == "out" { await setGoingOut(false, day: day) } else { await scheduleNotifications() }
+        if reason == "out" { await setGoingOut(false, day: day) } else { await scheduleHomeNotifications() }
     }
 }

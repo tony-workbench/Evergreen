@@ -32,6 +32,8 @@ final class AppModel {
     /// Whether the phone is unlocked, instead of asking the device (tests).
     @ObservationIgnored var unlocked: (@MainActor () -> Bool)?
     @ObservationIgnored let notifier = Notifier()
+    /// Writes a finished home workout to Apple Health; tests give one that counts.
+    @ObservationIgnored var writeStrength: @Sendable (Date, Date) async -> Bool = { await WorkoutWriter.saveStrength(start: $0, end: $1) }
     /// The memory engine over this phone's memory folder; nil if the folder can't be made.
     @ObservationIgnored let memory: MemoryEngine?
     /// False for the tour's model, which never touches the device or the network.
@@ -130,6 +132,7 @@ final class AppModel {
         notifier.onOpen = { [weak self] in Task { await self?.tick() } }
         notifier.onUndo = { [weak self] id in self?.undoMove(id) }
         notifier.onWorkoutAction = { [weak self] action, day in Task { await self?.handleWorkoutAction(action, day: day) } }
+        notifier.onPickTime = { [weak self] clock, day in Task { await self?.pickTime(clock, day: day) } }
         Task { await refreshNotifications() }
         if persona.isReal { Task { await refreshHealth() } }
         watchWorkoutsForEarnedTime()
@@ -272,12 +275,12 @@ final class AppModel {
 
     /// "Pick another time": logged as the person's own move so it shows in the feed.
     /// With `end`, its length changes too (a resize).
-    func move(_ item: PlanItem, to start: Date, end: Date? = nil) {
+    func move(_ item: PlanItem, to start: Date, end: Date? = nil, reason: String = "You picked this time.") {
         let after = Slot(start: start, end: end ?? start.addingTimeInterval(item.slot.end.timeIntervalSince(item.slot.start)),
                          activityType: item.slot.activityType)
         record(AgentAction(
             id: "user-move-\(UUID().uuidString)", kind: .move, planItemId: item.id,
-            before: item.slot, after: after, reason: "You picked this time.", createdAt: now
+            before: item.slot, after: after, reason: reason, createdAt: now
         ))
         save()
         Task { await tick() }
@@ -327,7 +330,7 @@ final class AppModel {
         // A session on a day at home has reminders of its own (AppModel+Reminders.swift), not the one 30 minutes before.
         let upcoming = plan.filter { completion(for: $0) == nil && !isDayOut($0.slot.start) && !isHomeSession($0) }
         await notifier.scheduleReminders(for: upcoming)
-        await notifier.scheduleHomeReminders(homeReminders(), calendar: calendar)
+        await scheduleHomeNotifications()
         await notifier.scheduleWeekAhead(userRules.isOn)
     }
 

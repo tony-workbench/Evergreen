@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// What the person did on the workout page: the reps or seconds of every set,
 /// the backpack's kilograms, how sore it was, and the days a home session was
@@ -32,13 +33,38 @@ struct WorkoutLog: Codable, Equatable, Sendable {
     var turn = 0
     /// Days skipped from a reminder, with the reason: "out", "unwell" or "not_today". Optional so an older log still reads.
     var skipped: [String: String]?
+    /// Days marked done another way ("I did it another way", "Already done"), which can be taken back. Optional so an
+    /// older log still reads.
+    var otherWay: [String]?
+
+    init() {}
+
+    /// Field by field, so a log saved by an older or newer version keeps everything it can read: a missing or unreadable
+    /// field takes its default instead of losing the whole log.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        entries = (try? c.decodeIfPresent([Entry].self, forKey: .entries)) ?? []
+        loads = (try? c.decodeIfPresent([String: Double].self, forKey: .loads)) ?? [:]
+        lastPain = try? c.decodeIfPresent(Int.self, forKey: .lastPain)
+        doneDays = (try? c.decodeIfPresent([String].self, forKey: .doneDays)) ?? []
+        lastFeeling = try? c.decodeIfPresent(WorkoutFeeling.self, forKey: .lastFeeling)
+        turn = (try? c.decodeIfPresent(Int.self, forKey: .turn)) ?? 0
+        skipped = try? c.decodeIfPresent([String: String].self, forKey: .skipped)
+        otherWay = try? c.decodeIfPresent([String].self, forKey: .otherWay)
+    }
 
     static func load(from defaults: UserDefaults) -> WorkoutLog {
-        defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(WorkoutLog.self, from: $0) } ?? WorkoutLog()
+        guard let data = defaults.data(forKey: key) else { return WorkoutLog() }
+        do { return try JSONDecoder().decode(WorkoutLog.self, from: data) } catch {
+            Logger.workout.error("The workout log couldn't be read: \(error.localizedDescription, privacy: .public)")
+            return WorkoutLog()
+        }
     }
 
     func save(to defaults: UserDefaults) {
-        if let data = try? JSONEncoder().encode(self) { defaults.set(data, forKey: Self.key) }
+        do { defaults.set(try JSONEncoder().encode(self), forKey: Self.key) } catch {
+            Logger.workout.error("The workout log couldn't be saved: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// The engine's `history`.
@@ -52,6 +78,12 @@ struct WorkoutLog: Codable, Equatable, Sendable {
     }
 
     func didHomeSession(on day: String) -> Bool { doneDays.contains(day) }
+
+    /// Done another way, not finished on the workout page.
+    func didOtherWay(_ day: String) -> Bool { otherWay?.contains(day) == true }
+
+    /// Finished on the workout page.
+    func finishedOnPage(_ day: String) -> Bool { didHomeSession(on: day) && !didOtherWay(day) }
 
     func didSkip(_ day: String) -> Bool { skipped?[day] != nil }
 
@@ -70,6 +102,8 @@ struct WorkoutLog: Codable, Equatable, Sendable {
         if entries.count > Self.keep { entries.removeFirst(entries.count - Self.keep) }
         if let pain { lastPain = pain }
         markDone(day)
+        // The session finished on the page stands in for "Already done" pressed meanwhile: done once, not twice.
+        otherWay?.removeAll { $0 == day }
     }
 
     /// The backpack's weight for next time, from the session just done: "Too hard" on a movement keeps the lighter weight
@@ -78,7 +112,9 @@ struct WorkoutLog: Codable, Equatable, Sendable {
     mutating func settleLoads(_ results: [WorkoutResult], feeling: WorkoutFeeling?) {
         for result in results {
             guard let load = result.load else { continue }
-            if result.tooHard { loads[result.movementId] = load }
+            // A load changed on the page ("Too hard" or "Too easy" on that movement) is the one kept; the end-of-session
+            // "Too easy" only raises the ones not changed there.
+            if result.tooHard || result.tooEasy == true { loads[result.movementId] = load }
             else if feeling == .easy { loads[result.movementId] = min(BackpackWater.maxKg, load + BackpackWater.easierStepKg) }
             else { loads.removeValue(forKey: result.movementId) }
         }
@@ -87,6 +123,20 @@ struct WorkoutLog: Codable, Equatable, Sendable {
     mutating func markDone(_ day: String) {
         if !doneDays.contains(day) { doneDays.append(day) }
         doneDays = Array(doneDays.suffix(60))
+    }
+
+    /// "I did it another way" or "Already done".
+    mutating func markDoneAnotherWay(_ day: String) {
+        guard !didHomeSession(on: day) else { return }
+        markDone(day)
+        otherWay = Array(((otherWay ?? []) + [day]).suffix(60))
+    }
+
+    /// Takes back "I did it another way" or "Already done"; a session finished on the page stays done.
+    mutating func undoOtherWay(_ day: String) {
+        guard didOtherWay(day) else { return }
+        doneDays.removeAll { $0 == day }
+        otherWay?.removeAll { $0 == day }
     }
 }
 
@@ -99,6 +149,8 @@ struct WorkoutResult: Codable, Equatable, Sendable {
     var tooHard = false
     /// The person swapped it for the easier movement on the page.
     var swappedFrom: String?
+    /// "Too easy" on a backpack movement this time: its load went up on the page and stays there.
+    var tooEasy: Bool?
 }
 
 /// A session left half done: picked up where it stopped when the page opens again the same day.
@@ -111,15 +163,29 @@ struct WorkoutProgress: Codable, Equatable, Sendable {
     var results: [WorkoutResult]
     var startedAt: Date
 
+    /// Today's half-done session. One that can't be read is said in the log and started again: the sets done in it are
+    /// lost, the day's log is not.
     static func load(from defaults: UserDefaults, day: String) -> WorkoutProgress? {
-        guard let saved = defaults.data(forKey: key).flatMap({ try? JSONDecoder().decode(WorkoutProgress.self, from: $0) }),
-              saved.day == day else { return nil }
-        return saved
+        guard let data = defaults.data(forKey: key) else { return nil }
+        do {
+            let saved = try JSONDecoder().decode(WorkoutProgress.self, from: data)
+            return saved.day == day ? saved : nil
+        } catch {
+            Logger.workout.error("The half-done workout couldn't be read: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
     }
 
     func save(to defaults: UserDefaults) {
-        if let data = try? JSONEncoder().encode(self) { defaults.set(data, forKey: Self.key) }
+        do { defaults.set(try JSONEncoder().encode(self), forKey: Self.key) } catch {
+            Logger.workout.error("The half-done workout couldn't be saved: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     static func clear(from defaults: UserDefaults) { defaults.removeObject(forKey: key) }
+}
+
+extension Logger {
+    /// The workout page and its log.
+    static let workout = Logger(subsystem: "com.evergreentraining.app", category: "workout")
 }

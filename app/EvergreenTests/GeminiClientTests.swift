@@ -262,7 +262,8 @@ struct GeminiClientTests {
 struct AutomaticTests {
     @Test func everySwitchIsOnUntilTurnedOff() throws {
         let defaults = try #require(UserDefaults(suiteName: "auto-\(UUID().uuidString)"))
-        #expect(Automatic.allCases.allSatisfy { $0.isOn(defaults) })
+        #expect(Automatic.allCases.allSatisfy { $0.isOn(defaults) == $0.startsOn })
+        #expect(!Automatic.pickEachDay.isOn(defaults), "picking the time each day waits until it's turned on")
         defaults.set(false, forKey: Automatic.rain.rawValue)
         #expect(!Automatic.rain.isOn(defaults) && Automatic.shoes.isOn(defaults))
     }

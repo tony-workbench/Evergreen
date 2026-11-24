@@ -21,6 +21,8 @@ struct BundlePlanRules: PlanRules {
     var carry: [String] = []
     /// What each day at home left this week was last planned to work, by day, so the split stays as planned.
     var queue: [String: String] = [:]
+    /// Today's home session is already done, so the engine keeps today's focus to today and passes nothing of it on.
+    var doneToday = false
 
     /// What every call is given: `planContext`'s input, which `checkPlan` takes as its `context`.
     func input(rows: [MemoryRow], now: Date) -> JSONValue {
@@ -44,6 +46,7 @@ struct BundlePlanRules: PlanRules {
             fields["dayKinds"] = DayKinds.engineValue(dayKinds)
             if !carry.isEmpty { fields["carry"] = .array(carry.map { .string($0) }) }
             if !queue.isEmpty { fields["queue"] = .object(queue.mapValues { .string($0) }) }
+            if doneToday { fields["doneToday"] = .bool(true) }
             input = .object(fields)
         }
         return input

@@ -155,8 +155,9 @@ struct UserRules: Codable, Equatable, Sendable {
         case outOfRange
     }
 
-    /// The rules with a profile's answers in them, turned on. Throws without changing anything when a value can't be used.
-    func importing(_ data: Data) throws -> UserRules {
+    /// The rules with a profile's answers in them, turned on. Throws without changing anything when a value can't be used,
+    /// a movement id that isn't in `library` (the movement library's ids, when it could be read) included.
+    func importing(_ data: Data, library: Set<String> = []) throws -> UserRules {
         guard let profile = try? JSONDecoder().decode(Profile.self, from: data) else { throw ImportError.unreadable }
         var rules = self
         rules.isOn = true
@@ -177,6 +178,8 @@ struct UserRules: Codable, Equatable, Sendable {
             rules.farKilometres = far
         }
         guard rules.isValid else { throw ImportError.outOfRange }
+        let named = (profile.avoid ?? []) + (profile.movements.map { Array($0.keys) } ?? [])
+        guard library.isEmpty || named.allSatisfy(library.contains) else { throw ImportError.outOfRange }
         return rules
     }
 }

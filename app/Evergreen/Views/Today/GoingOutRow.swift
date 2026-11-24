@@ -15,14 +15,10 @@ struct GoingOutRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: Theme.sm)
                     Button("I’m home") { Task { await model.setGoingOut(false) } }
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Theme.text)
-                        .frame(minWidth: 44, minHeight: 44)
+                        .buttonStyle(TapTargetButtonStyle(color: Theme.text, weight: .semibold))
                 } else {
                     Button("I’m going out today") { Task { await model.setGoingOut(true) } }
-                        .font(.body)
-                        .foregroundStyle(Theme.accent)
-                        .frame(minHeight: 44)
+                        .buttonStyle(TapTargetButtonStyle())
                     Spacer()
                 }
             }

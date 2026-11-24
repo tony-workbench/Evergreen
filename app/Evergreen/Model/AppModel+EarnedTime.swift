@@ -17,9 +17,15 @@ extension AppModel {
         }
     }
 
+    /// The days a session was planned: the past week's (kept with their focus, since the week itself starts today) and the
+    /// coming ones.
+    var plannedTrainingDays: [String] {
+        Set(homeFocus.keys).union((homeWeek?.days ?? []).filter(\.trains).map(\.day)).sorted()
+    }
+
     /// Finishing the workout page after a missed training day gives every group its comeback minutes today.
     func noteComeback(_ day: String) {
-        let planned = (homeWeek?.days ?? []).filter(\.trains).map(\.day)
+        let planned = plannedTrainingDays
         let done = workoutLog.doneDays.filter { $0 != day }
         guard EarnMath.isComeback(today: day, planned: planned, done: done) else { return }
         earnedTime.markComeback(day)

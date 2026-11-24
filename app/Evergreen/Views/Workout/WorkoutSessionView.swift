@@ -20,16 +20,31 @@ struct WorkoutSessionView: View {
     @State private var saving = false
     /// Goes up with each set done, for a light tap of feedback.
     @State private var setsLogged = 0
+    /// The session couldn't be worked out (not the same as no session today).
+    @State private var failed = false
+    /// What "Too hard" just did, said on the page.
+    @State private var swappedNote: String?
+    /// The full steps of a movement done twice before, opened from its short version.
+    @State private var showAllSteps = false
+
+    /// Steps are read mid-workout: at least 1.4 times the body size from line to line.
+    private static let stepLineSpacing: CGFloat = 7
+    /// From the third time a movement is done, its steps come as three short lines.
+    private static let shortAfter = 2
+    /// The count can go up to twice the top of the range, and to 30 at least.
+    private static let countRoom = 2
+    private static let leastCount = 30
 
     var body: some View {
         NavigationStack {
             Group {
                 if loading {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ProgressView("Getting today’s workout…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if failed {
+                    problem("Today’s workout couldn’t be worked out just now.", action: "Try again") { Task { await load() } }
                 } else if progress == nil {
-                    Text("There’s no home workout today.")
-                        .font(.body).foregroundStyle(Theme.textMuted)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    problem("There’s no home workout today. Today is a day out or a rest day, or it’s already done.",
+                            action: "Back to Today") { dismiss() }
                 } else if finishing {
                     finishPage
                 } else if let restUntil {
@@ -49,11 +64,28 @@ struct WorkoutSessionView: View {
         }
         .sensoryFeedback(.success, trigger: setsLogged)
         .sensoryFeedback(.success, trigger: finishing) { _, now in now }
-        .task {
-            progress = await model.workoutToday()
-            loading = false
-            resetCount()
+        .sensoryFeedback(.error, trigger: failed) { _, now in now }
+        .task { await load() }
+    }
+
+    private func load() async {
+        loading = true
+        let today = await model.workoutToday()
+        progress = today.progress
+        failed = today.failed
+        loading = false
+        resetCount()
+    }
+
+    /// An empty or failed page: what happened and one thing to do.
+    private func problem(_ words: String, action: String, perform: @escaping () -> Void) -> some View {
+        VStack(spacing: Theme.md) {
+            Text(words).font(.body).foregroundStyle(Theme.text).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(action, action: perform).buttonStyle(PrimaryButtonStyle.tall)
         }
+        .padding(Theme.md)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: One movement
@@ -75,14 +107,27 @@ struct WorkoutSessionView: View {
                         .accessibilityAddTraits(.isHeader)
                     Text(targetLine(item, move))
                         .font(.headline).foregroundStyle(Theme.accent)
-                    if item.isNew && setsDone == 0 && model.userRules.movements[move.id] == nil {
+                    if let swappedNote {
+                        Text(swappedNote).font(.footnote).foregroundStyle(Theme.textMuted).fixedSize(horizontal: false, vertical: true)
+                    }
+                    if asksFirst(item, move) {
                         canYouDoOne(move)
                     } else {
-                        howTo(move)
+                        if model.timesDone(move.id) >= Self.shortAfter && !showAllSteps { shortHowTo(move) } else { howTo(move) }
                         entry(item)
                     }
                 }
                 .padding(Theme.md)
+            }
+            .safeAreaInset(edge: .bottom) {
+                // The main button stays at the bottom, in reach of the thumb, while the steps scroll.
+                if !asksFirst(item, move) {
+                    Button("Done with this set") { doneWithSet() }
+                        .buttonStyle(PrimaryButtonStyle.tall)
+                        .padding(.horizontal, Theme.md)
+                        .padding(.vertical, Theme.sm)
+                        .background(Theme.surface)
+                }
             }
             .sheet(isPresented: $swapping) { swapList(for: move) }
         } else {
@@ -95,6 +140,22 @@ struct WorkoutSessionView: View {
         var line = "Set \(min(setsDone + 1, item.sets)) of \(item.sets) · \(item.target(sides: move.sides))"
         if let load = result?.load ?? item.load { line += " · " + BackpackWater.words(load) }
         return line
+    }
+
+    private func asksFirst(_ item: WorkoutContent.Item, _ move: Movement) -> Bool {
+        item.isNew && setsDone == 0 && model.userRules.movements[move.id] == nil
+    }
+
+    /// From the third time: three lines, and the rest a tap away.
+    private func shortHowTo(_ move: Movement) -> some View {
+        VStack(alignment: .leading, spacing: Theme.sm) {
+            Text(move.setup).font(.body).foregroundStyle(Theme.text)
+            Text("It counts when: " + move.pass).font(.body).foregroundStyle(Theme.text)
+            Text("Watch for: " + (move.mistakes.first ?? move.feel)).font(.body).foregroundStyle(Theme.text)
+            Button("Show all the steps") { showAllSteps = true }.buttonStyle(TapTargetButtonStyle())
+        }
+        .lineSpacing(Self.stepLineSpacing)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func canYouDoOne(_ move: Movement) -> some View {
@@ -123,11 +184,12 @@ struct WorkoutSessionView: View {
                     Text(step).font(.body).foregroundStyle(Theme.text)
                 }
             }
-            if let tempo = move.tempoLine { Text(tempo).font(.footnote).foregroundStyle(Theme.textMuted) }
+            if let tempo = move.tempoLine { Text(tempo).font(.body).foregroundStyle(Theme.text) }
             line("Where you should feel it", move.feel)
             line("It counts when", move.pass)
             line("Watch for", move.mistakes.joined(separator: " "))
         }
+        .lineSpacing(Self.stepLineSpacing)
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -140,26 +202,22 @@ struct WorkoutSessionView: View {
 
     private func entry(_ item: WorkoutContent.Item) -> some View {
         VStack(alignment: .leading, spacing: Theme.sm) {
-            Stepper(item.isHold ? "Seconds held: \(count)" : "Reps done: \(count)", value: $count, in: 0...max(item.high * 2, 30))
+            Stepper(item.isHold ? "Seconds held: \(count)" : "Reps done: \(count)", value: $count, in: 0...max(item.high * Self.countRoom, Self.leastCount))
                 .font(.body)
                 .frame(minHeight: 44)
             HStack(spacing: Theme.sm) {
                 smallAction("Too hard") { tooHard() }
+                if model.movement(item.movementId)?.usesBackpack == true { smallAction("Too easy") { tooEasy() } }
                 smallAction("Swap") { swapping = true }
                 smallAction("Skip") { advance() }
             }
-            Button("Done with this set") { doneWithSet() }
-                .buttonStyle(PrimaryButtonStyle.tall)
         }
     }
 
-    /// A secondary action on the workout page: at least 44 by 44 points to tap, with 8 points between neighbours.
+    /// A secondary action on the workout page: its whole box, at least 44 by 44 points, takes the tap, 8 points from the next.
     private func smallAction(_ title: String, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
-            .font(.body)
-            .foregroundStyle(Theme.accent)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .contentShape(Rectangle())
+            .buttonStyle(TapTargetButtonStyle(fills: true))
             .background(RoundedRectangle(cornerRadius: Theme.radiusButton).strokeBorder(Theme.rule, lineWidth: 1))
     }
 
@@ -181,26 +239,42 @@ struct WorkoutSessionView: View {
         guard let item else { return }
         edit { $0.results[$0.index].sets.append(count) }
         setsLogged += 1
+        swappedNote = nil
         if setsDone >= item.sets { advance() } else { restUntil = Date().addingTimeInterval(TimeInterval(item.rest)); resetCount() }
     }
 
-    /// A backpack movement drops a kilogram; a bodyweight one goes to the easier one (or stays, marked, when there is none).
+    /// A backpack movement drops a kilogram. Another goes to the easier one on its chain, which stands in from now on: the
+    /// harder one goes on the avoid list, and the page says so. With no easier one it stays, marked.
     private func tooHard() {
         guard let item, let move = model.movement(item.movementId) else { return }
         if move.usesBackpack, let load = result?.load ?? item.load {
-            edit { $0.results[$0.index].load = max(1, load - 1); $0.results[$0.index].tooHard = true }
+            let lighter = max(BackpackWater.leastKg, load - BackpackWater.harderStepKg)
+            edit { $0.results[$0.index].load = lighter; $0.results[$0.index].tooHard = true; $0.results[$0.index].tooEasy = nil }
+            swappedNote = "One litre less: " + BackpackWater.words(lighter) + "."
         } else if let easier = move.easier.flatMap(model.movement) {
             swap(to: easier)
+            swappedNote = "Swapped to \(easier.name). \(move.name) is left out from now on; you can bring it back in My rules, Leave out."
+            Task { await model.leaveOut(move.id) }
         } else {
             edit { $0.results[$0.index].tooHard = true }
+            swappedNote = "There’s nothing easier for this one. Do what you can; the next session goes lighter."
         }
+    }
+
+    /// A backpack movement that is too easy goes up two kilograms now, for the sets left and for next time.
+    private func tooEasy() {
+        guard let item, let load = result?.load ?? item.load else { return }
+        let heavier = min(BackpackWater.maxKg, load + BackpackWater.easierStepKg)
+        guard heavier > load else { swappedNote = "That’s as much as a backpack holds."; return }
+        edit { $0.results[$0.index].load = heavier; $0.results[$0.index].tooEasy = true; $0.results[$0.index].tooHard = false }
+        swappedNote = "Two litres more: " + BackpackWater.words(heavier) + "."
     }
 
     /// Puts another movement in this one's place. Sets already done stay with the first movement.
     private func swap(to move: Movement) {
         guard let item else { return }
         let left = max(1, item.sets - setsDone)
-        let load = move.usesBackpack ? (model.workoutLog.loads[move.id] ?? move.load ?? 2) : nil
+        let load = move.usesBackpack ? (model.workoutLog.loads[move.id] ?? move.load ?? BackpackWater.startKg) : nil
         let next = WorkoutContent.Item(movementId: move.id, sets: left, reps: move.dose.reps, seconds: move.dose.seconds,
                                        load: load, rest: move.rest, isNew: false)
         let replaced = item.movementId
@@ -217,6 +291,7 @@ struct WorkoutSessionView: View {
             }
         }
         swapping = false
+        showAllSteps = false
         resetCount()
     }
 
@@ -225,6 +300,8 @@ struct WorkoutSessionView: View {
         restUntil = nil
         if progress.index + 1 >= progress.content.items.count { finishing = true; return }
         edit { $0.index += 1 }
+        swappedNote = nil
+        showAllSteps = false
         resetCount()
     }
 
@@ -233,14 +310,9 @@ struct WorkoutSessionView: View {
         return "Next: \(move.name), set \(setsDone + 1) of \(item.sets)."
     }
 
-    /// Other movements that work the same thing, with what the person has and hasn't ruled out.
+    /// The movements next to this one on its chain, one easier and one harder, that the rules leave open.
     private func swapList(for current: Movement) -> some View {
-        let rules = model.userRules
-        let owned = Set(rules.equipment.map(\.rawValue) + ["floor", "wall"])
-        let choices = model.movements.filter { move in
-            move.id != current.id && move.pattern == current.pattern && move.equipment.allSatisfy(owned.contains)
-                && !rules.avoid.contains(move.id) && rules.movements[move.id] != .cannot && move.level <= current.level
-        }
+        let choices = model.swapChoices(for: current)
         return NavigationStack {
             List(choices) { move in
                 Button { swap(to: move) } label: {
@@ -251,7 +323,7 @@ struct WorkoutSessionView: View {
                     .frame(minHeight: 44)
                 }
             }
-            .overlay { if choices.isEmpty { Text("Nothing else here works the same way with what you have.").font(.body).foregroundStyle(Theme.textMuted).padding() } }
+            .overlay { if choices.isEmpty { Text("There’s no easier or harder one next to this movement with what you have.").font(.body).foregroundStyle(Theme.textMuted).padding() } }
             .navigationTitle("Swap for")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { swapping = false } } }
@@ -298,6 +370,11 @@ struct WorkoutSessionView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle.tall)
                 .disabled(saving)
+                if let progress, model.workoutLog.didOtherWay(progress.day) {
+                    Text("You marked today as trained from a reminder. Finishing saves this session instead, once.")
+                        .font(.footnote).foregroundStyle(Theme.textMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Text("Finishing saves a strength workout to Apple Health and takes off today’s other reminders.")
                     .font(.footnote).foregroundStyle(Theme.textMuted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -309,6 +386,8 @@ struct WorkoutSessionView: View {
 
 /// The rest between sets: a countdown, 15 seconds more or less, and Skip.
 private struct RestCountdown: View {
+    /// What "−15 s" and "+15 s" change.
+    static let step: TimeInterval = 15
     let until: Date
     let next: String
     let change: (Date) -> Void
@@ -318,20 +397,19 @@ private struct RestCountdown: View {
         VStack(spacing: Theme.lg) {
             Text("Rest").font(.headline).foregroundStyle(Theme.textMuted)
             Text(timerInterval: Date()...max(until, Date()), countsDown: true)
-                .font(.system(size: 64, weight: .semibold).monospacedDigit())
+                .agentFont(64, relativeTo: .largeTitle)
+                .monospacedDigit()
                 .foregroundStyle(Theme.text)
+                .accessibilityLabel("Rest left")
             Text(next).font(.body).foregroundStyle(Theme.textMuted)
             HStack(spacing: Theme.lg) {
-                Button("−15 s") { change(until.addingTimeInterval(-15)) }
-                    .frame(minWidth: 64, minHeight: 44)
-                    .contentShape(Rectangle())
+                Button("−15 s") { change(until.addingTimeInterval(-Self.step)) }
+                    .buttonStyle(TapTargetButtonStyle(color: Theme.text, weight: .medium))
                     .accessibilityLabel("15 seconds less rest")
-                Button("+15 s") { change(until.addingTimeInterval(15)) }
-                    .frame(minWidth: 64, minHeight: 44)
-                    .contentShape(Rectangle())
+                Button("+15 s") { change(until.addingTimeInterval(Self.step)) }
+                    .buttonStyle(TapTargetButtonStyle(color: Theme.text, weight: .medium))
                     .accessibilityLabel("15 seconds more rest")
             }
-            .font(.body.weight(.medium))
             Button("Skip rest", action: onDone).buttonStyle(GhostButtonStyle())
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

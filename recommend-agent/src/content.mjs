@@ -142,6 +142,11 @@ function lastLoad(history, id) {
   return times.length ? times[times.length - 1].load : null;
 }
 
+function toppedLastTime(history, m) {
+  const last = history.filter((h) => h.movementId === m.id).at(-1);
+  return Boolean(last) && last.sets.length >= m.dose.sets && last.sets.every((n) => n >= top(m));
+}
+
 function itemFor(m, history, loads, sets) {
   const item = { movementId: m.id, sets, rest: m.rest, isNew: false };
   if (m.dose.reps) item.reps = [...m.dose.reps]; else item.seconds = [...m.dose.seconds];
@@ -149,8 +154,8 @@ function itemFor(m, history, loads, sets) {
     const set = Number.isFinite(loads[m.id]) ? loads[m.id] : null;
     const last = lastLoad(history, m.id);
     let load = set ?? last ?? m.load ?? 2;
-    // Every set at the top of the range twice and nothing harder taken: one more kilogram, up to what a backpack holds.
-    if (set === null && last !== null && mastered(history, m.id)) load += LOAD_STEP_KG;
+    // Every set at the top of the range last time: one more kilogram next time, up to what a backpack holds.
+    if (set === null && last !== null && toppedLastTime(history, m)) load += LOAD_STEP_KG;
     item.load = Math.min(LOAD_MAX_KG, Math.max(1, load));
   }
   return item;

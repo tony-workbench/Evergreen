@@ -27,6 +27,14 @@ enum NotificationCopy {
         ("Tomorrow at home", "\(session.focusWords.capitalizedFirst) at \(start.clock), about \(session.minutes) minutes.")
     }
 
+    /// 21:00 the evening before, with "Always ask me to pick one time" on and no time picked yet.
+    static func homePickTomorrow(_ session: WorkoutReminders.Session, times: [Date]) -> (title: String, body: String) {
+        let clocks = times.map(\.clock)
+        let list = clocks.count > 1 ? clocks.dropLast().joined(separator: ", ") + " or " + (clocks.last ?? "") : (clocks.first ?? "")
+        return ("Tomorrow at home: pick a time",
+                "\(session.focusWords.capitalizedFirst), about \(session.minutes) minutes, at \(list). Only the time you pick reminds you.")
+    }
+
     /// Ten minutes before.
     static func homeSoon(_ session: WorkoutReminders.Session) -> (title: String, body: String) {
         ("In 10 minutes", "\(session.movements) movements, about \(session.minutes) minutes.")
@@ -41,6 +49,11 @@ enum NotificationCopy {
     /// Twenty minutes after the time with nothing started: the later time it now waits for.
     static func homeMoved(to next: Date) -> (title: String, body: String) {
         ("Moved to \(next.clock)", "No rush. Your workout waits for \(next.clock), or start now if you have the time.")
+    }
+
+    /// Twenty minutes after a picked time with nothing started: asked once, nothing moves by itself.
+    static func homeAsk(next: Date) -> (title: String, body: String) {
+        ("Move to later today?", "Not started yet. Move today’s workout to \(next.clock), or start now if you have the time.")
     }
 
     /// Rain all afternoon on a day at home.

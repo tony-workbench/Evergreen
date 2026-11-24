@@ -52,6 +52,12 @@ const RULES = {
   alex: { restWeekdays: [2, 5, 6], sessionMinutes: { min: 20, max: 25 }, window: { from: '12:00', to: '20:30' }, mornings: false, equipment: ['backpack', 'chair', 'table', 'sofa', 'book', 'step'], avoid: ['jump_squat'], movements: { split_squat: 'can', push_up: 'untried' } },
   jordan: { restWeekdays: [4], sessionMinutes: { min: 30, max: 40 }, window: { from: '06:00', to: '20:00' }, mornings: true, equipment: ['backpack', 'step'], avoid: [], movements: { pike_push_up: 'cannot' } },
 };
+// What each person's phone tells the plan engine about the days at home that week (Monday 9 November): written by hand.
+const HOME_DAYS = {
+  sam: { dayKinds: { '2026-11-10': 'out' }, carry: [], queue: {}, doneToday: false },
+  alex: { dayKinds: { '2026-11-12': 'home' }, carry: ['lower'], queue: { '2026-11-11': 'upper', '2026-11-13': 'full' }, doneToday: false },
+  jordan: { dayKinds: {}, queue: { '2026-11-09': 'full_lower', '2026-11-11': 'full_upper' }, doneToday: true },
+};
 // A home session of each person's: written by hand with movements from the library, as workoutContent returns them.
 const item = (movementId, sets, dose, rest, extra = {}) => ({ movementId, sets, ...dose, rest, isNew: false, ...extra });
 const CONTENT = {
@@ -67,6 +73,7 @@ for (const p of PEOPLE) {
     'calendar-intent': S.intent, 'preview-block': S.block, 'calendar-result': S.calendarResult, outcome: S.outcomes.find((o) => o.done), error: S.error, 'stopped-slot': S.stopped[0],
   };
   values['user-rules'] = RULES[p.persona];
+  values['home-days'] = HOME_DAYS[p.persona];
   values['workout-content'] = CONTENT[p.persona];
   for (const [name, value] of Object.entries(values)) write(`fixtures/valid/${p.persona}/${name}.json`, assertValid(name, value));
   write(`fixtures/valid/${p.persona}/plan-check.rejected.json`, assertValid('plan-check', S.staleCheck));
@@ -219,6 +226,14 @@ const bad = {
     'movement-state-not-on-the-list': change(g['user-rules'], (v) => { v.movements = { squat: 'maybe' }; }),
     'avoid-id-with-a-space': change(g['user-rules'], (v) => { v.avoid = ['jump squat']; }),
     'home-is-not-a-field': change(g['user-rules'], (v) => { v.home = { latitude: 1, longitude: 2 }; }),
+  },
+  'home-days': {
+    'day-kind-not-on-the-list': change(g['home-days'], (v) => { v.dayKinds = { '2026-11-10': 'away' }; }),
+    'queue-focus-not-on-the-list': change(g['home-days'], (v) => { v.queue = { '2026-11-11': 'arms' }; }),
+    'carry-as-one-text': change(g['home-days'], (v) => { v.carry = 'lower'; }),
+    'carry-longer-than-three-days': change(g['home-days'], (v) => { v.carry = ['lower', 'upper', 'full', 'lower']; }),
+    'done-today-as-text': change(g['home-days'], (v) => { v.doneToday = 'yes'; }),
+    'rules-are-not-a-field': change(g['home-days'], (v) => { v.rules = {}; }),
   },
   'workout-content': {
     'focus-not-on-the-list': change(g['workout-content'], (v) => { v.focus = 'arms'; }),
