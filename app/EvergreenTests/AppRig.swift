@@ -61,6 +61,12 @@ final class RecordingCalendar: PlanCalendar {
         access == .on ? meetings.sorted { $0.start < $1.start } : []
     }
 
+    /// All-day or free events with a place, as the calendar would give them.
+    var placed: [Busy] = []
+    func placedEvents(from storyDay: Date) async -> [Busy] {
+        access == .on ? placed : []
+    }
+
     /// The event for a plan item, by the item's id at the end of its key.
     func event(for planItemId: String) -> CalendarEntry? {
         events.first { $0.key.lastPathComponent == planItemId }

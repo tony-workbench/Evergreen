@@ -12,8 +12,9 @@ import { engineSuppression } from '../memory/roll.mjs';
 import { openAgentFile } from './store.mjs';
 import {
   recordFacts, recordOutcomes, dailyEvidence, applyDaily, reviewQueue, confirmMemory, rejectMemory, restoreMemory,
-  stopSlots, restoreSlots, forgetDay, forgetDayRecomputed, forgetSlots, wipe, recordExtras,
+  stopSlots, restoreSlots, forgetDay, forgetDayRecomputed, forgetSlots, wipe, recordExtras, retireSlot,
 } from './engine.mjs';
+import { placeEvidence, PLACE_SLOT } from './place.mjs';
 import { memoryTable } from './table.mjs';
 import { cleanOutcomes, cleanExtras, addDays, isDay } from './evidence.mjs';
 import { SYSTEM, userMessage } from './prompts.mjs';
@@ -66,6 +67,10 @@ function record(ctx, state, snapshot, now, day, trim = true) {
   if (sup.days.includes(day)) return false;
   const facts = computeFacts(snapshot, midnightOf(now), { suppressed: engineSuppression(sup), forgottenDays: sup.days, dayMode: 'completed' });
   recordFacts(state, day, facts, sup.types, trim);
+  // Where the person trains, from the kinds of workouts over 8 weeks; a gym workout retires the memory that says home.
+  const place = placeEvidence(snapshot, day, parseTimestamp(midnightOf(now)).ms, sup.days);
+  state.evidence[day].push(...place.items);
+  if (place.gym) retireSlot(state, PLACE_SLOT, { day, at: now });
   const stopped = new Set(sup.keys.flatMap((k) => storeKeySlots(k.type, k.key)));
   const off = (slot) => stopped.has(slot) || sup.types.some((t) => TYPE_SLOTS[t]?.(slot));
   state.evidence[day] = state.evidence[day].map((i) => ({ ...i, slots: i.slots.filter((s) => !off(s.slot)) })).filter((i) => i.slots.length > 0);

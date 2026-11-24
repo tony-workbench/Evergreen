@@ -44,12 +44,29 @@ struct BundlePlanRules: PlanRules {
         if let rules, rules.isOn, case .object(var fields) = input {
             fields["rules"] = rules.engineValue
             fields["dayKinds"] = DayKinds.engineValue(dayKinds)
+            fields["dayOffsets"] = Self.dayOffsets(from: now, timeZone: timeZone)
             if !carry.isEmpty { fields["carry"] = .array(carry.map { .string($0) }) }
             if !queue.isEmpty { fields["queue"] = .object(queue.mapValues { .string($0) }) }
             if doneToday { fields["doneToday"] = .bool(true) }
             input = .object(fields)
         }
         return input
+    }
+
+    /// Each day's UTC offset at noon, from today through the week the engine plans, so a session after a clock change keeps
+    /// its own day's offset.
+    static func dayOffsets(from now: Date, timeZone: TimeZone) -> JSONValue {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let start = calendar.startOfDay(for: now)
+        var out: [String: JSONValue] = [:]
+        for offset in 0..<DayKinds.days {
+            guard let day = calendar.date(byAdding: .day, value: offset, to: start),
+                  let noon = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: day) else { continue }
+            let minutes = timeZone.secondsFromGMT(for: noon) / 60
+            out[LocalTime(noon, in: timeZone).day] = .string(String(format: "%@%02d:%02d", minutes < 0 ? "-" : "+", abs(minutes) / 60, abs(minutes) % 60))
+        }
+        return .object(out)
     }
 
     func planContext(rows: [MemoryRow], now: Date) async -> JSONValue {

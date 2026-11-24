@@ -2,6 +2,7 @@ import FamilyControls
 import Foundation
 import HealthKit
 import Observation
+import os
 import UIKit
 
 /// Screen time earned by working out: the person picks the apps to lock (social, videos and games),
@@ -114,12 +115,27 @@ final class EarnedTimeModel {
     private nonisolated static func observer(_ onNew: @escaping @Sendable () async -> Bool) -> HKObserverQuery {
         HKObserverQuery(sampleType: .workoutType(), predicate: nil) { _, done, error in
             guard error == nil else { done(); return }
-            // HealthKit's completion handler is not Sendable; it is called at most once, after the read.
-            // Left uncalled when Health could not be read yet, so HealthKit tries again.
-            nonisolated(unsafe) let finish = done
+            // Called at most once, after the read; left uncalled when Health could not be read yet, so HealthKit tries again.
+            let finish = HealthDone(done)
             Task {
-                if await onNew() { finish() }
+                if await onNew() { finish.call() }
             }
         }
+    }
+}
+
+/// HealthKit's "done" for one observer call. Its handler isn't Sendable, so it is kept behind a lock to reach the task
+/// that reads Health, and handed out once: calling it twice does nothing.
+final class HealthDone: Sendable {
+    private let handler: OSAllocatedUnfairLock<(() -> Void)?>
+
+    init(_ done: @escaping () -> Void) { handler = OSAllocatedUnfairLock(uncheckedState: done) }
+
+    func call() {
+        let once = handler.withLockUnchecked { held -> (() -> Void)? in
+            defer { held = nil }
+            return held
+        }
+        once?()
     }
 }

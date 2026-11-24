@@ -3,9 +3,10 @@ export { SYSTEM, PROMPT_VERSION, userMessage } from './prompts.mjs';
 export { factEvidence, outcomeEvidence, cleanOutcomes, cleanExtras, extraEvidence, allowedNumbers, numbersNotIn, activityOf, DEFAULT_MINUTES, BANDS } from './evidence.mjs';
 export {
   freshState, recordFacts, recordOutcomes, dayEvidence, dailyEvidence, supportDays, neighborsFor, applyDaily, confidenceOf, reviewQueue,
-  confirmMemory, rejectMemory, restoreMemory, stopSlots, restoreSlots, forgetDay, forgetDayRecomputed, forgetSlots, wipe, recordExtras,
+  confirmMemory, rejectMemory, restoreMemory, stopSlots, restoreSlots, forgetDay, forgetDayRecomputed, forgetSlots, wipe, recordExtras, retireSlot,
 } from './engine.mjs';
 export { demoModel } from './demo-model.mjs';
+export { placeEvidence, GYM_ACTIVITY_TYPES, PLACE_SLOT, PLACE_KIND, PLACE_STATEMENT, PLACE_WEEKS, PLACE_DAYS } from './place.mjs';
 export { statementFor } from './statements.mjs';
 export { memoryTable, tableWords } from './table.mjs';
 export { openAgentFile, AGENT_FILE } from './store.mjs';

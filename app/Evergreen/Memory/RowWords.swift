@@ -23,6 +23,9 @@ enum RowWords {
         case "resting_hr":
             guard let rate = number("bpm7d") else { return row.statement }
             return "Your resting heart rate is \(Int(rate.rounded())) bpm this week."
+        case "training_place":
+            guard row.data["place"]?.string == "home" else { return row.statement }
+            return "You train at home, without gym equipment."
         default:
             // "Workouts by activity over the last 28 days: running 28, yoga 4." said as a person would.
             guard let found = row.statement.wholeMatch(of: /Workouts by activity over the last (\d+) days: (.+)\./), let days = Int(found.1) else { return row.statement }
@@ -46,6 +49,7 @@ enum RowWords {
         case "load": return "your training load"
         case "sleep": return "your sleep"
         case "resting_hr": return "your resting heart rate"
+        case "training_place": return "training at home"
         default: return "that"
         }
     }
@@ -55,7 +59,9 @@ enum RowWords {
         var parts: [String] = []
         let day = Date.ISO8601FormatStyle(timeZone: .current).year().month().day()
         // How often it was seen says more than the day it was first written down, and the two read as a contradiction side by side.
-        if let seen = row.data["weeksSeen"]?.number, let total = row.data["weeksTotal"]?.number {
+        if row.kind == "training_place", let weeks = row.data["weeks"]?.number {
+            parts.append("No elliptical or stair-climber workouts in the last \(Int(weeks)) weeks.")
+        } else if let seen = row.data["weeksSeen"]?.number, let total = row.data["weeksTotal"]?.number {
             parts.append("Seen in \(Int(seen)) of the last \(Int(total)) weeks.")
         } else if let since = try? day.parse(row.since) {
             parts.append("Remembered since \(since.formatted(.dateTime.month(.wide).day())).")

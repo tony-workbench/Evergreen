@@ -41,6 +41,7 @@ These are identical in every bundle and in Swift. The schemas are the source.
   - `response`: `{ about, pattern }` (for example skipped early sessions)
   - `gear`: `{ item, km, boughtOn }`
   - `goal`: `{ what, date }`
+  - `training_place`: `{ place: "home", gymWorkouts: 0, weeks }` (group `routine`): over the last `weeks` (8 or more) of Health workouts, none was of a gym-equipment type
 - **Session:** `{ id, day, start, minutes, activity, intensity ("easy"|"steady"|"hard"), reason, basedOn: [memory key] }`. `id` is stable for the same day, activity and start.
 - **Preview block:** `{ id, sessionId?, activity, title, start, end, minutes, status ("new"|"moved"|"resized"|"cancelled"), reason }`.
 - **Outcome:** `{ sessionId, day, activity, plannedStart, done, actualStart?, actualMinutes? }`.
@@ -51,7 +52,7 @@ Details the lines above leave open (the schemas enforce them):
 - **Time, exactly:** `YYYY-MM-DDTHH:MM:SS` with an optional fraction, then `+HH:MM` or `-HH:MM`. `Z` is not accepted, because the local day must be readable from the text.
 - **Closed values:** a row, session, block, outcome, intent or error has no other fields. A result (table, plan, plan check, calendar result) has `ok: true` and may carry more fields.
 - **Memory row fields:** `memoryId`, `key` and `slot` are non-empty opaque strings (`slot` names the memory this row is a version of); `group` is `routine`, `body`, `load`, `response`, `gear` or `goal`; `state` is `candidate`, `saved`, `confirmed`, `rejected`, `superseded` or `inactive`, and the table holds only `saved` and `confirmed`; `confidence` is 0 to 1; `since` and `updated` are days.
-- **Row data:** `usual_slot.minutes` is the usual length (5 to 240); `load.ratioToUsual` is null when there is no usual load; `gear.boughtOn` and `goal.date` are a day or null; `mix.byActivity` has only Activity names.
+- **Row data:** `usual_slot.minutes` is the usual length (5 to 240); `load.ratioToUsual` is null when there is no usual load; `gear.boughtOn` and `goal.date` are a day or null; `training_place` has only `place: "home"` and `gymWorkouts: 0`; `mix.byActivity` has only Activity names.
 - **Session fields:** `minutes` is 0 for `rest`, else 5 to 240; `basedOn` may be empty.
 - **Preview block:** a rest day spans its day, midnight to midnight, with `minutes: 0`.
 - **Memory table:** `{ ok: true, rows: [Memory row] }`.

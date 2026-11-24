@@ -92,11 +92,38 @@ struct DayKindTests {
         #expect(week[day(1)] == .home)
     }
 
-    @Test func withoutAHomeAnEventCantMakeADayOut() async {
+    @Test func withoutAHomeEveryPlacedEventMakesADayOut() async {
         var noHome = rules
         noHome.home = nil
-        let week = await kinds(busy: [event(1, at: .coordinate(campus))], rules: noHome)
-        #expect(week[day(1)] == .home)
+        let week = await kinds(busy: [event(1, at: .coordinate(campus)), event(3, at: .text("https://zoom.us/j/1"))], rules: noHome)
+        #expect(week[day(1)] == .out)       // no place can be home yet (plan 5.B.1)
+        #expect(week[day(3)] == .home)      // a meeting link is no place
+    }
+
+    @Test func withoutAHomeATypedPlaceIsADayOutWithoutBeingLookedUp() async {
+        var noHome = rules
+        noHome.home = nil
+        // Offline: a looked-up place would keep the previous kind (home). Not looked up, it is simply a day out.
+        let week = await DayKinds.classify(rules: noHome, busy: [event(3, at: .text("Library"))], goingOut: [], farToday: false,
+                                           from: monday, calendar: Fixture.calendar, geocoder: OfflineGeocoder(), previous: [day(3): .home])
+        #expect(week[day(3)] == .out)
+    }
+
+    @Test func anAllDayEventAwayMakesEachDayItSpansADayOut() async {
+        let start = Fixture.calendar.startOfDay(for: monday)
+        let trip = Busy(start: start, end: Fixture.calendar.date(byAdding: .day, value: 2, to: start)!, place: .coordinate(campus))
+        let week = await kinds(busy: [trip])
+        #expect(week[day(0)] == .out)
+        #expect(week[day(1)] == .out)
+        #expect(week[day(3)] == .home)
+    }
+
+    @Test func offlineADayKeepsTheKindItHadLastTime() async {
+        let week = await DayKinds.classify(rules: rules, busy: [event(1, at: .text("Library")), event(4, at: .text("Library"))],
+                                           goingOut: [], farToday: false, from: monday, calendar: Fixture.calendar,
+                                           geocoder: OfflineGeocoder(), previous: [day(1): .out])
+        #expect(week[day(1)] == .out)       // judged out while online, kept while offline
+        #expect(week[day(4)] == .home)      // never judged: home until the place can be asked
     }
 
     @Test func theEngineIsGivenOnlyHomeAndOutWords() async {

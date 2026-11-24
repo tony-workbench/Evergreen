@@ -31,6 +31,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         case skipUnwell = "skip_unwell"
         case skipNotToday = "skip_not_today"
         case goingOut = "going_out"
+        case homeTomorrow = "home_tomorrow"
 
         /// Why a day was skipped, as kept in the workout log; nil for the actions that aren't a skip.
         var skipReason: String? {
@@ -44,11 +45,12 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     /// The categories: Start · Later today · Already done, Start · Already done · Skip today (with its reason),
-    /// Start now · Already done, and I'm going out tomorrow (with "Only at …" when the reminder names times).
+    /// Start now · Already done, I'm going out tomorrow (with "Only at …" when the reminder names times), and I'm home tomorrow.
     nonisolated static let workoutCategory = "workout"
     nonisolated static let workoutLastCategory = "workout_last"
     nonisolated static let workoutMovedCategory = "workout_moved"
     nonisolated static let tomorrowCategory = "home_tomorrow"
+    nonisolated static let outTomorrowCategory = "out_tomorrow"
 
     /// The evening reminder with its "Only at …" buttons, and the question twenty minutes after a picked time with its
     /// "Move to …": their buttons name times, so they get a category for each set of times ("home_tomorrow|16:40,18:10").
@@ -76,6 +78,9 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             UNNotificationCategory(identifier: Self.workoutLastCategory, actions: [start, Self.doneAction] + skips, intentIdentifiers: []),
             UNNotificationCategory(identifier: Self.workoutMovedCategory, actions: [startNow, Self.doneAction], intentIdentifiers: []),
             UNNotificationCategory(identifier: Self.tomorrowCategory, actions: [Self.goingOutAction], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Self.outTomorrowCategory,
+                                   actions: [UNNotificationAction(identifier: WorkoutAction.homeTomorrow.rawValue, title: "I’m home tomorrow", options: [])],
+                                   intentIdentifiers: []),
         ]
         super.init()
         center.delegate = self
@@ -98,6 +103,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         case .ask: askCategory + "|" + reminder.choices.joined(separator: ",")
         case .moved: workoutMovedCategory
         case .last: workoutLastCategory
+        case .outTomorrow: outTomorrowCategory
         case .soon, .now, .later: workoutCategory
         }
     }
@@ -285,7 +291,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         if action == undoAction, let move { return .undo(move) }
         if let clock = pickedClock(action), let day { return .pick(clock, day: day) }
         if let workout = WorkoutAction(rawValue: action), let day { return .workout(workout, day: day) }
-        let sameDay = kind.flatMap(WorkoutReminder.Kind.init(rawValue:)).map { $0 != .evening } ?? false
+        let sameDay = kind.flatMap(WorkoutReminder.Kind.init(rawValue:)).map { $0 != .evening && $0 != .outTomorrow } ?? false
         if action == UNNotificationDefaultActionIdentifier, sameDay, let day { return .workout(.start, day: day) }
         return .open
     }

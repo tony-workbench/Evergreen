@@ -12,7 +12,7 @@ import {
   DAYS, LOAD_GROWTH, ACWR_MAX, SLEEP_DROP_MIN, RHR_RISE, TAPER_DAYS, WORN_RUN_MAX_MIN, BREAK_IN_MIN, MIN_SESSION, HARD_EFFORT, EASY_EFFORT,
 } from './workouts.mjs';
 import { readRules, readDayKinds, rulesView, kindOf, dayKindsView } from './rules.mjs';
-import { homeContext, homeWeek, homeWeekView, readQueue, stretchesOn, FOCUS_WORDS } from './homeweek.mjs';
+import { homeContext, homeWeek, homeWeekView, readQueue, readDayOffsets, offOf, stretchesOn, FOCUS_WORDS } from './homeweek.mjs';
 
 export const MIN_MINUTES = 10;
 export const MAX_MINUTES = 180;
@@ -51,7 +51,8 @@ export function situation(ctx) {
   const calendar = (ctx.calendar ?? ctx.busy ?? []).map((b) => ({ start: parseDT(b.start), end: parseDT(b.end), title: typeof b.title === 'string' ? b.title : null }));
   const stopped = readStopped(ctx.stopped, mem);
   const stoppedKeys = [...new Set([...mem.stoppedKeys, ...stopped.map((x) => x.key).filter(Boolean), ...(Array.isArray(ctx.stoppedKeys) ? ctx.stoppedKeys.filter((k) => typeof k === 'string') : [])])];
-  const s = { now, today, mem, calendar, stopped, stoppedKeys, memoryKeys: mem.keys.filter((k) => !stoppedKeys.includes(k)), ws: null, week: new Map(), long: null };
+  const s = { now, today, mem, calendar, stopped, stoppedKeys, memoryKeys: mem.keys.filter((k) => !stoppedKeys.includes(k)), ws: null, week: new Map(), long: null,
+    days: DAYS, offOf: () => now.off };
   const slots = mem.slots.filter((x) => !stoppedKeys.includes(x.key));
 
   if (ctx.history) {
@@ -116,26 +117,29 @@ export function situation(ctx) {
 
 /**
  * With the person's rules, every day at home with time to train gets one session, so the limits that come from the
- * usual week (how many sessions, how many minutes, how many days in a row) never stand in its way.
+ * usual week (how many sessions, how many minutes, how many days in a row) never stand in its way. The window is then
+ * the home week: today through Sunday, or through next Sunday when today is Sunday, each day at its own UTC offset.
  */
 function applyRules(s, ctx) {
   s.rules = readRules(ctx.rules);
   if (!s.rules) return;
   s.dayKinds = readDayKinds(ctx.dayKinds);
   s.home = homeContext({ now: s.now, calendar: s.calendar, rules: s.rules, dayKinds: s.dayKinds, carry: Array.isArray(ctx.carry) ? ctx.carry : [],
-    queue: readQueue(ctx.queue), doneToday: ctx.doneToday === true });
+    queue: readQueue(ctx.queue), doneToday: ctx.doneToday === true, offsets: readDayOffsets(ctx.dayOffsets) });
   s.homeWeek = homeWeek(s.home);
+  s.days = s.homeWeek.days.length;
+  s.offOf = (day) => offOf(s.home, day);
   const n = s.homeWeek.trainingDays;
   const minutes = n * s.rules.session.max;
   s.maxSessions = Math.max(s.maxSessions, n);
   if (s.minutes.limit !== null) s.minutes = { ...s.minutes, limit: Math.max(s.minutes.limit, minutes) };
   if (s.loadCap !== null) s.loadCap = Math.max(s.loadCap, s.unit === 'minutes' ? minutes : minutes * EFFORT_OF.steady);
-  s.streak = DAYS;
+  s.streak = Math.max(DAYS, s.days);
 }
 
 // The free stretches of one day between 06:00 and 21:00, at least 20 minutes long. Today: from an hour after `now`, until 22:00.
 function freeOn(s, dayNum) {
-  if (s.rules) return stretchesOn(s.home, dayNum).map((x) => ({ day: dayISO(dayNum), start: isoDT({ mic: x.a, off: s.now.off }), end: isoDT({ mic: x.b, off: s.now.off }) }));
+  if (s.rules) return stretchesOn(s.home, dayNum).map((x) => ({ day: dayISO(dayNum), start: isoDT({ mic: x.a, off: s.offOf(dayNum) }), end: isoDT({ mic: x.b, off: s.offOf(dayNum) }) }));
   const today = dayNum === s.today;
   let from = Math.max(atDay(dayNum, s.now.off, DAY_START_HOUR).mic, today ? s.now.mic + TODAY_LEAD_MIN * US_MIN : 0);
   const to = atDay(dayNum, s.now.off, today ? TODAY_END_HOUR : DAY_END_HOUR).mic;
@@ -163,10 +167,10 @@ export function planContext(ctx) {
     ...(u.activity === 'other' ? { label: u.label ?? null } : {}),
   }));
   const freeSlots = [];
-  for (let i = 0; i < DAYS; i += 1) freeSlots.push(...freeOn(s, s.today + i));
+  for (let i = 0; i < s.days; i += 1) freeSlots.push(...freeOn(s, s.today + i));
   const daysAway = s.raceDate !== null ? s.raceDate - s.today : null;
   return {
-    now: isoDT(s.now), window: { from: dayISO(s.today), to: dayISO(s.today + DAYS - 1), earliestStart: isoDT({ mic: s.now.mic + TODAY_LEAD_MIN * US_MIN, off: s.now.off }) },
+    now: isoDT(s.now), window: { from: dayISO(s.today), to: dayISO(s.today + s.days - 1), earliestStart: isoDT({ mic: s.now.mic + TODAY_LEAD_MIN * US_MIN, off: s.now.off }) },
     usualWeek: usual, usualDaysPerWeek: s.usualDays, maxSessions: s.maxSessions, mostDaysInARow: s.streak,
     usualMinutes: s.minutes.usual, minutesRatio: s.minutes.ratio, maxMinutes: s.minutes.limit,
     loadUnit: s.unit, loadThisWeek: s.load7, loadUsual: s.loadUsual, loadCap: s.loadCap,
@@ -182,7 +186,7 @@ export function planContext(ctx) {
     limits: { minMinutes: MIN_MINUTES, maxMinutes: MAX_MINUTES, shortestSession: MIN_SESSION, wornShoeRunMin: WORN_RUN_MAX_MIN, breakInRunMin: BREAK_IN_MIN },
     ...(s.rules ? {
       rules: rulesView(s.rules),
-      days: dayKindsView(s.rules, s.dayKinds, s.today, DAYS),
+      days: dayKindsView(s.rules, s.dayKinds, s.today, s.days),
       homeWeek: homeWeekView(s.home, s.homeWeek),
     } : {}),
   };
@@ -303,12 +307,12 @@ function readSession(a, index, s) {
       const t = typeof a.start === 'string' ? /^(\d{1,2}):(\d\d)$/.exec(a.start.trim()) : null;
       if (t) {
         if (+t[1] > 23 || +t[2] > 59) return { index, error: 'invalid_session' };
-        start = atDay(parseDay(a.day), s.now.off, +t[1], +t[2]);
+        start = atDay(parseDay(a.day), s.offOf?.(parseDay(a.day)) ?? s.now.off, +t[1], +t[2]);
       } else start = parseDT(a.start);
       if (!t && a.day !== undefined && a.day !== null && parseDay(a.day) !== dayOf(start)) return { index, error: 'invalid_session' };
     }
     if (!Number.isFinite(minutes) || minutes < 0) return { index, error: 'invalid_session' };
-    start = { mic: start.mic, off: s.now.off };
+    start = { mic: start.mic, off: s.offOf?.(dayOf({ mic: start.mic, off: s.now.off })) ?? s.now.off };
     const intensity = a.intensity === 'moderate' ? 'steady' : a.intensity ?? null;
     if (intensity !== null && !INTENSITIES.includes(intensity)) return { index, error: 'invalid_session' };
     const day = dayOf(start);
@@ -344,15 +348,15 @@ export function checkPlan(args) {
   });
   items.sort((a, b) => a.start.mic - b.start.mic || a.index - b.index);
 
-  // The window: 7 local days starting today; today only from an hour after now, and done by 22:00.
-  const windowEnd = atDay(s.today + DAYS, s.now.off).mic;
+  // The window: 7 local days starting today (with rules, the home week); today only from an hour after now, and done by 22:00.
+  const windowEnd = atDay(s.today + s.days, s.offOf(s.today + s.days)).mic;
   const earliest = s.now.mic + TODAY_LEAD_MIN * US_MIN;
   const todayEnd = atDay(s.today, s.now.off, TODAY_END_HOUR).mic;
   for (const x of items) {
     if (x.minutes < MIN_MINUTES) add('bad_duration', x, `${what(x)} is shorter than ${MIN_MINUTES} minutes.`, `lengthen to ≥${MIN_MINUTES} min`);
     else if (x.minutes > MAX_MINUTES) add('bad_duration', x, `${what(x)} is longer than ${MAX_MINUTES} minutes.`, `shorten to ≤${MAX_MINUTES} min`);
     if (x.start.mic < s.now.mic) add('outside_window', x, `${what(x)} is in the past.`, `move to ${hhmm({ mic: earliest, off: s.now.off })} or later`);
-    else if (x.start.mic >= windowEnd) add('outside_window', x, `${what(x)} is outside the ${DAYS} days that start today.`, `move to ${dayISO(s.today + DAYS - 1)} or earlier`);
+    else if (x.start.mic >= windowEnd) add('outside_window', x, `${what(x)} is outside the ${s.days} days that start today.`, `move to ${dayISO(s.today + s.days - 1)} or earlier`);
     else if (x.start.mic < earliest) add('outside_window', x, `${what(x)} starts too soon to get ready for.`, `move to ${hhmm({ mic: earliest, off: s.now.off })} or later`);
     else if (x.day === s.today && x.end.mic > todayEnd) add('outside_window', x, `${what(x)} would end too late tonight.`, `end by ${TODAY_END_HOUR}:00 or move to tomorrow`);
     const busy = s.calendar.find((b) => b.start.mic < x.end.mic && x.start.mic < b.end.mic);
@@ -467,7 +471,7 @@ function checkRules(s, items, add) {
     if (kind === 'rest') add('rest_day_rule', x, `${dayName(x.day)} is a day you never train.`, 'remove this session');
     else if (kind === 'out') add('out_day_rule', x, `You are out on ${dayName(x.day)}, so nothing is planned that day.`, 'remove this session');
     else if (x.activity === 'strength') {
-      const minute = (x.start.mic - atDay(x.day, s.now.off).mic) / US_MIN;
+      const minute = (x.start.mic - atDay(x.day, s.offOf(x.day)).mic) / US_MIN;
       if (minute < r.window.from || minute > r.window.to) add('outside_rule_hours', x, `${what(x)} starts outside the hours you allow.`, `start between ${at(r.window.from)} and ${at(r.window.to)}`);
       if (x.minutes < r.session.min || x.minutes > r.session.max) add('session_length_rule', x, `${what(x)} is not ${r.session.min} to ${r.session.max} minutes long.`, `make it ${r.session.max} min`);
     }
@@ -475,7 +479,7 @@ function checkRules(s, items, add) {
   for (const d of s.homeWeek.days) {
     if (d.first === null || items.some((x) => x.day === d.day && x.activity === 'strength')) continue;
     add('home_day_missing', null, `${dayName(d.day)} is a day at home, and every day at home has a workout.`,
-      `add a ${r.session.max}-minute strength session on ${dayISO(d.day)} at ${hhmm({ mic: d.first, off: s.now.off })}`);
+      `add a ${r.session.max}-minute strength session on ${dayISO(d.day)} at ${hhmm({ mic: d.first, off: s.offOf(d.day) })}`);
   }
 }
 

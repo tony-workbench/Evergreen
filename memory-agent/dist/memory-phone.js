@@ -3004,7 +3004,7 @@
   var mayMove = (from, to, actor) => (TRANSITIONS[`${from}>${to}`] ?? []).includes(actor);
   var OPS = ["ADD", "NOOP", "MERGE", "SUPERSEDE", "REVIEW"];
   var GROUPS = ["routine", "body", "load", "response", "gear", "goal"];
-  var KINDS = ["usual_slot", "weekly_volume", "load", "sleep", "resting_hr", "mix", "response", "gear", "goal"];
+  var KINDS = ["usual_slot", "weekly_volume", "load", "sleep", "resting_hr", "mix", "response", "gear", "goal", "training_place"];
   var ACTIVITIES2 = ["run", "long_run", "walk", "strength", "yoga", "ride", "swim", "elliptical", "stretch", "rest", "other"];
   var SLOT_RE = /^[a-z]+(\.[a-z0-9_]+){1,3}$/;
   var groupOf = (slot) => slot.slice(0, slot.indexOf("."));
@@ -3087,26 +3087,6 @@
     too_long: "The memory text is too long to return."
   };
   var fail = (code) => ({ ok: false, error: { code, text: ERROR_TEXT[code] } });
-
-  // src/agent/statements.mjs
-  var cap2 = (s) => s[0].toUpperCase() + s.slice(1);
-  var r = (v, places) => rounded(String(v), places);
-  var BAND_TEXT = { early: "before 08:00", morning: "between 08:00 and 12:00", afternoon: "between 12:00 and 17:00", evening: "from 17:00" };
-  function statementFor(e) {
-    const n = e.numbers;
-    if (e.id.startsWith("regularity.slot.")) return cap2(e.text.replace("Fixed slot among recognised activities: ", "").replace(", in ", " in "));
-    if (e.id === "volume.per_week") return `Weekly average over 4 weeks: ${r(n.workoutsPerWeek, 1)} workouts and ${r(n.minutesPerWeek, 0)} workout minutes.`;
-    if (e.id === "load.ratio") return `Load over the last 7 days: ${r(n.load7, 0)} ${n.basis === "minutes" ? "minutes" : "effort-minutes"}, ${r(n.ratio, 2)} times the 28-day weekly average.`;
-    if (e.id === "body.sleep") return `Average sleep is ${r(n.average7, 1)} h a night over 7 days and ${r(n.average28, 1)} h over 28 days.`;
-    if (e.id === "body.resting_hr") return `Average resting heart rate is ${r(n.average7, 0)} bpm over 7 days and ${r(n.average28, 0)} bpm over 28 days.`;
-    if (e.id === "mix.count" && e.text.includes("last 28 days: ")) return `Workouts by activity over the last 28 days: ${e.text.split("last 28 days: ")[1]}`;
-    if (e.id.startsWith("gear.") || e.id.startsWith("goal.")) return e.text;
-    if (e.id.startsWith("outcomes.")) {
-      const [, activity, band] = e.id.split(".");
-      return `${n.notDone} of ${n.planned} planned ${activity} sessions ${BAND_TEXT[band]} were not done in the last 28 days.`;
-    }
-    return null;
-  }
 
   // src/agent/evidence.mjs
   var DAY_MS3 = 864e5;
@@ -3337,6 +3317,70 @@
     return missing;
   }
 
+  // src/agent/place.mjs
+  var PLACE_WEEKS = 8;
+  var PLACE_DAYS = PLACE_WEEKS * 7;
+  var PLACE_SLOT = "routine.training_place";
+  var PLACE_KIND = "training_place";
+  var PLACE_STATEMENT = "You train at home, without gym equipment.";
+  var GYM_ACTIVITY_TYPES = ["Elliptical", "StairClimbing"];
+  function placeEvidence(snapshot, day, nowMs, forgottenDays = []) {
+    const forgot = new Set(forgottenDays);
+    const records = [];
+    for (const w of snapshot.workouts ?? []) {
+      const s = parseTimestamp(w.start);
+      const e = parseTimestamp(w.end);
+      if (s === null || e === null) continue;
+      records.push({ type: w.activityType, ms: s.ms, day: w.start.slice(0, 10), ended: e.ms <= nowMs && s.ms <= nowMs, minutes: w.durationMin });
+    }
+    const gone = new Set(records.filter((r3) => forgot.has(r3.day)).map((r3) => `${r3.type}|${r3.ms}`));
+    const seen = /* @__PURE__ */ new Set();
+    const workouts = records.filter((r3) => {
+      const id = `${r3.type}|${r3.ms}`;
+      if (!r3.ended || r3.day > day || gone.has(id) || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    const logged = [...(snapshot.dailySummaries ?? []).map((x) => x.date), ...workouts.map((w) => w.day)].filter((d) => d <= day && !forgot.has(d)).sort();
+    if (logged.length === 0 || dayNum3(day) - dayNum3(logged[0]) + 1 < PLACE_DAYS) return { items: [], gym: false };
+    const from = addDays3(day, -(PLACE_DAYS - 1));
+    const counted = workouts.filter((w) => w.day >= from && Number.isFinite(w.minutes) && w.minutes >= MIN_WORKOUT_MINUTES);
+    const gymWorkouts = counted.filter((w) => GYM_ACTIVITY_TYPES.includes(w.type)).length;
+    if (gymWorkouts > 0) return { items: [], gym: true };
+    if (counted.length === 0) return { items: [], gym: false };
+    return {
+      gym: false,
+      items: [{
+        id: "place.home",
+        window: `${PLACE_DAYS}d`,
+        numbers: { from, to: day, workouts: counted.length, gymWorkouts: 0, weeks: PLACE_WEEKS },
+        text: `Counted workouts in the last ${PLACE_DAYS} days (${from} to ${day}; workouts of ${MIN_WORKOUT_MINUTES} minutes or more): ${counted.length}, of which 0 of a gym-equipment type (elliptical, stair climbing).`,
+        slots: [{ slot: PLACE_SLOT, kind: PLACE_KIND, data: { place: "home", gymWorkouts: 0, weeks: PLACE_WEEKS } }]
+      }]
+    };
+  }
+
+  // src/agent/statements.mjs
+  var cap2 = (s) => s[0].toUpperCase() + s.slice(1);
+  var r = (v, places) => rounded(String(v), places);
+  var BAND_TEXT = { early: "before 08:00", morning: "between 08:00 and 12:00", afternoon: "between 12:00 and 17:00", evening: "from 17:00" };
+  function statementFor(e) {
+    const n = e.numbers;
+    if (e.id.startsWith("regularity.slot.")) return cap2(e.text.replace("Fixed slot among recognised activities: ", "").replace(", in ", " in "));
+    if (e.id === "volume.per_week") return `Weekly average over 4 weeks: ${r(n.workoutsPerWeek, 1)} workouts and ${r(n.minutesPerWeek, 0)} workout minutes.`;
+    if (e.id === "load.ratio") return `Load over the last 7 days: ${r(n.load7, 0)} ${n.basis === "minutes" ? "minutes" : "effort-minutes"}, ${r(n.ratio, 2)} times the 28-day weekly average.`;
+    if (e.id === "body.sleep") return `Average sleep is ${r(n.average7, 1)} h a night over 7 days and ${r(n.average28, 1)} h over 28 days.`;
+    if (e.id === "body.resting_hr") return `Average resting heart rate is ${r(n.average7, 0)} bpm over 7 days and ${r(n.average28, 0)} bpm over 28 days.`;
+    if (e.id === "mix.count" && e.text.includes("last 28 days: ")) return `Workouts by activity over the last 28 days: ${e.text.split("last 28 days: ")[1]}`;
+    if (e.id.startsWith("gear.") || e.id.startsWith("goal.")) return e.text;
+    if (e.id === "place.home") return PLACE_STATEMENT;
+    if (e.id.startsWith("outcomes.")) {
+      const [, activity, band] = e.id.split(".");
+      return `${n.notDone} of ${n.planned} planned ${activity} sessions ${BAND_TEXT[band]} were not done in the last 28 days.`;
+    }
+    return null;
+  }
+
   // src/agent/engine.mjs
   var REFS_KEPT = 40;
   var FORGET_REACH = 34;
@@ -3464,6 +3508,14 @@
     const drop = new Set([...old.values()].flatMap((ids) => ids.slice(0, Math.max(0, ids.length - SUPERSEDED_KEPT))));
     if (drop.size > 0) removeMemories(state, drop);
   }
+  function retireSlot(state, slot, ctx) {
+    let any = false;
+    for (const m of inSlot(state, slot)) if (OPEN.includes(m.state) && move(state, m, INACTIVE, "system", ctx, "RETIRE")) {
+      closeReviews(state, m.id);
+      any = true;
+    }
+    return any;
+  }
   function applyDaily(state, { day, proposals, at, sha256 }) {
     if (state.off) return fail("memory_off");
     if (!isDay(day)) return fail("bad_arguments");
@@ -3502,7 +3554,7 @@
       if (support.kind !== p.kind) return drop("kind_mismatch");
       const allowed = allowedNumbers(cited);
       if (numbersNotIn(p.statement, allowed).length > 0 || Object.values(p.numbers ?? {}).some((v) => v < 0 || !allowed.numbers.has(String(v)))) return drop("number_not_in_evidence");
-      if (lintWords(p.statement).filter((x) => !(group === "goal" && /number/.test(x))).length > 0) return drop("not_a_fact");
+      if (p.kind === PLACE_KIND ? p.statement !== PLACE_STATEMENT : lintWords(p.statement).filter((x) => !(group === "goal" && /number/.test(x))).length > 0) return drop("not_a_fact");
       if (group !== "response" && supporting.every((c) => c.window === "day")) return drop("raw_reading");
       if (inSlot(state, p.slot).some((m2) => m2.state === REJECTED && norm(current(m2).statement) === norm(p.statement))) return drop("rejected_before");
       const usable = usableIn(state, p.slot);
@@ -3818,14 +3870,14 @@
 Output ONLY a JSON object that matches the schema: {"proposals": [...]}. Return {"proposals": []} when nothing qualifies.
 
 WHAT IS WORTH KEEPING: what a planner can use next week and next month.
-- routine: a usual time for an activity, the usual weekly volume, the mix of activities
+- routine: a usual time for an activity, the usual weekly volume, the mix of activities, where they train (place.home: 8 weeks of workouts with none of a gym-equipment type)
 - body: the usual sleep and resting heart rate
 - load: the last 7 days against the usual week
 - response: how the person answers the plan, such as planned early sessions that are repeatedly not done
 - gear and goal: what the person told the app (evidence gear.<item>, goal.<what>)
 Do not keep a single day, a one-off, or anything you would have to guess.
 
-SLOT: every evidence item lists the "slots" it can support. Use one of those keys exactly and never invent one. The key names the SLOT, not the value, so a later change lands on the same key (routine.run.sun_08, body.sleep, response.run.early). Set "kind" to match: routine.<activity>.<day>_<hour> is usual_slot, routine.weekly_volume is weekly_volume, routine.mix is mix, load.week is load, body.sleep is sleep, body.resting_hr is resting_hr, response.* is response, gear.* is gear, goal.* is goal.
+SLOT: every evidence item lists the "slots" it can support. Use one of those keys exactly and never invent one. The key names the SLOT, not the value, so a later change lands on the same key (routine.run.sun_08, body.sleep, response.run.early). Set "kind" to match: routine.<activity>.<day>_<hour> is usual_slot, routine.weekly_volume is weekly_volume, routine.mix is mix, routine.training_place is training_place, load.week is load, body.sleep is sleep, body.resting_hr is resting_hr, response.* is response, gear.* is gear, goal.* is goal.
 
 ONE OPERATION PER SLOT:
 - ADD: no existing memory in the slot (or only an inactive one). No targetMemoryId.
@@ -3839,6 +3891,7 @@ STATEMENT: one sentence, a fact about the person, at most 160 characters, ending
 - Every number in it must appear in the evidence you cite, as written or rounded (minutes and bpm to whole numbers, hours to one decimal, ratios to two). Otherwise the proposal is dropped.
 - Facts only: no advice, no judgement, no prediction, no "you", no "should". Do not begin with a bare verb (not "Run ...", "Sleep ...", "Skip ...").
 - Windows, not single readings: say "over 7 days", never one day's value for sleep, heart rate or load.
+- One exception: routine.training_place has one fixed statement, exactly "${PLACE_STATEMENT}" Any other wording for it is dropped.
 
 EVIDENCE IDS: "evidenceIds" lists the ids you used, at least one that supports the slot. "numbers" may repeat the statement's numbers by name. Do not rate your own confidence: code computes it from the days of support.
 
@@ -3928,6 +3981,9 @@ ${JSON.stringify(neighbors, null, 1)}`;
     if (sup.days.includes(day)) return false;
     const facts = computeFacts(snapshot, midnightOf(now), { suppressed: engineSuppression(sup), forgottenDays: sup.days, dayMode: "completed" });
     recordFacts(state, day, facts, sup.types, trim);
+    const place = placeEvidence(snapshot, day, parseTimestamp(midnightOf(now)).ms, sup.days);
+    state.evidence[day].push(...place.items);
+    if (place.gym) retireSlot(state, PLACE_SLOT, { day, at: now });
     const stopped = new Set(sup.keys.flatMap((k) => storeKeySlots(k.type, k.key)));
     const off = (slot) => stopped.has(slot) || sup.types.some((t2) => TYPE_SLOTS[t2]?.(slot));
     state.evidence[day] = state.evidence[day].map((i) => ({ ...i, slots: i.slots.filter((s) => !off(s.slot)) })).filter((i) => i.slots.length > 0);
@@ -4044,6 +4100,7 @@ ${JSON.stringify(neighbors, null, 1)}`;
     if (e.id === "body.sleep") return { ...base, kind: "sleep", moved: (old) => Math.abs(Number(/and (\d+(?:\.\d+)?) h over 28/.exec(old)?.[1] ?? n.average28) - n.average28) >= 0.2 };
     if (e.id === "body.resting_hr") return { ...base, kind: "resting_hr", moved: (old) => Math.abs(Number(/and (\d+) bpm over 28/.exec(old)?.[1] ?? n.average28) - n.average28) >= 2 };
     if (e.id === "mix.count") return { ...base, kind: "mix" };
+    if (e.id === "place.home") return { ...base, kind: "training_place" };
     if (e.id.startsWith("gear.") || e.id.startsWith("goal.")) return { ...base, kind: e.id.slice(0, 4), moved: () => true };
     if (e.id.startsWith("outcomes.") && n.notDone >= 2) return { ...base, kind: "response", ask: true };
     return null;

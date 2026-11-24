@@ -76,6 +76,52 @@ struct MemoryBriefTests {
         #expect(some.noticed == ["This week's training is 20% below your usual.", "You do about 6.5 workouts a week."])
     }
 
+    /// The memory row for where the person trains, as the memory engine writes it (contract kind `training_place`).
+    static let home = MemoryRow(memoryId: "mem_0009", key: "routine.training_place", slot: "routine.training_place", group: "routine",
+                                kind: "training_place", statement: "You train at home, without gym equipment.",
+                                data: ["place": "home", "gymWorkouts": 0, "weeks": 8], state: "saved", confidence: 0.5, since: "2026-11-17", updated: "2026-11-17")
+
+    @Test func whereThePersonTrainsIsNoticedAndCanBeSaidNoTo() {
+        let lines = Self.full.noticedLines(rows: [PlanFakes.load, Self.home])
+        #expect(lines.map(\.text) == [
+            "You usually run Sunday mornings.",
+            "This week's training is 14% above your usual.",
+            "You train at home, without gym equipment.",
+        ])
+        // Only that line carries a key, the one "Not true for me" rejects.
+        #expect(lines.map(\.key) == [nil, nil, "routine.training_place"])
+        #expect(lines.allSatisfy { $0.text.split(separator: " ").count <= 8 })
+        // Without the row, or once it is rejected, the first screen is the brief's own lines, none of them answerable.
+        var rejected = Self.home
+        rejected.state = "rejected"
+        #expect(Self.full.noticedLines(rows: [rejected]).map(\.text) == Self.full.noticed)
+        #expect(Self.full.noticedLines(rows: []).allSatisfy { $0.key == nil })
+        // With nothing else to say yet, it is said alone; a short history keeps its friendly version.
+        #expect(MemoryBrief().noticedLines(rows: [Self.home]).map(\.text) == ["You train at home, without gym equipment."])
+        let thin = MemoryBrief(lines: [.init(group: .routine, id: "thin", key: nil, text: "9 days of data, fewer than 14.")])
+        #expect(thin.noticedLines(rows: [Self.home]).map(\.text) == thin.noticed)
+    }
+
+    @Test func theMemoryListSaysWhereThePersonTrains() throws {
+        #expect(RowWords.sentence(Self.home) == "You train at home, without gym equipment.")
+        #expect(RowWords.title(Self.home) == "training at home")
+        #expect(RowWords.support(Self.home).hasPrefix("No elliptical or stair-climber workouts in the last 8 weeks."))
+        // It sits under the routine, as a sentence of its own with its key for "Stop".
+        #expect(MemoryPattern.split([Self.home]).others == [Self.home])
+        #expect(BodyFigure.figures([Self.home]).isEmpty)
+        // A kind this code doesn't know is said as the row's own statement.
+        var unknown = Self.home
+        unknown.kind = "training_spot"
+        unknown.statement = "Something the engine learned later."
+        #expect(RowWords.sentence(unknown) == "Something the engine learned later.")
+        #expect(MemoryBrief().noticedLines(rows: [unknown]).allSatisfy { $0.key == nil })
+        // The contract's own example of the row decodes and is said the same way.
+        let rows = try HandOffTests.load("memory-row", as: [MemoryRow].self)
+        let example = try #require(rows.first { $0.kind == "training_place" })
+        #expect(example.data == ["place": "home", "gymWorkouts": 0, "weeks": 8])
+        #expect(RowWords.sentence(example) == "You train at home, without gym equipment.")
+    }
+
     @Test func thinHistoryGetsAFriendlyVersion() {
         let thin = MemoryBrief(lines: [.init(group: .routine, id: "thin", key: nil, text: "9 days of data, fewer than 14.")])
         #expect(thin.thinDays == 9)

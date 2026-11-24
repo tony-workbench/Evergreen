@@ -35,15 +35,51 @@ extension AppModel {
                                 picked: pickedTimes[day])
     }
 
-    /// Every reminder of the coming days at home that is still to do: not done any way, not skipped, not a day out.
+    /// Every reminder of the coming days at home that is still to do: not done any way, not skipped, not a day out, and
+    /// none of today's while a session is under way; and the evening before each day out, its own.
     func homeReminders() -> [WorkoutReminder] {
         guard userRules.isOn, let week = homeWeek else { return [] }
         let out = goingOutDays
-        return week.days.filter { $0.day >= todayISO && $0.kind == .home && $0.trains && !out.contains($0.day) }
+        // The whole of today is planned, the part already sent included, so it counts against today's six.
+        let from = calendar.startOfDay(for: now)
+        let home = week.days.filter { $0.day >= todayISO && $0.kind == .home && $0.trains && !out.contains($0.day) }
             .filter { !workoutLog.didHomeSession(on: $0.day) && !trainedStrength(on: $0.day) && !workoutLog.didSkip($0.day) }
             .flatMap { day in
-                WorkoutReminders.plan(day: day, session: reminderSession(day), choice: reminderChoice(day.day), now: now, calendar: calendar)
+                WorkoutReminders.plan(day: day, session: reminderSession(day), choice: reminderChoice(day.day), now: from, calendar: calendar)
             }
+        let underWay = sessionUnderWayUntil
+        let quiet = home.filter { reminder in underWay.map { reminder.day != todayISO || reminder.fires >= $0 } ?? true }
+        let outDays = week.days.filter { $0.day > todayISO && ($0.kind == .out || out.contains($0.day)) }
+        let all = quiet + outDays.compactMap { WorkoutReminders.outEvening(day: $0.day, now: from, calendar: calendar) }
+        return NotificationBudget.fit(all, room: roomForHomeReminders, calendar: calendar).filter { $0.fires > now }
+    }
+
+    /// What is left of a day's six once the other notifications are counted: sent at once that day, the 30-minute
+    /// reminders of other workouts, and "Your week ahead" on a Sunday.
+    func roomForHomeReminders(on day: String) -> Int {
+        let others = otherReminderItems.filter { LocalTime($0.slot.start.addingTimeInterval(-Notifier.reminderLead), in: calendar.timeZone).day == day }
+        let weekAhead = userRules.isOn && WorkoutReminders.date(day, clock: "12:00", calendar: calendar)
+            .map { calendar.component(.weekday, from: $0) == Self.weekAheadWeekday } == true
+        return NotificationBudget.maxPerDay - NotificationBudget.sent(on: day, in: settings) - others.count - (weekAhead ? 1 : 0)
+    }
+
+    /// The workouts on the plan that get the 30-minute reminder: not done, not on a day out, not a day-at-home session.
+    var otherReminderItems: [PlanItem] {
+        plan.filter { completion(for: $0) == nil && !isDayOut($0.slot.start) && !isHomeSession($0) }
+    }
+
+    /// A notification sent at once (rain, a move off a meeting, shoes): not at night, and not past today's six. It goes
+    /// before the day-at-home reminders, which are planned again to make room for it.
+    func notifyNow(_ copy: (title: String, body: String), id: String) async {
+        let today = todayISO
+        guard !NotificationBudget.isQuiet(now, calendar: calendar),
+              NotificationBudget.sent(on: today, in: settings) < NotificationBudget.maxPerDay else {
+            log("A notification was held back: night, or six already today")
+            return
+        }
+        await notifier.send(copy, id: id)
+        NotificationBudget.recordSent(on: today, in: settings)
+        await scheduleHomeNotifications()
     }
 
     /// Plans the days-at-home reminders again. Needs nothing the locked phone keeps from the app, so a button on a reminder
@@ -78,6 +114,9 @@ extension AppModel {
         case .goingOut:
             log("You’re out on \(day); no workout that day")
             await setGoingOut(true, day: day)
+        case .homeTomorrow:
+            log("You’re home on \(day) after all")
+            await setGoingOut(false, day: day)
         case .skipOut, .skipUnwell, .skipNotToday:
             await skipDay(day, reason: action.skipReason ?? "not_today")
         }

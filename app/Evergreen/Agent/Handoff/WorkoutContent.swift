@@ -5,6 +5,8 @@ import Foundation
 /// each with its sets, its range of reps or seconds, its rest and, for a
 /// backpack movement, the kilograms in the backpack.
 struct WorkoutContent: Codable, Equatable, Sendable {
+    /// How much slower each rep is lowered in the slow step (the engine's SLOW_EXTRA_SECONDS).
+    static let slowExtraSeconds = 2
     var sessionId: String?
     var focus: String
     var minutes: Int
@@ -23,6 +25,8 @@ struct WorkoutContent: Codable, Equatable, Sendable {
         var rest: Int
         /// Not done before: the page asks first whether the person can do one.
         var isNew: Bool
+        /// The slow step: every rep lowered two seconds slower than the movement's usual tempo.
+        var slow: Bool?
 
         var id: String { movementId }
         var range: [Int] { reps ?? seconds ?? [1, 1] }

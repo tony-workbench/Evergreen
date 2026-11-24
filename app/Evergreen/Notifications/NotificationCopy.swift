@@ -27,6 +27,9 @@ enum NotificationCopy {
         ("Tomorrow at home", "\(session.focusWords.capitalizedFirst) at \(start.clock), about \(session.minutes) minutes.")
     }
 
+    /// 21:00 the evening before a day out.
+    static let outTomorrow = (title: "Tomorrow you’re out", body: "No workout tomorrow. If you’ll be home after all, tap “I’m home tomorrow”.")
+
     /// 21:00 the evening before, with "Always ask me to pick one time" on and no time picked yet.
     static func homePickTomorrow(_ session: WorkoutReminders.Session, times: [Date]) -> (title: String, body: String) {
         let clocks = times.map(\.clock)

@@ -2,6 +2,7 @@
 // rounded the same way (minutes and bpm whole, hours to one decimal, ratios to two). Used when forgetting a day changed a
 // memory's numbers (no model is asked then), and by the rule-based stand-in for the model. null when the item has no template.
 import { rounded } from '../memory/brief.mjs';
+import { PLACE_STATEMENT } from './place.mjs';
 
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 const r = (v, places) => rounded(String(v), places);
@@ -16,6 +17,7 @@ export function statementFor(e) {
   if (e.id === 'body.resting_hr') return `Average resting heart rate is ${r(n.average7, 0)} bpm over 7 days and ${r(n.average28, 0)} bpm over 28 days.`;
   if (e.id === 'mix.count' && e.text.includes('last 28 days: ')) return `Workouts by activity over the last 28 days: ${e.text.split('last 28 days: ')[1]}`;
   if (e.id.startsWith('gear.') || e.id.startsWith('goal.')) return e.text;
+  if (e.id === 'place.home') return PLACE_STATEMENT;
   if (e.id.startsWith('outcomes.')) {
     const [, activity, band] = e.id.split('.');
     return `${n.notDone} of ${n.planned} planned ${activity} sessions ${BAND_TEXT[band]} were not done in the last 28 days.`;

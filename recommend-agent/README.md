@@ -12,7 +12,7 @@ npm run sample    # prints a sample week, brief and check
 npm run eval:home # grades 30 home weeks
 ```
 
-Needs Node.js 20+. The app runs `dist/recommend-phone.js` in JavaScriptCore; [docs/PHONE.md](docs/PHONE.md) lists its globals.
+Needs Node.js 20+. The app runs `dist/recommend-phone.js` in JavaScriptCore; [docs/PHONE.md](docs/PHONE.md) and [docs/HOME.md](docs/HOME.md) list its globals.
 
 ## What is inside
 
@@ -20,7 +20,7 @@ Needs Node.js 20+. The app runs `dist/recommend-phone.js` in JavaScriptCore; [do
 - `src/plan.mjs`: `planContext` (the numbers), `planBrief` (the limits as sentences), `checkPlan` (every hard rule).
 - `src/memory.mjs`: memory table rows and the activity list.
 - `src/rules.mjs`, `src/homeweek.mjs`, `src/content.mjs`: My rules, the week at home, and each session from `data/movements.json`.
-- `data/workout_ideas/`: optional extras for a run, each with its guide.
+- `data/workout_ideas/`: extras for a run.
 
 ## Tests
 

@@ -68,14 +68,21 @@ struct WeekTableView: View {
             let earlier = model.earlierThisWeek
             if !earlier.isEmpty {
                 Section("Earlier this week") {
-                    ForEach(earlier) { EarlierLine(day: $0) }
+                    ForEach(earlier) { day in
+                        EarlierLine(day: day)
+                        if day.outcome == .skipped { takeBackSkip(day.day, label: "Take back the skip") }
+                    }
                 }
             }
             Section {
                 ForEach(week.days) { day in
                     row(day)
                     timePicker(day)
+                    rainLine(day)
                     homeAfterAll(day)
+                    if day.kind != .out, model.workoutLog.didSkip(day.day) {
+                        takeBackSkip(day.day, label: day.day == model.todayISO ? "Train today after all" : "Train that day after all")
+                    }
                 }
             }
         }
@@ -130,10 +137,29 @@ struct WeekTableView: View {
         }
     }
 
+    /// The day's short breaks for rain: on the plan, or offered on Today and still to answer there.
+    @ViewBuilder private func rainLine(_ day: HomeWeek.Day) -> some View {
+        if let rain = model.rainBreaks(on: day.day) {
+            let times = rain.clocks.joined(separator: ", ")
+            Label(rain.added ? "Rain: short breaks at \(times)" : "Rain: short breaks offered at \(times), on Today",
+                  systemImage: "cloud.rain")
+                .font(.footnote).foregroundStyle(Theme.textMuted)
+                .frame(minHeight: 44, alignment: .leading)
+        }
+    }
+
+    /// A skip, from Today or from a reminder (also one tapped after midnight, for the day before), taken back here.
+    private func takeBackSkip(_ day: String, label: String) -> some View {
+        Button(label) { Task { await model.unskipDay(day); await load() } }
+            .buttonStyle(TapTargetButtonStyle())
+            .accessibilityHint("Takes back the skip on this day")
+    }
+
     @ViewBuilder private func row(_ day: HomeWeek.Day) -> some View {
         let isToday = day.day == model.todayISO
         let line = DayLine(day: day, picked: picks[day.day], isToday: isToday,
-                           movements: model.movementLine(day.day),
+                           movements: model.movementLine(day.day), aiPicked: model.homeWeekReasons[day.day] != nil,
+                           skipped: model.workoutLog.didSkip(day.day),
                            done: model.workoutLog.didHomeSession(on: day.day) || model.trainedStrength(on: day.day))
         if day.trains {
             Button { if isToday { workout = true } else { preview = day } } label: { line }
@@ -152,6 +178,9 @@ private struct DayLine: View {
     let picked: String?
     let isToday: Bool
     let movements: String?
+    /// The AI chose this day's movements; the day's own page says why.
+    let aiPicked: Bool
+    let skipped: Bool
     let done: Bool
 
     var body: some View {
@@ -162,10 +191,13 @@ private struct DayLine: View {
                 Text(kindWord).font(.footnote.weight(.semibold)).foregroundStyle(Theme.textMuted)
             }
             if let first = day.first, day.trains {
-                Text(done ? "Done" : picked.map { "Only at \($0)" } ?? "At \(first.clock)")
-                    .font(.body).foregroundStyle(done ? Theme.success : Theme.accent)
+                Text(done ? "Done" : skipped ? "Skipped" : picked.map { "Only at \($0)" } ?? "At \(first.clock)")
+                    .font(.body).foregroundStyle(done ? Theme.success : skipped ? Theme.textMuted : Theme.accent)
                 if let movements { Text(movements).font(.body).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true) }
-                if picked == nil, !day.fallbacks.isEmpty, !done {
+                if movements != nil, aiPicked {
+                    Label("Movements picked by AI", systemImage: "sparkles").font(.footnote).foregroundStyle(Theme.textMuted)
+                }
+                if picked == nil, !day.fallbacks.isEmpty, !done, !skipped {
                     Text("Later: " + day.fallbacks.map(\.clock).joined(separator: ", "))
                         .font(.footnote).foregroundStyle(Theme.textMuted)
                 }
@@ -234,12 +266,14 @@ private struct DayPreview: View {
         NavigationStack {
             List {
                 if let content = model.homeWeekContent[day.day] {
+                    if let reason = model.homeWeekReasons[day.day] { Section { AIPickedNote(reason: reason) } }
                     Section("About \(content.minutes) minutes") {
                         ForEach(content.items) { item in
                             if let move = model.movement(item.movementId) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(move.name).font(.body).foregroundStyle(Theme.text)
-                                    Text("\(item.sets) sets of \(item.target(sides: move.sides))" + (item.load.map { ", " + BackpackWater.words($0) } ?? ""))
+                                    Text("\(item.sets) sets of \(item.target(sides: move.sides))" + (item.load.map { ", " + BackpackWater.words($0) } ?? "")
+                                         + (item.slow == true ? ", lowered slower" : ""))
                                         .font(.footnote).foregroundStyle(Theme.textMuted)
                                 }
                                 .frame(minHeight: 44, alignment: .leading)

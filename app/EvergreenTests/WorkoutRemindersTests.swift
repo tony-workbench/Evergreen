@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UserNotifications
 @testable import Evergreen
 
 /// A day at home's reminders (the evening before, before, at, after and at each later time, at most six and none
@@ -308,7 +309,70 @@ struct WorkoutRemindersTests {
         let rig = try twoDaysAtHome()
         await rig.model.handleWorkoutAction(.goingOut, day: friday)
         #expect(rig.model.goingOutDays.contains(friday))
-        #expect(kinds(rig, friday).isEmpty)
+        #expect(kinds(rig, friday) == [.outTomorrow], "only the evening word that Friday is out")
+    }
+
+    @MainActor @Test func aSessionUnderWayQuietsTodaysRemindersWhileItRuns() async throws {
+        let rig = try twoDaysAtHome(at: Fixture.at(16, 45))
+        #expect(kinds(rig, thursday) == [.moved, .later, .last])
+        // Opened at 16:41: 17:00 falls inside its 20 minutes and the half hour after, so it isn't sent; 18:10 still is.
+        let progress = WorkoutProgress(day: thursday, content: oneMovement, results: [WorkoutResult(movementId: "sit_to_stand", sets: [])],
+                                       startedAt: Fixture.at(16, 41))
+        rig.model.saveProgress(progress)
+        #expect(kinds(rig, thursday) == [.later, .last])
+        #expect(kinds(rig, friday).count == 6, "other days are untouched")
+    }
+
+    @MainActor @Test func everyNotificationSharesTheDaysSixAndNoneComeAtNight() async throws {
+        let rig = try twoDaysAtHome()
+        // Rain and a move sent at once this morning: Thursday's reminders make room, the later time and the move go first.
+        await rig.model.notifyNow(("Rain", "This afternoon"), id: "rain-test")
+        await rig.model.notifyNow(("Moved", "Your run"), id: "move-test")
+        #expect(NotificationBudget.sent(on: thursday, in: rig.settings) == 2)
+        #expect(kinds(rig, thursday) == [.soon, .now, .last])
+        #expect(kinds(rig, friday) == [.evening, .soon, .now, .moved, .later, .last], "Friday's own day still has six")
+        // Nothing at night: held back, not counted.
+        rig.clock.now = Fixture.at(23)
+        await rig.model.notifyNow(("Rain", "Tomorrow"), id: "rain-night")
+        #expect(NotificationBudget.sent(on: thursday, in: rig.settings) == 2)
+        #expect(NotificationBudget.isQuiet(Fixture.at(5, 50), calendar: cal) && !NotificationBudget.isQuiet(Fixture.at(6), calendar: cal))
+    }
+
+    @Test func makingRoomKeepsTheTimeTheLastAndTheEveningWord() {
+        let at = { (kind: WorkoutReminder.Kind, hour: Int) in
+            WorkoutReminder(id: "\(kind.rawValue)-\(hour)", kind: kind, fires: Fixture.at(hour), title: "", body: "", day: "2026-11-19")
+        }
+        let day = [at(.soon, 16), at(.now, 16), at(.moved, 17), at(.later, 18), at(.last, 19), at(.evening, 21)]
+        #expect(NotificationBudget.fit(day, room: { _ in 6 }, calendar: cal) == day)
+        #expect(NotificationBudget.fit(day, room: { _ in 3 }, calendar: cal).map(\.kind) == [.now, .last, .evening])
+        #expect(NotificationBudget.fit(day, room: { _ in -1 }, calendar: cal).isEmpty)
+    }
+
+    @MainActor @Test func theWeekTableShowsADaysShortBreaksForRainOnceAdded() async throws {
+        let rig = try twoDaysAtHome(at: Fixture.at(8))
+        #expect(rig.model.rainBreaks(on: thursday) == nil)
+        let snacks = try #require(RainCheck.snacks(days: [RainHomeDay(day: Fixture.storyDay, session: session1640)], plan: [],
+                                                   forecast: forecast(wet: 12..<20), busy: [], now: Fixture.at(8), calendar: cal).first)
+        rig.model.addRainSnacks(snacks)
+        let added = try #require(rig.model.rainBreaks(on: thursday))
+        #expect(added.added && added.clocks == snacks.blocks.map(\.start.clock))
+        #expect(rig.model.rainBreaks(on: friday) == nil)
+    }
+
+    @MainActor @Test func theEveningBeforeADayOutSaysSoAndOneTapPutsItRight() async throws {
+        let rig = try twoDaysAtHome()
+        rig.model.homeWeek?.days[1].kind = .out
+        let evening = try #require(rig.model.homeReminders().first { $0.day == friday })
+        #expect(evening.kind == .outTomorrow && evening.fires == Fixture.at(21) && evening.title == "Tomorrow you’re out")
+        #expect(Notifier.category(of: evening) == Notifier.outTomorrowCategory)
+        #expect(Notifier.route(action: UNNotificationDefaultActionIdentifier, day: friday, kind: "out_tomorrow", move: nil) == .open)
+        #expect(Notifier.route(action: "home_tomorrow", day: friday, kind: "out_tomorrow", move: nil) == .workout(.homeTomorrow, day: friday))
+        await rig.model.handleWorkoutAction(.homeTomorrow, day: friday)
+        #expect(rig.model.stayingHomeDays.contains(friday) && !rig.model.goingOutDays.contains(friday))
+        // Past 21:00 there is nothing left to say.
+        rig.clock.now = Fixture.at(21, 30)
+        rig.model.homeWeek?.days[1].kind = .out
+        #expect(!rig.model.homeReminders().contains { $0.kind == .outTomorrow })
     }
 
     @MainActor @Test func aMissedDaysFocusIsPassedOnOnce() throws {

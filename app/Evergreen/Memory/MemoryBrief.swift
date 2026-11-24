@@ -119,26 +119,53 @@ struct MemoryBrief: Equatable, Sendable {
         lines.first { $0.id == "thin" }.flatMap { $0.text.firstMatch(of: /(\d+) days? of data/) }.flatMap { Int($0.1) }
     }
 
+    /// One line of "What I noticed", with the memory key behind it when the
+    /// person can answer it "Not true for me".
+    struct NoticedLine: Equatable, Identifiable, Sendable {
+        var text: String
+        var key: String? = nil
+
+        var id: String { text }
+    }
+
     /// At most three short lines (8 words or fewer) for the first screen: what
     /// Evergreen already knows. With under 14 days of data, a friendly version that says so.
     var noticed: [String] {
-        if let thinDays {
-            return [
-                "I have \(thinDays) \(thinDays == 1 ? "day" : "days") of your workouts.",
-                "Two more weeks and I'll know your routine.",
-                "Until then, a gentle week to start.",
-            ]
-        }
+        if let thinDays { return Self.thinLines(thinDays) }
+        let found = shortLines
+        return found.isEmpty
+            ? ["I don't have your history yet.", "A few workouts and I'll learn your routine.", "Until then, a gentle week to start."]
+            : Array(found.prefix(3))
+    }
+
+    /// The same first screen with the memory table's rows: where the person
+    /// trains, when memory holds it ("You train at home, without gym
+    /// equipment."), takes the third place and can be answered "Not true for
+    /// me" by its key. A row kind this code doesn't know changes nothing.
+    func noticedLines(rows: [MemoryRow]) -> [NoticedLine] {
+        let plain = noticed.map { NoticedLine(text: $0) }
+        guard thinDays == nil, let home = rows.first(where: { $0.kind == "training_place" && $0.isUsable }) else { return plain }
+        let place = NoticedLine(text: RowWords.sentence(home), key: home.key)
+        return Array(shortLines.prefix(2)).map { NoticedLine(text: $0) } + [place]
+    }
+
+    private static func thinLines(_ days: Int) -> [String] {
+        [
+            "I have \(days) \(days == 1 ? "day" : "days") of your workouts.",
+            "Two more weeks and I'll know your routine.",
+            "Until then, a gentle week to start.",
+        ]
+    }
+
+    /// What the brief's lines say in 8 words or fewer, best first.
+    private var shortLines: [String] {
         func line(_ id: String) -> Line? { lines.first { $0.id == id } }
         let usual = line("usual_time")?.usualTime.map {
             "You usually \($0.verb) \($0.weekdayName) \($0.hour < 12 ? "mornings" : $0.hour < 17 ? "afternoons" : "evenings")."
         }
         // The first clause of the sleep sentence is short enough on its own.
         let sleep = line("sleep").map(\.sentence).flatMap { $0.contains(",") ? String($0.prefix { $0 != "," }) + "." : nil }
-        let found = [usual, line("load")?.sentence, sleep, line("workouts_per_week")?.sentence].compactMap(\.self)
+        return [usual, line("load")?.sentence, sleep, line("workouts_per_week")?.sentence].compactMap(\.self)
             .filter { $0.split(separator: " ").count <= 8 }
-        return found.isEmpty
-            ? ["I don't have your history yet.", "A few workouts and I'll learn your routine.", "Until then, a gentle week to start."]
-            : Array(found.prefix(3))
     }
 }

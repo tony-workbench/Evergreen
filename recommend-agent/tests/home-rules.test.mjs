@@ -131,7 +131,7 @@ test('rules that cannot be read are an input error, not a guess', () => {
 test('the split stays as planned later in the week: Tuesday is still upper body after Monday', () => {
   const tuesday = base({ now: at(DAYS[1], '08:00'), queue: { [DAYS[1]]: 'upper', [DAYS[3]]: 'lower', [DAYS[4]]: 'upper' } });
   assert.deepEqual(weekOf(tuesday).filter((d) => d.focus).map((d) => [d.day, d.focus]),
-    [[DAYS[1], 'upper'], [DAYS[3], 'lower'], [DAYS[4], 'upper'], ['2026-12-07', 'lower']]);
+    [[DAYS[1], 'upper'], [DAYS[3], 'lower'], [DAYS[4], 'upper']]);
 });
 
 test('a day at home that turns into a day out passes its focus on to the next day at home', () => {
@@ -149,10 +149,58 @@ test('a session done today keeps its focus to today and passes nothing on to the
   assert.deepEqual(morning.filter((d) => d.focus && d.day <= DAYS[6]).map((d) => d.focus), ['upper', 'lower', 'upper']);
 });
 
-test('next week seen from midweek takes its place in that whole week’s split', () => {
-  const thursday = base({ now: at(DAYS[3], '08:00') });
-  const monday = weekOf(thursday).find((d) => d.day === '2026-12-07');
-  assert.equal(monday.focus, 'lower');
+test('the week runs from today through Sunday: seven days from Monday, four from Thursday', () => {
+  assert.deepEqual(weekOf(base()).map((d) => d.day), DAYS);
+  assert.deepEqual(weekOf(base({ now: at(DAYS[3], '08:00') })).map((d) => d.day), DAYS.slice(3));
+  const c = planContext(base({ now: at(DAYS[3], '08:00') }));
+  assert.deepEqual([c.window.from, c.window.to], [DAYS[3], DAYS[6]]);
+  assert.deepEqual(c.days.map((d) => d.day), DAYS.slice(3));
+});
+
+test('on Sunday the week runs through next Sunday, with next week in its own split', () => {
+  const days = weekOf(base({ now: at(DAYS[6], '20:00') }));
+  assert.equal(days.length, 8);
+  assert.deepEqual([days[0].day, days[7].day], [DAYS[6], '2026-12-13']);
+  assert.deepEqual(days.filter((d) => d.focus).map((d) => [d.day, d.focus]),
+    [['2026-12-07', 'lower'], ['2026-12-08', 'upper'], ['2026-12-10', 'lower'], ['2026-12-11', 'upper']]);
+  const ctx = base({ now: at(DAYS[6], '20:00') });
+  assert.deepEqual(codes(checkPlan({ plan: { sessions: recommendWeek(ctx).sessions }, context: ctx })), []);
+});
+
+test('midweek, a session after Sunday is outside the week', () => {
+  const ctx = base({ now: at(DAYS[3], '08:00') });
+  const week = recommendWeek(ctx).sessions;
+  const later = { ...week[0], id: 'next-mon', day: '2026-12-07', start: at('2026-12-07', '13:00') };
+  assert.ok(codes(checkPlan({ plan: { sessions: [...week, later] }, context: ctx })).includes('outside_window'));
+});
+
+// America/Los_Angeles leaves summer time at 02:00 on Sunday 1 November 2026: -07:00 before, -08:00 after.
+const DST = { restWeekdays: [] };
+const FALL = { '2026-10-31': '-07:00', '2026-11-01': '-08:00' };
+const dst = (over = {}) => base({ now: '2026-10-31T08:00:00-07:00', rules: DST, ...over });
+
+test('across a clock change each day keeps its own hours when the phone gives each day\'s offset', () => {
+  const days = weekOf(dst({ dayOffsets: FALL }));
+  assert.deepEqual(days.map((d) => d.first), ['2026-10-31T12:00:00-07:00', '2026-11-01T12:00:00-08:00']);
+  assert.equal(weekOf(dst())[1].first, '2026-11-01T12:00:00-07:00', 'without it, one offset for the whole week');
+  const week = recommendWeek(dst({ dayOffsets: FALL })).sessions;
+  assert.equal(week[1].start, '2026-11-01T12:00:00-08:00');
+  assert.deepEqual(codes(checkPlan({ plan: { sessions: week }, context: dst({ dayOffsets: FALL }) })), []);
+});
+
+test('with each day\'s offset, a session an hour early by the old offset starts outside the rules\' hours', () => {
+  const ctx = dst({ dayOffsets: FALL });
+  const week = recommendWeek(ctx).sessions;
+  const early = { ...week[1], start: '2026-11-01T12:00:00-07:00' };   // 11:00 on the Sunday's own clock
+  assert.ok(codes(checkPlan({ plan: { sessions: [week[0], early] }, context: ctx })).includes('outside_rule_hours'));
+  assert.ok(!codes(checkPlan({ plan: { sessions: [week[0], early] }, context: dst() })).includes('outside_rule_hours'));
+});
+
+test('a day offset that can\'t be read is an input error', () => {
+  for (const dayOffsets of [['-08:00'], { '2026-11-01': '-8' }, { '2026-11-01': 'PST' }, { '2026-11-01': '-08:60' }, { '2026-11-01': '+15:00' }, { 'Sunday': '-08:00' }]) {
+    assert.throws(() => planContext(dst({ dayOffsets })), (e) => e.code === 'bad_day_offsets', JSON.stringify(dayOffsets));
+    assert.throws(() => recommendWeek(dst({ dayOffsets })), (e) => e.code === 'bad_day_offsets', JSON.stringify(dayOffsets));
+  }
 });
 
 test('every home-days value in the contract is taken as it is', () => {

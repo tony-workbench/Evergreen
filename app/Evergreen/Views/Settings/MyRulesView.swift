@@ -116,12 +116,11 @@ struct MyRulesView: View {
     private func setHome() async {
         settingHome = true
         defer { settingHome = false }
-        let location = DeviceLocation(accuracy: 100)
-        guard await location.request(), let here = await location.current() else {
+        guard let home = await model.locateHome() else {
             homeLine = "Location is off for Evergreen, so home can’t be set."
             return
         }
-        rules.home = HomePlace(place: here)
+        rules.home = home
         homeLine = "Home is set to where you are now."
     }
 }

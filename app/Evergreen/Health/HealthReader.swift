@@ -70,6 +70,8 @@ struct HealthReader: Sendable {
         case .walking, .hiking: "Walking"
         case .cycling: "Cycling"
         case .elliptical: "Elliptical"
+        // Read by the memory's "you train at home" check, which a gym machine's workout turns off.
+        case .stairClimbing, .stairs: "StairClimbing"
         case .functionalStrengthTraining: "FunctionalStrengthTraining"
         case .traditionalStrengthTraining: "TraditionalStrengthTraining"
         case .yoga: "Yoga"

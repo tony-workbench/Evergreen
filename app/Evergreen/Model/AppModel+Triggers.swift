@@ -114,6 +114,15 @@ extension AppModel {
         }
     }
 
+    /// A day's short breaks for rain, for the week table: those on the plan, or else those offered and not yet answered.
+    func rainBreaks(on day: String) -> (clocks: [String], added: Bool)? {
+        let zone = calendar.timeZone
+        let added = plan.filter { $0.id.hasPrefix("snack-\(day)-") }.map(\.slot.start).sorted()
+        if !added.isEmpty { return (added.map(\.clock), true) }
+        guard let offered = triggers.rainSnacks.first(where: { LocalTime($0.day, in: zone).day == day }) else { return nil }
+        return (offered.blocks.map(\.start.clock), false)
+    }
+
     /// "Short breaks through the day": each break goes on the plan and the calendar as its own short block.
     /// They aren't strength sessions: they don't count towards the week's sets or unlock screen time.
     func addRainSnacks(_ snacks: RainSnacks) {

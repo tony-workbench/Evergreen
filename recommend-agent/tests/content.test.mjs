@@ -2,14 +2,19 @@
 // person's minutes and equipment, the week's floor of sets, and each checkContent code failing when it should.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { MOVEMENTS, movementOf, chainOf, workoutContent, weekContent, checkContent, movementLibrary, feelingWordsIn, mastered,
-  sessionMinutes, setsByPattern, MAIN_PATTERNS, WEEK_FLOOR_SETS, LOAD_MAX_KG } from '../src/content.mjs';
+  sessionMinutes, itemSeconds, setsByPattern, MAIN_PATTERNS, WEEK_FLOOR_SETS, LOAD_MAX_KG, SLOW_EXTRA_SECONDS } from '../src/content.mjs';
 import { EQUIPMENT, ALWAYS_THERE } from '../src/rules.mjs';
 
 const ALL = ['backpack', 'chair', 'table', 'sofa', 'book', 'step'];
 const rules = (over = {}) => ({ equipment: ALL, ...over });
 const codes = (r) => r.violations.map((v) => v.code);
-const allTop = (id, day, load) => { const m = movementOf(id); const top = (m.dose.reps ?? m.dose.seconds)[1]; return { movementId: id, day, sets: Array(m.dose.sets).fill(top), ...(load ? { load } : {}) }; };
+const allTop = (id, day, load, slow) => { const m = movementOf(id); const top = (m.dose.reps ?? m.dose.seconds)[1]; return { movementId: id, day, sets: Array(m.dose.sets).fill(top), ...(load ? { load } : {}), ...(slow ? { slow } : {}) }; };
+// Every set at the top at the usual tempo, then every set at the top done slow: what earns the next movement up.
+const passedTwice = (id, days = ['2026-11-20', '2026-11-23'], load) => [allTop(id, days[0], load), allTop(id, days[1], load, true)];
+const itemIn = (focus, history, id, over = {}) => workoutContent({ sessionId: 's', focus, minutes: 60, rules: rules(), history, ...over }).content.items.find((i) => i.movementId === id);
+const IMAGES = new URL('../../app/Evergreen/Resources/Movements/', import.meta.url);
 
 test('every movement has the words the workout page shows, and none of them points outside', () => {
   const ids = new Set();
@@ -21,9 +26,18 @@ test('every movement has the words the workout page shows, and none of them poin
     assert.equal(m.mistakes.length, 2, `${m.id} mistakes`);
     assert.ok(m.equipment.every((e) => EQUIPMENT.includes(e)), `${m.id} equipment`);
     assert.ok(Boolean(m.dose.reps) !== Boolean(m.dose.seconds), `${m.id} dose is reps or seconds`);
-    assert.deepEqual(m.images, [], `${m.id} has no pictures yet`);
+    assert.ok(m.images === undefined || Array.isArray(m.images), `${m.id} images`);
     assert.doesNotMatch(JSON.stringify(m), /https?:|www\./i, m.id);
   }
+});
+
+test('a movement may have no pictures yet, and any picture it lists is in the app', () => {
+  for (const m of MOVEMENTS) for (const image of m.images ?? []) assert.ok(existsSync(new URL(image, IMAGES)), `${m.id}: ${image}`);
+  assert.equal(existsSync(new URL('not-a-picture.png', IMAGES)), false);
+});
+
+test('every movement\'s pass says something other than its feel', () => {
+  for (const m of MOVEMENTS) assert.notEqual(m.pass.trim().toLowerCase(), m.feel.trim().toLowerCase(), m.id);
 });
 
 test('a movement passes on something seen or counted, never on a feeling', () => {
@@ -66,8 +80,8 @@ test('without the equipment, a chain starts further on or another stands in', ()
   assert.ok(content.items.some((i) => i.movementId === 'bodyweight_squat'));
 });
 
-test('two sessions at the top of the range earn the next movement up, one new movement at a time', () => {
-  const history = [allTop('sit_to_stand', '2026-11-20'), allTop('sit_to_stand', '2026-11-23'), allTop('wall_push_up', '2026-11-20'), allTop('wall_push_up', '2026-11-23')];
+test('two sessions at the top of the range, the second slow, earn the next movement up, one new movement at a time', () => {
+  const history = [...passedTwice('sit_to_stand'), ...passedTwice('wall_push_up')];
   assert.ok(mastered(history, 'sit_to_stand'));
   const { content } = workoutContent({ sessionId: 's', focus: 'full', rules: rules(), history });
   const ids = content.items.map((i) => i.movementId);
@@ -85,23 +99,77 @@ test('"I can do this" skips the wait, "can\'t do" and the avoid list stop the ch
   assert.ok(!avoided.items.some((i) => chainOf(i.movementId) === 'wall_push_up'));
 });
 
-test('a backpack movement done at the top once gets one more kilogram next time, and not otherwise', () => {
-  const rowOf = (history) => workoutContent({ sessionId: 's', focus: 'upper', rules: rules(), history }).content.items
-    .find((i) => i.movementId === 'backpack_row');
-  assert.equal(rowOf([allTop('backpack_row', '2026-11-23', 4)]).load, 5);
-  const short = { ...allTop('backpack_row', '2026-11-23', 4), sets: [12, 12, 9] };
-  assert.equal(rowOf([short]).load, 4);
+test('the first time every set reaches the top, the next session is slow, at the same weight', () => {
+  const row = itemIn('upper', [allTop('backpack_row', '2026-11-23', 4)], 'backpack_row');
+  assert.equal(row.slow, true);
+  assert.equal(row.load, 4);
+  assert.equal(itemIn('upper', [allTop('wall_push_up', '2026-11-23')], 'wall_push_up').slow, true);
 });
 
-test('a backpack movement done at the top twice gets one more kilogram, up to what a backpack holds', () => {
-  const history = [allTop('backpack_row', '2026-11-20', 4), allTop('backpack_row', '2026-11-23', 4)];
-  const row = workoutContent({ sessionId: 's', focus: 'upper', rules: rules(), history }).content.items.find((i) => i.movementId === 'backpack_row');
-  assert.ok(row, 'still rowing: one_arm_row waits');
-  const heavy = [allTop('backpack_press', '2026-11-20', LOAD_MAX_KG), allTop('backpack_press', '2026-11-23', LOAD_MAX_KG)];
-  const press = workoutContent({ sessionId: 's', focus: 'upper', rules: rules(), history: heavy }).content.items.find((i) => i.movementId.endsWith('press'));
-  assert.ok(press.load <= LOAD_MAX_KG);
-  const set = workoutContent({ sessionId: 's', focus: 'upper', rules: rules(), loads: { backpack_row: 3 } }).content.items.find((i) => i.movementId === 'backpack_row');
-  assert.equal(set.load, 3, 'a load the person set is used as is');
+test('no slow step before the top of the range, nor for a movement held for seconds', () => {
+  const short = { ...allTop('wall_push_up', '2026-11-23'), sets: [15, 15, 11] };
+  assert.equal(itemIn('upper', [short], 'wall_push_up').slow, undefined);
+  assert.equal(itemIn('upper', [], 'wall_push_up').slow, undefined);
+  const plank = itemIn('full', [allTop('kneeling_side_plank', '2026-11-23')], 'kneeling_side_plank', { turn: 2 });
+  assert.equal(plank.slow, undefined);
+});
+
+test('the slow step stays until every set reaches the top slowly, and comes only once', () => {
+  const missed = { ...allTop('wall_push_up', '2026-11-23', undefined, true), sets: [15, 12, 10] };
+  assert.equal(itemIn('upper', [allTop('wall_push_up', '2026-11-20'), missed], 'wall_push_up').slow, true);
+  const done = [...passedTwice('backpack_row', undefined, 4), allTop('backpack_row', '2026-11-26', 5)];
+  assert.equal(itemIn('upper', done, 'backpack_row').slow, undefined);
+});
+
+test('a slow item takes two more seconds for every rep', () => {
+  const item = { movementId: 'wall_push_up', sets: 3, reps: [10, 14], rest: 60 };
+  assert.equal(itemSeconds({ ...item, slow: true }) - itemSeconds(item), 3 * 12 * SLOW_EXTRA_SECONDS);
+});
+
+test('after the slow step, one session with every set at the top adds one kilogram', () => {
+  assert.equal(itemIn('upper', passedTwice('backpack_row', undefined, 4), 'backpack_row').load, 5);
+  const third = [...passedTwice('backpack_row', undefined, 4), allTop('backpack_row', '2026-11-26', 5)];
+  assert.equal(itemIn('upper', third, 'backpack_row').load, 6);
+});
+
+test('a set below the top keeps the backpack as heavy as last time', () => {
+  const short = { ...allTop('backpack_row', '2026-11-26', 5), sets: [15, 15, 9] };
+  assert.equal(itemIn('upper', [...passedTwice('backpack_row', undefined, 4), short], 'backpack_row').load, 5);
+});
+
+test('the backpack never goes past what it holds, and a weight the person set is used as is', () => {
+  const full = [...passedTwice('backpack_row', undefined, 4), allTop('backpack_row', '2026-11-26', LOAD_MAX_KG)];
+  assert.equal(itemIn('upper', full.slice(0, 2).concat([{ ...full[2], load: LOAD_MAX_KG - 1 }]), 'backpack_row').load, LOAD_MAX_KG);
+  assert.equal(itemIn('upper', [...full, allTop('backpack_row', '2026-11-27', LOAD_MAX_KG)], 'backpack_row'), undefined, 'at 12 kg twice the next row up comes');
+  assert.equal(itemIn('upper', [], 'backpack_row', { loads: { backpack_row: 3 } }).load, 3);
+});
+
+test('a backpack movement reaches 12 kg before the next movement up', () => {
+  const at11 = [...passedTwice('backpack_row', undefined, 4), allTop('backpack_row', '2026-11-26', 11), allTop('backpack_row', '2026-11-27', 11)];
+  const ids = (history) => workoutContent({ sessionId: 's', focus: 'upper', minutes: 60, rules: rules(), history }).content.items.map((i) => i.movementId);
+  assert.ok(ids(at11).includes('backpack_row') && !ids(at11).includes('one_arm_row'));
+  const at12 = [...at11, allTop('backpack_row', '2026-11-28', LOAD_MAX_KG), allTop('backpack_row', '2026-11-29', LOAD_MAX_KG)];
+  assert.ok(ids(at12).includes('one_arm_row'), ids(at12).join());
+});
+
+test('the next movement up waits for two sessions in a row at the top, and for the slow step', () => {
+  const ids = (history) => workoutContent({ sessionId: 's', focus: 'full', minutes: 60, rules: rules(), history }).content.items.map((i) => i.movementId);
+  assert.ok(!ids([allTop('sit_to_stand', '2026-11-23')]).includes('bodyweight_squat'), 'once is not enough');
+  assert.ok(!ids([allTop('sit_to_stand', '2026-11-20'), allTop('sit_to_stand', '2026-11-23')]).includes('bodyweight_squat'), 'twice without the slow step');
+  const broken = [allTop('sit_to_stand', '2026-11-20'), { ...allTop('sit_to_stand', '2026-11-22'), sets: [12, 12, 8] }, allTop('sit_to_stand', '2026-11-23', undefined, true)];
+  assert.ok(!ids(broken).includes('bodyweight_squat'), 'not two in a row');
+  assert.ok(ids(passedTwice('sit_to_stand')).includes('bodyweight_squat'));
+});
+
+test('a gated movement never starts its chain because its easier one needs equipment the person lacks', () => {
+  assert.equal(movementOf('single_leg_glute_bridge').gated, true);
+  const history = passedTwice('glute_bridge');
+  const lower = (equipment) => workoutContent({ sessionId: 's', focus: 'lower', minutes: 60, rules: rules({ equipment }), history }).content.items.map((i) => i.movementId);
+  assert.ok(!lower([]).includes('single_leg_glute_bridge'), lower([]).join());
+  assert.ok(lower([]).includes('glute_bridge'));
+  const notGated = workoutContent({ sessionId: 's', focus: 'full', rules: rules({ equipment: [] }) }).content.items.map((i) => i.movementId);
+  assert.ok(notGated.includes('bodyweight_squat'), 'a movement that is not gated still starts the chain');
+  assert.deepEqual(codes(checkContent({ content: { items: [{ movementId: 'single_leg_glute_bridge', sets: 3 }] }, rules: rules({ equipment: [] }), history })), ['gated_movement']);
 });
 
 test('pain at 4 last time or a lighter week takes a set off', () => {
@@ -132,7 +200,7 @@ test('checkContent: each code fails when it should, and a built session passes',
     assert.deepEqual(codes(checkContent({ content: { items: [{ movementId: 'glute_bridge', sets }] }, rules: rules() })), ['bad_dose']);
   }
   const fresh = checkContent({ content: { items: [{ movementId: 'knee_push_up', sets: 3 }, { movementId: 'reverse_lunge', sets: 3 }] },
-    rules: rules({ movements: {} }), history: [allTop('table_push_up', 'a'), allTop('table_push_up', 'b'), allTop('wall_split_squat', 'a'), allTop('wall_split_squat', 'b')] });
+    rules: rules({ movements: {} }), history: [...passedTwice('table_push_up', ['a', 'b']), ...passedTwice('wall_split_squat', ['a', 'b'])] });
   assert.deepEqual(codes(fresh), ['too_many_new']);
   const long = checkContent({ content: { items: ['sit_to_stand', 'wall_push_up', 'backpack_row', 'hip_hinge', 'glute_bridge', 'dead_bug'].map((movementId) => ({ movementId, sets: 4 })) }, rules: rules() });
   assert.ok(codes(long).includes('session_too_long'));

@@ -53,7 +53,8 @@
         "mix",
         "response",
         "gear",
-        "goal"
+        "goal",
+        "training_place"
       ]
     },
     "statement": {
@@ -394,6 +395,39 @@
                 "null"
               ],
               "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "training_place"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "place",
+            "gymWorkouts",
+            "weeks"
+          ],
+          "properties": {
+            "place": {
+              "type": "string",
+              "enum": [
+                "home"
+              ]
+            },
+            "gymWorkouts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 0
+            },
+            "weeks": {
+              "type": "integer",
+              "minimum": 8
             }
           }
         }

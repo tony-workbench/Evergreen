@@ -1,0 +1,17 @@
+{
+  "memoryId": "m-1",
+  "key": "mem:9cbb98b9",
+  "slot": "usual_slot/walk/0/12",
+  "group": "routine",
+  "kind": "training_place",
+  "statement": "Walking on Monday at 12:00 in 4 of the last 4 weeks.",
+  "data": {
+    "place": "home",
+    "gymWorkouts": 2,
+    "weeks": 8
+  },
+  "state": "saved",
+  "confidence": 0.8,
+  "since": "2026-11-08",
+  "updated": "2026-11-08"
+}

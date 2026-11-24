@@ -53,6 +53,50 @@ struct MemoryEngineTests {
         #expect(brief.noticed.count == 3)
     }
 
+    // MARK: Where the person trains
+
+    /// 60 days of home workouts (strength training, a run and a walk each week), and any others given.
+    static func atHome(_ extra: [Workout] = []) -> MemoryInput {
+        let types = [1: "TraditionalStrengthTraining", 3: "Running", 5: "Walking"]
+        let workouts = (1...60).compactMap { daysAgo -> Workout? in
+            types[daysAgo % 7].map { Fixture.workout("home-\(daysAgo)", at: Fixture.at(18, dayOffset: -daysAgo), minutes: 30, type: $0) }
+        }
+        return MemoryInput(personaKey: "home", historyStart: Fixture.at(0, dayOffset: -60), now: Fixture.at(8),
+                           workouts: workouts + extra, calendar: Fixture.calendar)
+    }
+
+    /// One day of the memory agent with the bundle's own rules for the model; the rows after it.
+    static func remember(_ input: MemoryInput) async throws -> (EngineMemory, [MemoryRow]) {
+        let engine = try Self.engine()
+        await engine.sync(input)
+        let memory = EngineMemory(engine: engine, personaKey: input.personaKey, timeZone: Fixture.timeZone, withoutModel: true)
+        let answer = try #require(await memory.rulesAnswer(now: input.now, outcomes: []))
+        let day = try #require(await memory.dailyRequest(now: input.now, outcomes: [])?.day)
+        #expect(await memory.apply(day: day, answer: answer, now: input.now)?.isEmpty == true)
+        return (memory, await memory.table())
+    }
+
+    @Test func eightWeeksWithoutAGymWorkoutAreRememberedAsTrainingAtHome() async throws {
+        let (memory, rows) = try await Self.remember(Self.atHome())
+        let row = try #require(rows.first { $0.kind == "training_place" })
+        #expect(row.isUsable && row.group == "routine")
+        #expect(row.statement == "You train at home, without gym equipment." && RowWords.sentence(row) == row.statement)
+        #expect(row.data == ["place": "home", "gymWorkouts": 0, "weeks": 8])
+
+        // "Not true for me": the row is rejected, and nothing plans from it any more.
+        await memory.reject(key: row.key, now: Fixture.at(9))
+        let after = await memory.table()
+        #expect(after.first { $0.key == row.key }?.isRejected == true)
+        #expect(!after.contains { $0.kind == "training_place" && $0.isUsable })
+    }
+
+    @Test func aGymWorkoutInTheLastEightWeeksMeansNoTrainingAtHome() async throws {
+        let elliptical = Fixture.workout("gym-1", at: Fixture.at(7, dayOffset: -12), minutes: 40, type: "Elliptical")
+        let (_, rows) = try await Self.remember(Self.atHome([elliptical]))
+        #expect(!rows.contains { $0.kind == "training_place" })
+        #expect(rows.contains { $0.kind == "usual_slot" || $0.kind == "weekly_volume" })
+    }
+
     // MARK: Stopping one fact
 
     @Test func aStoppedFactIsNotSentAndComesBackWhenRestored() async throws {

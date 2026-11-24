@@ -32,7 +32,7 @@ export const mayMove = (from, to, actor) => (TRANSITIONS[`${from}>${to}`] ?? [])
 
 export const OPS = ['ADD', 'NOOP', 'MERGE', 'SUPERSEDE', 'REVIEW'];
 export const GROUPS = ['routine', 'body', 'load', 'response', 'gear', 'goal'];
-export const KINDS = ['usual_slot', 'weekly_volume', 'load', 'sleep', 'resting_hr', 'mix', 'response', 'gear', 'goal'];
+export const KINDS = ['usual_slot', 'weekly_volume', 'load', 'sleep', 'resting_hr', 'mix', 'response', 'gear', 'goal', 'training_place'];
 export const ACTIVITIES = ['run', 'long_run', 'walk', 'strength', 'yoga', 'ride', 'swim', 'elliptical', 'stretch', 'rest', 'other'];
 export const SLOT_RE = /^[a-z]+(\.[a-z0-9_]+){1,3}$/;
 export const groupOf = (slot) => slot.slice(0, slot.indexOf('.'));

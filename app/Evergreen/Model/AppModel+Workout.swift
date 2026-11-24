@@ -44,18 +44,49 @@ extension AppModel {
         await loadMovements()
         if let saved = WorkoutProgress.load(from: settings, day: todayISO) { return TodayWorkout(progress: saved) }
         guard let focus = homeFocusToday, !homeDoneToday else { return TodayWorkout() }
-        guard !movements.isEmpty,
-              let content = await contentEngine.session(id: "home-\(todayISO)", focus: focus, minutes: homeMinutesToday,
-                                                        rules: userRules, log: workoutLog, turn: workoutLog.turn, lighter: isLighterWeek)
-        else { return TodayWorkout(failed: true) }
+        guard !movements.isEmpty else { return TodayWorkout(failed: true) }
+        let picked = await aiPickedToday(focus: focus)
+        var chosen = picked?.content
+        if chosen == nil {
+            chosen = await contentEngine.session(id: "home-\(todayISO)", focus: focus, minutes: homeMinutesToday,
+                                                 rules: userRules, log: workoutLog, turn: workoutLog.turn, lighter: isLighterWeek)
+        }
+        guard let content = chosen else { return TodayWorkout(failed: true) }
         let progress = WorkoutProgress(day: todayISO, content: content,
-                                       results: content.items.map { WorkoutResult(movementId: $0.movementId, load: $0.load) },
-                                       startedAt: Date())
-        progress.save(to: settings)
+                                       results: content.items.map { WorkoutResult(movementId: $0.movementId, load: $0.load, slow: $0.slow) },
+                                       startedAt: now, reason: picked?.reason)
+        saveProgress(progress)
         return TodayWorkout(progress: progress)
     }
 
-    func saveProgress(_ progress: WorkoutProgress) { progress.save(to: settings) }
+    /// Today's movements as the AI chose them for the week, dosed again from the log as it is now and checked again for
+    /// today's length and rules. Nil when the AI didn't choose today's, or its choice no longer passes: then the rules'.
+    func aiPickedToday(focus: String) async -> (content: WorkoutContent, reason: String)? {
+        if homeWeekContent.isEmpty { await fillHomeWeek() }
+        let today = todayISO
+        guard let reason = homeWeekReasons[today], let chosen = homeWeekContent[today],
+              let checked = await contentEngine.propose(ContentAgent.proposal(of: chosen), id: "home-\(today)", focus: focus,
+                                                        minutes: homeMinutesToday, rules: userRules, log: workoutLog, lighter: isLighterWeek),
+              checked.pass, let content = checked.content else { return nil }
+        return (content, reason)
+    }
+
+    /// Keeps the session as it goes. Opening it on the workout page quiets today's reminders while it runs (`homeReminders`).
+    func saveProgress(_ progress: WorkoutProgress) {
+        let wasOpen = WorkoutProgress.load(from: settings, day: progress.day) != nil
+        progress.save(to: settings)
+        if !wasOpen, progress.day == todayISO { Task { await scheduleHomeNotifications() } }
+    }
+
+    /// A reminder isn't sent while a session is under way: from opening it to its length and this much more. Left open
+    /// with nothing done, the reminders come back after that.
+    static let underWayGrace: TimeInterval = 30 * 60
+
+    /// Until when today's session counts as under way; nil when it wasn't opened today.
+    var sessionUnderWayUntil: Date? {
+        guard let progress = WorkoutProgress.load(from: settings, day: todayISO) else { return nil }
+        return progress.startedAt.addingTimeInterval(TimeInterval(progress.content.minutes * 60) + Self.underWayGrace)
+    }
 
     /// "Can you do one?" answered for a new movement: yes marks it "can"; no marks it "can't do", and the easier one stands in.
     func answerCanDo(_ id: String, can: Bool) async {

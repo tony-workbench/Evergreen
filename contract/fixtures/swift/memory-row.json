@@ -145,6 +145,23 @@
     "updated": "2026-11-08"
   },
   {
+    "memoryId": "m-training_place",
+    "key": "mem:training_place",
+    "slot": "training_place",
+    "group": "routine",
+    "kind": "training_place",
+    "statement": "You train at home, without gym equipment.",
+    "data": {
+      "place": "home",
+      "gymWorkouts": 0,
+      "weeks": 8
+    },
+    "state": "saved",
+    "confidence": 0.8,
+    "since": "2026-11-08",
+    "updated": "2026-11-08"
+  },
+  {
     "memoryId": "m-1",
     "key": "mem:9cbb98b9",
     "slot": "usual_slot/walk/0/12",

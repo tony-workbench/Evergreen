@@ -11,6 +11,8 @@ protocol PlanCalendar: AnyObject {
     func sync(_ entries: [CalendarEntry], from storyDay: Date)
     func removeAllEvents(around storyDay: Date)
     func busyTimes(from storyDay: Date) async -> [Busy]
+    /// All-day and free events with a place, which only tell days out from days at home.
+    func placedEvents(from storyDay: Date) async -> [Busy]
 }
 
 extension CalendarSync: PlanCalendar {}

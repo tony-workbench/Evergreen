@@ -14,6 +14,7 @@ extension AppModel {
     @discardableResult
     func refreshBusy() async -> [Busy] {
         busyCache = onDevice ? await calendarSync.busyTimes(from: storyDay) : []
+        placedCache = onDevice ? await calendarSync.placedEvents(from: storyDay) : []
         // An event away from home makes its day a day out, so the days are worked out again with the calendar.
         await refreshDayKinds()
         return busyCache

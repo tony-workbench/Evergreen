@@ -5,6 +5,7 @@ import Foundation
 /// With no time picked, every time of the day reminds:
 ///
 ///   the evening before, 21:00   "Tomorrow at home"                   Only at … (each time) · I'm going out tomorrow
+///   (a day out: 21:00 before)    "Tomorrow you’re out"                I'm home tomorrow
 ///   10 minutes before            "In 10 minutes"                      Start · Later today · Already done
 ///   at the time                  "Time for your workout"              Start · Later today · Already done
 ///   20 minutes later, not begun  "Moved to 19:30"                     Start now · Already done
@@ -17,12 +18,14 @@ import Foundation
 /// With "Always ask me to pick one time" on, the evening reminder asks for a time, and until one is picked only the first
 /// time reminds, the same way.
 ///
-/// At most six for a day and none from 22:00. With "Keep reminding me until I've trained" off and no time picked, only the
+/// At most six for a day and none from 22:00 or before 06:00; with the app's other notifications, six a day in all (`NotificationBudget`). With "Keep reminding me until I've trained" off and no time picked, only the
 /// first three. Once the session is done, by any way, what is left of that day's goes (`Notifier.cancelHomeReminders`,
 /// `AppModel.homeReminders`).
 struct WorkoutReminder: Equatable, Sendable {
     enum Kind: String, Sendable {
         case evening, soon, now, moved, later, last, ask
+        /// The evening before a day out: says there's no workout, with "I'm home tomorrow" for a wrong guess.
+        case outTomorrow = "out_tomorrow"
     }
 
     var id: String
@@ -39,10 +42,10 @@ struct WorkoutReminder: Equatable, Sendable {
 
 enum WorkoutReminders {
     static let prefix = "reminder-home-"
-    static let maxPerDay = 6
+    static let maxPerDay = NotificationBudget.maxPerDay
     static let eveningHour = 21
-    /// Nothing fires from this hour on.
-    static let quietFrom = 22
+    /// Nothing fires from this hour on, nor before `NotificationBudget.quietUntilHour`.
+    static let quietFrom = NotificationBudget.quietFromHour
     static let soonLead: TimeInterval = 10 * 60
     static let movedAfter: TimeInterval = 20 * 60
     /// "Later today" skips a time that starts within this: too soon to get ready for.
@@ -85,11 +88,20 @@ enum WorkoutReminders {
             out += everyTime(first, laters: day.fallbacks.compactMap(\.date), keepReminding: choice.keepReminding, session: session)
         }
         let reminders = out.enumerated().compactMap { index, entry -> WorkoutReminder? in
-            guard entry.fires > now, calendar.component(.hour, from: entry.fires) < quietFrom else { return nil }
+            guard entry.fires > now, !NotificationBudget.isQuiet(entry.fires, calendar: calendar) else { return nil }
             return WorkoutReminder(id: "\(prefix)\(day.day)-\(index + 1)", kind: entry.kind, fires: entry.fires,
                                    title: entry.copy.title, body: entry.copy.body, day: day.day, choices: entry.choices)
         }
         return Array(reminders.prefix(maxPerDay))
+    }
+
+    /// The evening before a day out, so a day taken for a day out by mistake is put right with one tap. Nil once it has passed.
+    static func outEvening(day: String, now: Date, calendar: Calendar) -> WorkoutReminder? {
+        guard let morning = date(day, clock: "00:00", calendar: calendar),
+              let before = calendar.date(byAdding: .day, value: -1, to: morning),
+              let fires = calendar.date(bySettingHour: eveningHour, minute: 0, second: 0, of: before), fires > now else { return nil }
+        let copy = NotificationCopy.outTomorrow
+        return WorkoutReminder(id: "\(prefix)\(day)-out", kind: .outTomorrow, fires: fires, title: copy.title, body: copy.body, day: day)
     }
 
     /// The first time and the later times of a day, in order.

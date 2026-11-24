@@ -16,32 +16,30 @@ struct EarnedTimeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.xl) {
-                    statement
-                    if !earned.isOn { turnOn }
-                    block("What it locks") {
-                        ForEach(FunGroup.allCases) { appsRow($0) }
-                        Text("Social is for apps like X and Discord. An app goes in one group. A whole category can only be locked in one group.")
-                            .font(.footnote)
-                            .foregroundStyle(Theme.textMuted)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, Theme.sm)
-                    }
-                    block("Free each day") {
-                        ForEach(FunGroup.allCases) { baseRow($0) }
-                        Text(rulesNote)
-                            .font(.footnote)
-                            .foregroundStyle(Theme.textMuted)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, Theme.sm)
-                    }
-                    block("Earned for each workout minute") {
-                        ForEach(FunGroup.allCases) { rateRow($0) }
-                    }
-                    if earned.isOn {
-                        Button("Turn off") { confirmingOff = true }
-                            .buttonStyle(TapTargetButtonStyle(color: Theme.warning))
+            Form {
+                Section { statement }
+                if !earned.isOn { Section { turnOn } }
+                Section {
+                    ForEach(FunGroup.allCases) { appsRow($0) }
+                } header: {
+                    Text("What it locks")
+                } footer: {
+                    Text("Social is for apps like X and Discord. An app goes in one group. A whole category can only be locked in one group.")
+                }
+                Section {
+                    ForEach(FunGroup.allCases) { baseRow($0) }
+                } header: {
+                    Text("Free each day")
+                } footer: {
+                    Text(rulesNote)
+                }
+                Section("Earned for each workout minute") {
+                    ForEach(FunGroup.allCases) { rateRow($0) }
+                }
+                if earned.isOn {
+                    Section {
+                        Button("Turn off", role: .destructive) { confirmingOff = true }
+                            .frame(minHeight: 44)
                             .confirmationDialog("Turn off earned screen time?", isPresented: $confirmingOff, titleVisibility: .visible) {
                                 Button("Turn off and unlock the apps", role: .destructive) { earned.turnOff() }
                             } message: {
@@ -49,16 +47,22 @@ struct EarnedTimeView: View {
                             }
                     }
                 }
-                .padding(.horizontal, Theme.md)
-                .padding(.vertical, Theme.lg)
             }
-            .background(Theme.surface)
             .navigationTitle("Earned screen time")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .familyActivityPicker(isPresented: Binding(get: { picking != nil }, set: { if !$0 { save() } }),
                                   selection: $selection)
+            .sheet(isPresented: $confirmingOn) { LockConfirmation(earned: earned, turnOn: turnOnNow) }
             .onAppear { earned.refresh(workouts: model.workouts, now: model.now, calendar: model.calendar) }
+        }
+    }
+
+    private func turnOnNow() {
+        turningOn = true
+        Task {
+            await earned.turnOn(workouts: model.workouts, now: model.now, calendar: model.calendar)
+            turningOn = false
         }
     }
 
@@ -88,18 +92,8 @@ struct EarnedTimeView: View {
     }
 
     private func baseRow(_ group: FunGroup) -> some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(group.title).foregroundStyle(Theme.text)
-                Spacer()
-                Text(earned.isOn ? "\(earned.baseLeft[group] ?? 0) of \(group.baseMinutes) min left" : "\(group.baseMinutes) min")
-                    .foregroundStyle(Theme.textMuted)
-            }
-            .font(.body)
-            .frame(minHeight: 52)
-            .accessibilityElement(children: .combine)
-            rule
-        }
+        LabeledContent(group.title, value: earned.isOn ? "\(earned.baseLeft[group] ?? 0) of \(group.baseMinutes) min left" : "\(group.baseMinutes) min")
+            .frame(minHeight: 44)
     }
 
     private var turnOn: some View {
@@ -109,76 +103,43 @@ struct EarnedTimeView: View {
                 .foregroundStyle(Theme.text)
                 .fixedSize(horizontal: false, vertical: true)
             Button(turningOn ? "Turning on" : "Turn on") { confirmingOn = true }
-            .buttonStyle(PrimaryButtonStyle())
-            .confirmationDialog("Lock these apps?", isPresented: $confirmingOn, titleVisibility: .visible) {
-                Button("Turn on") {
-                    turningOn = true
-                    Task {
-                        await earned.turnOn(workouts: model.workouts, now: model.now, calendar: model.calendar)
-                        turningOn = false
-                    }
-                }
-            } message: {
-                Text(lockSummary)
-            }
-            .disabled(nothingPicked || turningOn)
-            .opacity(nothingPicked ? 0.4 : 1)
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(nothingPicked || turningOn)
+                .opacity(nothingPicked ? 0.4 : 1)
             if let problem = earned.problem {
                 Text(problem).font(.footnote).foregroundStyle(Theme.warning)
             } else if nothingPicked {
                 Text("Pick the apps below first.").font(.footnote).foregroundStyle(Theme.textMuted)
             }
         }
-    }
-
-    /// What turning on locks and when, in words: each group, how many apps, and its free time a day.
-    private var lockSummary: String {
-        let groups = FunGroup.allCases.filter { earned.picked($0) > 0 }.map { group in
-            let count = earned.picked(group)
-            return "\(group.title): \(count == 1 ? "1 app or category" : "\(count) apps or categories"), free for \(group.baseMinutes) min a day"
-        }
-        return groups.joined(separator: "\n") + "\n\nEach locks once its free time is used, until you earn more with a workout. The free time starts again at midnight."
+        .padding(.vertical, Theme.sm)
     }
 
     private var nothingPicked: Bool { FunGroup.allCases.allSatisfy { earned.picked($0) == 0 } }
 
     private func rateRow(_ group: FunGroup) -> some View {
         let rate = earned.rates[group] ?? group.defaultRate
-        return VStack(spacing: 0) {
-            Stepper(value: Binding(get: { rate }, set: { earned.setRate($0, for: group) }), in: 0.25...3, step: 0.25) {
-                HStack {
-                    Text(group.title).foregroundStyle(Theme.text)
-                    Spacer()
-                    Text("\(Self.number(rate)) min").foregroundStyle(Theme.textMuted)
-                }
-                .font(.body)
-            }
-            .frame(minHeight: 52)
-            rule
+        return Stepper(value: Binding(get: { rate }, set: { earned.setRate($0, for: group) }), in: Self.rates, step: Self.rateStep) {
+            LabeledContent(group.title, value: "\(Self.number(rate)) min")
         }
+        .frame(minHeight: 44)
     }
+
+    /// What a workout minute can earn, and the step between.
+    private static let rates = 0.25...3.0
+    private static let rateStep = 0.25
 
     private func appsRow(_ group: FunGroup) -> some View {
         let count = earned.picked(group)
-        return VStack(spacing: 0) {
-            Button {
-                selection = earned.selections[group] ?? FamilyActivitySelection()
-                picking = group
-            } label: {
-                HStack {
-                    Text(group.title).foregroundStyle(Theme.text)
-                    Spacer()
-                    Text(count == 0 ? "Pick apps" : count == 1 ? "1 picked" : "\(count) picked")
-                        .foregroundStyle(count == 0 ? Theme.accent : Theme.textMuted)
-                    Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Theme.textMuted)
-                }
-                .font(.body)
-                .frame(minHeight: 52)
+        return Button {
+            selection = earned.selections[group] ?? FamilyActivitySelection()
+            picking = group
+        } label: {
+            LabeledContent(group.title, value: count == 0 ? "Pick apps" : count == 1 ? "1 picked" : "\(count) picked")
+                .frame(minHeight: 44)
                 .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            rule
         }
+        .foregroundStyle(Theme.text)
     }
 
     private func save() {
@@ -186,22 +147,47 @@ struct EarnedTimeView: View {
         picking = nil
     }
 
-    private var rule: some View { Rectangle().fill(Theme.rule).frame(height: 1) }
-
-    private func block(_ title: String, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.footnote)
-                .foregroundStyle(Theme.textMuted)
-                .accessibilityAddTraits(.isHeader)
-                .padding(.bottom, Theme.sm)
-            rule
-            content()
-        }
-    }
-
     /// 1, 0.5, 1.25: no trailing zeros.
     nonisolated static func number(_ value: Double) -> String {
         value.formatted(.number.precision(.fractionLength(0...2)))
+    }
+}
+
+/// "Lock these apps?" before turning on: each group with every app, category and site it locks, by name and icon
+/// (the system draws them from its tokens), and its free time a day.
+private struct LockConfirmation: View {
+    let earned: EarnedTimeModel
+    let turnOn: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(FunGroup.allCases.filter { earned.picked($0) > 0 }) { group in
+                    let picked = earned.selections[group] ?? FamilyActivitySelection()
+                    Section {
+                        ForEach(Array(picked.applicationTokens), id: \.self) { Label($0) }
+                        ForEach(Array(picked.categoryTokens), id: \.self) { Label($0) }
+                        ForEach(Array(picked.webDomainTokens), id: \.self) { Label($0) }
+                    } header: {
+                        Text(group.title)
+                    } footer: {
+                        Text("Free for \(group.baseMinutes) min a day, then locked until you earn more with a workout.")
+                    }
+                }
+                Section {
+                    Text("The free time starts again at midnight. You can turn this off here at any time.")
+                        .font(.footnote).foregroundStyle(Theme.textMuted)
+                }
+            }
+            .navigationTitle("Lock these apps?")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Lock them") { turnOn(); dismiss() }
+                }
+            }
+        }
     }
 }

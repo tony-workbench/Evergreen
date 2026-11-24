@@ -17,6 +17,8 @@ struct WorkoutLog: Codable, Equatable, Sendable {
         /// Reps (or seconds) of each set done.
         var sets: [Int]
         var load: Double?
+        /// Done at the slower tempo: the slow step of progression (each rep lowered two seconds slower).
+        var slow: Bool?
     }
 
     var entries: [Entry] = []
@@ -73,6 +75,7 @@ struct WorkoutLog: Codable, Equatable, Sendable {
             var value: [String: JSONValue] = ["movementId": .string(entry.movementId), "day": .string(entry.day),
                                               "sets": .array(entry.sets.map { .number(Double($0)) })]
             if let load = entry.load { value["load"] = .number(load) }
+            if entry.slow == true { value["slow"] = .bool(true) }
             return .object(value)
         })
     }
@@ -97,7 +100,7 @@ struct WorkoutLog: Codable, Equatable, Sendable {
     /// Records a finished session: each movement's sets, the soreness answer and the day.
     mutating func record(day: String, results: [WorkoutResult], pain: Int?) {
         for result in results where !result.sets.isEmpty {
-            entries.append(Entry(movementId: result.movementId, day: day, sets: result.sets, load: result.load))
+            entries.append(Entry(movementId: result.movementId, day: day, sets: result.sets, load: result.load, slow: result.slow == true ? true : nil))
         }
         if entries.count > Self.keep { entries.removeFirst(entries.count - Self.keep) }
         if let pain { lastPain = pain }
@@ -151,6 +154,8 @@ struct WorkoutResult: Codable, Equatable, Sendable {
     var swappedFrom: String?
     /// "Too easy" on a backpack movement this time: its load went up on the page and stays there.
     var tooEasy: Bool?
+    /// Done at the slower tempo the session asked for (the slow step), kept in the log so the engine knows it was done.
+    var slow: Bool?
 }
 
 /// A session left half done: picked up where it stopped when the page opens again the same day.
@@ -162,6 +167,40 @@ struct WorkoutProgress: Codable, Equatable, Sendable {
     var index = 0
     var results: [WorkoutResult]
     var startedAt: Date
+    /// When the AI chose today's movements: its one sentence on why, shown on the page as picked by AI.
+    var reason: String?
+
+    /// A set has been done: the session is under way, not only open.
+    var isUnderWay: Bool { results.contains { !$0.sets.isEmpty } }
+
+    /// The kilograms in the backpack for the movement on screen: what the page set, else what the session planned.
+    var backpackLoad: Double? {
+        guard results.indices.contains(index), content.items.indices.contains(index) else { return nil }
+        return results[index].load ?? content.items[index].load
+    }
+
+    /// "Too hard" on a backpack movement: a kilogram less now and next time, down to the least. The new weight, or nil
+    /// for a movement without a backpack.
+    mutating func backpackTooHard() -> Double? {
+        guard let load = backpackLoad else { return nil }
+        let lighter = max(BackpackWater.leastKg, load - BackpackWater.harderStepKg)
+        results[index].load = lighter
+        results[index].tooHard = true
+        results[index].tooEasy = nil
+        return lighter
+    }
+
+    /// "Too easy" on a backpack movement: two kilograms more now and next time, up to what a backpack holds. Nil when
+    /// it already holds that much, and nothing changes.
+    mutating func backpackTooEasy() -> Double? {
+        guard let load = backpackLoad else { return nil }
+        let heavier = min(BackpackWater.maxKg, load + BackpackWater.easierStepKg)
+        guard heavier > load else { return nil }
+        results[index].load = heavier
+        results[index].tooEasy = true
+        results[index].tooHard = false
+        return heavier
+    }
 
     /// Today's half-done session. One that can't be read is said in the log and started again: the sets done in it are
     /// lost, the day's log is not.

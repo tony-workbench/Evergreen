@@ -7,7 +7,7 @@ import { buildPhone, OUT } from '../scripts/build-phone.mjs';
 import { recommendWeek, bundleArgs } from './support/sample.mjs';
 import { memoryFor } from './support/harness-memory.mjs';
 
-const GLOBALS = ['recommendWeek', 'planContext', 'checkPlan', 'explainAction', 'checkWeek', 'planBrief', 'workoutContent', 'weekContent', 'checkContent', 'movementLibrary'];
+const GLOBALS = ['recommendWeek', 'planContext', 'checkPlan', 'explainAction', 'checkWeek', 'planBrief', 'workoutContent', 'weekContent', 'checkContent', 'movementLibrary', 'contentBrief', 'proposedContent'];
 const bundle = await buildPhone();
 const fresh = () => { const c = vm.createContext({}); vm.runInContext(bundle, c); return c; };
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');

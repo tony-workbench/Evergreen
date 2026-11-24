@@ -918,7 +918,27 @@
   var SPLIT_DAYS = 4;
   var FOCUS = ["full", "lower", "upper", "full_lower", "full_upper"];
   var FOCUS_WORDS = { full: "full-body", lower: "lower-body", upper: "upper-body", full_lower: "full-body, more legs", full_upper: "full-body, more upper body" };
-  function homeContext({ now, calendar, rules, dayKinds, carry = [], queue = /* @__PURE__ */ new Map(), doneToday = false }) {
+  var OFFSET = /^([+-])(\d{2}):(\d{2})$/;
+  var MAX_OFFSET_MIN = 14 * 60;
+  function readDayOffsets(raw) {
+    const out = /* @__PURE__ */ new Map();
+    if (raw === void 0 || raw === null) return out;
+    if (typeof raw !== "object" || Array.isArray(raw)) throw new InputError("bad_day_offsets");
+    for (const [iso, text] of Object.entries(raw)) {
+      const m = typeof text === "string" ? OFFSET.exec(text) : null;
+      const minutes = m ? (m[1] === "-" ? -1 : 1) * (+m[2] * 60 + +m[3]) : NaN;
+      if (!m || +m[3] > 59 || Math.abs(minutes) > MAX_OFFSET_MIN) throw new InputError("bad_day_offsets");
+      try {
+        out.set(parseDay(iso), minutes);
+      } catch {
+        throw new InputError("bad_day_offsets");
+      }
+    }
+    return out;
+  }
+  var offOf = (h, day) => h.offsets.get(day) ?? h.off;
+  var weekLength = (today) => weekdayOf(today) === 6 ? 8 : 7 - weekdayOf(today);
+  function homeContext({ now, calendar, rules, dayKinds, carry = [], queue = /* @__PURE__ */ new Map(), doneToday = false, offsets = /* @__PURE__ */ new Map() }) {
     return {
       now,
       today: dayOf(now),
@@ -928,7 +948,8 @@
       given: dayKinds,
       carry,
       queue: new Map([...queue].filter(([, f]) => FOCUS.includes(f))),
-      doneToday: doneToday === true
+      doneToday: doneToday === true,
+      offsets
     };
   }
   function readQueue(raw) {
@@ -945,10 +966,11 @@
   function stretchesOn(h, day) {
     if (kindOf(h.rules, h.given, day) !== "home") return [];
     const isToday = day === h.today;
-    let from = atDay(day, h.off, 0, h.rules.window.from).mic;
+    const off = offOf(h, day);
+    let from = atDay(day, off, 0, h.rules.window.from).mic;
     if (isToday) from = Math.max(from, h.now.mic + LEAD_MIN * US_MIN);
-    let to = atDay(day, h.off, 0, h.rules.window.to + h.rules.session.max).mic;
-    if (isToday) to = Math.min(to, atDay(day, h.off, TODAY_END_HOUR).mic);
+    let to = atDay(day, off, 0, h.rules.window.to + h.rules.session.max).mic;
+    if (isToday) to = Math.min(to, atDay(day, off, TODAY_END_HOUR).mic);
     const out = [];
     const push = (a, b) => {
       if (b - a >= SLOT_MIN * US_MIN) out.push({ a, b });
@@ -964,7 +986,7 @@
   var roundUp = (mic) => Math.ceil(mic / (ROUND_MIN * US_MIN)) * ROUND_MIN * US_MIN;
   function nextStart(h, day, stretches, after) {
     const length = h.rules.session.max * US_MIN;
-    const latest = atDay(day, h.off, 0, h.rules.window.to).mic;
+    const latest = atDay(day, offOf(h, day), 0, h.rules.window.to).mic;
     let best = null;
     for (const s of stretches) {
       const t = roundUp(Math.max(after, s.a));
@@ -1026,14 +1048,13 @@
       row += 1;
     }
   }
-  function nextWeekFocus(h, rows, monday) {
+  function nextWeekFocus(h, rows, monday, last) {
     if (!rows.length) return;
-    const last = h.today + 6;
     const days = Array.from({ length: 7 }, (_, i) => monday + i).filter((d) => d <= last ? rows.some((r) => r.day === d) : kindOf(h.rules, h.given, d) === "home");
     const focus = splitOf(days);
     for (const r of rows) r.focus = focus[days.indexOf(r.day)];
   }
-  function homeWeek(h, days = 7) {
+  function homeWeek(h, days = weekLength(h.today)) {
     const rows = [];
     for (let i = 0; i < days; i += 1) {
       const day = h.today + i;
@@ -1044,7 +1065,7 @@
     const training = rows.filter((r) => r.first !== null);
     const thisWeek = training.filter((r) => r.day <= sunday);
     thisWeekFocus(h, thisWeek, sunday);
-    nextWeekFocus(h, training.filter((r) => r.day > sunday), sunday + 1);
+    nextWeekFocus(h, training.filter((r) => r.day > sunday), sunday + 1, h.today + days - 1);
     const homeDays = rows.filter((r) => r.kind === "home").length;
     let note = null;
     if (training.length === 0) note = "There is no day at home with time to train this week, so nothing is planned.";
@@ -1052,15 +1073,14 @@
     return { days: rows, homeDays, trainingDays: training.length, note };
   }
   function homeWeekView(h, week) {
-    const at = (mic) => isoDT({ mic, off: h.off });
     return {
       days: week.days.map((r) => ({
         day: dayISO(r.day),
         weekday: WEEKDAY_NAMES[weekdayOf(r.day)],
         kind: r.kind,
         focus: r.focus,
-        first: r.first === null ? null : at(r.first),
-        fallbacks: r.fallbacks.map(at)
+        first: r.first === null ? null : isoDT({ mic: r.first, off: offOf(h, r.day) }),
+        fallbacks: r.fallbacks.map((mic) => isoDT({ mic, off: offOf(h, r.day) }))
       })),
       homeDays: week.homeDays,
       trainingDays: week.trainingDays,
@@ -1215,16 +1235,17 @@
       stopped: a.stopped ?? null,
       rules: readRules(a.rules),
       dayKinds: readDayKinds(a.dayKinds),
-      carry
+      carry,
+      offsets: readDayOffsets(a.dayOffsets)
     };
   }
   var HOME_EFFORT = 5;
   function homeBuild(req, base) {
-    const h = homeContext({ now: req.now, calendar: req.busy, rules: req.rules, dayKinds: req.dayKinds, carry: req.carry });
+    const h = homeContext({ now: req.now, calendar: req.busy, rules: req.rules, dayKinds: req.dayKinds, carry: req.carry, offsets: req.offsets });
     const week = homeWeek(h);
     const minutes = req.rules.session.max;
     const sessions = week.days.filter((d) => d.focus !== null).map((d) => {
-      const start = { mic: d.first, off: req.now.off };
+      const start = { mic: d.first, off: offOf(h, d.day) };
       return {
         date: d.day,
         activityType: "TraditionalStrengthTraining",
@@ -1235,7 +1256,7 @@
         start,
         end: addUs(start, minutes * US_MIN),
         tags: [{ code: "home_day", focus: d.focus }],
-        fallbacks: d.fallbacks.map((mic) => ({ mic, off: req.now.off }))
+        fallbacks: d.fallbacks.map((mic) => ({ mic, off: start.off }))
       };
     });
     base.sig.plannedLoad = pyRound(pySum(sessions.map((s) => s.effort * s.minutes)));
@@ -1650,7 +1671,20 @@
     const calendar = (ctx.calendar ?? ctx.busy ?? []).map((b) => ({ start: parseDT(b.start), end: parseDT(b.end), title: typeof b.title === "string" ? b.title : null }));
     const stopped = readStopped(ctx.stopped, mem);
     const stoppedKeys = [.../* @__PURE__ */ new Set([...mem.stoppedKeys, ...stopped.map((x) => x.key).filter(Boolean), ...Array.isArray(ctx.stoppedKeys) ? ctx.stoppedKeys.filter((k) => typeof k === "string") : []])];
-    const s = { now, today, mem, calendar, stopped, stoppedKeys, memoryKeys: mem.keys.filter((k) => !stoppedKeys.includes(k)), ws: null, week: /* @__PURE__ */ new Map(), long: null };
+    const s = {
+      now,
+      today,
+      mem,
+      calendar,
+      stopped,
+      stoppedKeys,
+      memoryKeys: mem.keys.filter((k) => !stoppedKeys.includes(k)),
+      ws: null,
+      week: /* @__PURE__ */ new Map(),
+      long: null,
+      days: DAYS,
+      offOf: () => now.off
+    };
     const slots = mem.slots.filter((x) => !stoppedKeys.includes(x.key));
     if (ctx.history) {
       const [ws, days] = readHistory(ctx.history, now);
@@ -1720,18 +1754,21 @@
       dayKinds: s.dayKinds,
       carry: Array.isArray(ctx.carry) ? ctx.carry : [],
       queue: readQueue(ctx.queue),
-      doneToday: ctx.doneToday === true
+      doneToday: ctx.doneToday === true,
+      offsets: readDayOffsets(ctx.dayOffsets)
     });
     s.homeWeek = homeWeek(s.home);
+    s.days = s.homeWeek.days.length;
+    s.offOf = (day) => offOf(s.home, day);
     const n = s.homeWeek.trainingDays;
     const minutes = n * s.rules.session.max;
     s.maxSessions = Math.max(s.maxSessions, n);
     if (s.minutes.limit !== null) s.minutes = { ...s.minutes, limit: Math.max(s.minutes.limit, minutes) };
     if (s.loadCap !== null) s.loadCap = Math.max(s.loadCap, s.unit === "minutes" ? minutes : minutes * EFFORT_OF.steady);
-    s.streak = DAYS;
+    s.streak = Math.max(DAYS, s.days);
   }
   function freeOn(s, dayNum) {
-    if (s.rules) return stretchesOn(s.home, dayNum).map((x) => ({ day: dayISO(dayNum), start: isoDT({ mic: x.a, off: s.now.off }), end: isoDT({ mic: x.b, off: s.now.off }) }));
+    if (s.rules) return stretchesOn(s.home, dayNum).map((x) => ({ day: dayISO(dayNum), start: isoDT({ mic: x.a, off: s.offOf(dayNum) }), end: isoDT({ mic: x.b, off: s.offOf(dayNum) }) }));
     const today = dayNum === s.today;
     let from = Math.max(atDay(dayNum, s.now.off, DAY_START_HOUR).mic, today ? s.now.mic + TODAY_LEAD_MIN * US_MIN : 0);
     const to = atDay(dayNum, s.now.off, today ? TODAY_END_HOUR2 : DAY_END_HOUR).mic;
@@ -1761,11 +1798,11 @@
       ...u.activity === "other" ? { label: u.label ?? null } : {}
     }));
     const freeSlots = [];
-    for (let i = 0; i < DAYS; i += 1) freeSlots.push(...freeOn(s, s.today + i));
+    for (let i = 0; i < s.days; i += 1) freeSlots.push(...freeOn(s, s.today + i));
     const daysAway = s.raceDate !== null ? s.raceDate - s.today : null;
     return {
       now: isoDT(s.now),
-      window: { from: dayISO(s.today), to: dayISO(s.today + DAYS - 1), earliestStart: isoDT({ mic: s.now.mic + TODAY_LEAD_MIN * US_MIN, off: s.now.off }) },
+      window: { from: dayISO(s.today), to: dayISO(s.today + s.days - 1), earliestStart: isoDT({ mic: s.now.mic + TODAY_LEAD_MIN * US_MIN, off: s.now.off }) },
       usualWeek: usual,
       usualDaysPerWeek: s.usualDays,
       maxSessions: s.maxSessions,
@@ -1791,7 +1828,7 @@
       limits: { minMinutes: MIN_MINUTES, maxMinutes: MAX_MINUTES, shortestSession: MIN_SESSION, wornShoeRunMin: WORN_RUN_MAX_MIN, breakInRunMin: BREAK_IN_MIN },
       ...s.rules ? {
         rules: rulesView(s.rules),
-        days: dayKindsView(s.rules, s.dayKinds, s.today, DAYS),
+        days: dayKindsView(s.rules, s.dayKinds, s.today, s.days),
         homeWeek: homeWeekView(s.home, s.homeWeek)
       } : {}
     };
@@ -1894,12 +1931,12 @@
         const t = typeof a.start === "string" ? /^(\d{1,2}):(\d\d)$/.exec(a.start.trim()) : null;
         if (t) {
           if (+t[1] > 23 || +t[2] > 59) return { index, error: "invalid_session" };
-          start = atDay(parseDay(a.day), s.now.off, +t[1], +t[2]);
+          start = atDay(parseDay(a.day), s.offOf?.(parseDay(a.day)) ?? s.now.off, +t[1], +t[2]);
         } else start = parseDT(a.start);
         if (!t && a.day !== void 0 && a.day !== null && parseDay(a.day) !== dayOf(start)) return { index, error: "invalid_session" };
       }
       if (!Number.isFinite(minutes) || minutes < 0) return { index, error: "invalid_session" };
-      start = { mic: start.mic, off: s.now.off };
+      start = { mic: start.mic, off: s.offOf?.(dayOf({ mic: start.mic, off: s.now.off })) ?? s.now.off };
       const intensity = a.intensity === "moderate" ? "steady" : a.intensity ?? null;
       if (intensity !== null && !INTENSITIES.includes(intensity)) return { index, error: "invalid_session" };
       const day = dayOf(start);
@@ -1930,14 +1967,14 @@
       else if (x.activity !== "rest") items.push(x);
     });
     items.sort((a, b) => a.start.mic - b.start.mic || a.index - b.index);
-    const windowEnd = atDay(s.today + DAYS, s.now.off).mic;
+    const windowEnd = atDay(s.today + s.days, s.offOf(s.today + s.days)).mic;
     const earliest = s.now.mic + TODAY_LEAD_MIN * US_MIN;
     const todayEnd = atDay(s.today, s.now.off, TODAY_END_HOUR2).mic;
     for (const x of items) {
       if (x.minutes < MIN_MINUTES) add("bad_duration", x, `${what(x)} is shorter than ${MIN_MINUTES} minutes.`, `lengthen to \u2265${MIN_MINUTES} min`);
       else if (x.minutes > MAX_MINUTES) add("bad_duration", x, `${what(x)} is longer than ${MAX_MINUTES} minutes.`, `shorten to \u2264${MAX_MINUTES} min`);
       if (x.start.mic < s.now.mic) add("outside_window", x, `${what(x)} is in the past.`, `move to ${hhmm({ mic: earliest, off: s.now.off })} or later`);
-      else if (x.start.mic >= windowEnd) add("outside_window", x, `${what(x)} is outside the ${DAYS} days that start today.`, `move to ${dayISO(s.today + DAYS - 1)} or earlier`);
+      else if (x.start.mic >= windowEnd) add("outside_window", x, `${what(x)} is outside the ${s.days} days that start today.`, `move to ${dayISO(s.today + s.days - 1)} or earlier`);
       else if (x.start.mic < earliest) add("outside_window", x, `${what(x)} starts too soon to get ready for.`, `move to ${hhmm({ mic: earliest, off: s.now.off })} or later`);
       else if (x.day === s.today && x.end.mic > todayEnd) add("outside_window", x, `${what(x)} would end too late tonight.`, `end by ${TODAY_END_HOUR2}:00 or move to tomorrow`);
       const busy = s.calendar.find((b) => b.start.mic < x.end.mic && x.start.mic < b.end.mic);
@@ -2034,7 +2071,7 @@
       if (kind === "rest") add("rest_day_rule", x, `${dayName(x.day)} is a day you never train.`, "remove this session");
       else if (kind === "out") add("out_day_rule", x, `You are out on ${dayName(x.day)}, so nothing is planned that day.`, "remove this session");
       else if (x.activity === "strength") {
-        const minute = (x.start.mic - atDay(x.day, s.now.off).mic) / US_MIN;
+        const minute = (x.start.mic - atDay(x.day, s.offOf(x.day)).mic) / US_MIN;
         if (minute < r.window.from || minute > r.window.to) add("outside_rule_hours", x, `${what(x)} starts outside the hours you allow.`, `start between ${at(r.window.from)} and ${at(r.window.to)}`);
         if (x.minutes < r.session.min || x.minutes > r.session.max) add("session_length_rule", x, `${what(x)} is not ${r.session.min} to ${r.session.max} minutes long.`, `make it ${r.session.max} min`);
       }
@@ -2045,7 +2082,7 @@
         "home_day_missing",
         null,
         `${dayName(d.day)} is a day at home, and every day at home has a workout.`,
-        `add a ${r.session.max}-minute strength session on ${dayISO(d.day)} at ${hhmm({ mic: d.first, off: s.now.off })}`
+        `add a ${r.session.max}-minute strength session on ${dayISO(d.day)} at ${hhmm({ mic: d.first, off: s.offOf(d.day) })}`
       );
     }
   }
@@ -3889,8 +3926,12 @@
   var SETUP_SECONDS = 30;
   var LOAD_STEP_KG = 1;
   var LOAD_MAX_KG = 12;
+  var SLOW_EXTRA_SECONDS = 2;
   var MAX_ITEMS = 5;
   var MIN_ITEMS = 3;
+  var MAX_SETS = 6;
+  var MAX_PROPOSED_ITEMS = 8;
+  var ID2 = /^[a-z0-9_]{1,48}$/;
   var ROOT = /* @__PURE__ */ new Map();
   for (const m of MOVEMENTS) {
     let r = m;
@@ -3905,6 +3946,13 @@
     upper: ["wall_push_up", "backpack_row", "backpack_press", "prone_arm_raise", "core"],
     full_lower: ["sit_to_stand", "hip_hinge", "wall_split_squat", "wall_push_up", "backpack_row"],
     full_upper: ["wall_push_up", "backpack_row", "backpack_press", "sit_to_stand", "core"]
+  };
+  var FOCUS_PATTERNS = {
+    full: [...MAIN_PATTERNS, "core"],
+    full_lower: [...MAIN_PATTERNS, "core"],
+    full_upper: [...MAIN_PATTERNS, "core"],
+    lower: ["lower_push", "lower_pull", "core"],
+    upper: ["upper_push", "upper_pull", "core"]
   };
   var STAND_INS = {
     sit_to_stand: ["wall_split_squat", "calf_raise"],
@@ -3921,15 +3969,27 @@
     if (!Array.isArray(raw)) throw new InputError("bad_content");
     return raw.map((h) => {
       if (!h || typeof h.movementId !== "string" || !Array.isArray(h.sets) || !h.sets.every((n) => Number.isFinite(n) && n >= 0)) throw new InputError("bad_content");
-      return { movementId: h.movementId, day: String(h.day ?? ""), sets: h.sets, load: Number.isFinite(h.load) ? h.load : null };
+      return { movementId: h.movementId, day: String(h.day ?? ""), sets: h.sets, load: Number.isFinite(h.load) ? h.load : null, slow: h.slow === true };
     }).sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
   }
   var owns = (rules, m) => m.equipment.every((e) => rules.equipment.includes(e) || ALWAYS_THERE.includes(e));
   var top = (m) => (m.dose.reps ?? m.dose.seconds)[1];
+  var timesOf = (history, id) => history.filter((h) => h.movementId === id);
+  var atTop = (m, t) => t.sets.length >= m.dose.sets && t.sets.every((n) => n >= top(m));
+  var toppedLastTime = (history, m) => {
+    const last = timesOf(history, m.id).at(-1);
+    return Boolean(last) && atTop(m, last);
+  };
   function mastered(history, id) {
     const m = movementOf(id);
-    const times = history.filter((h) => h.movementId === id).slice(-2);
-    return times.length === 2 && times.every((t) => t.sets.length >= m.dose.sets && t.sets.every((n) => n >= top(m)));
+    const times = timesOf(history, id).slice(-2);
+    return times.length === 2 && times.every((t) => atTop(m, t));
+  }
+  var slowStepDone = (history, m) => !m.tempo || timesOf(history, m.id).some((t) => t.slow && atTop(m, t));
+  function nextIsSlow(history, m) {
+    if (slowStepDone(history, m)) return false;
+    const last = timesOf(history, m.id).at(-1);
+    return Boolean(last) && (last.slow || atTop(m, last));
   }
   var doneBefore = (history, id) => history.some((h) => h.movementId === id);
   function blockOf(rules, history, id) {
@@ -3945,9 +4005,10 @@
     if (m.entry || rules.movements[m.id] === "can" || doneBefore(history, m.id)) return true;
     const before = m.easier && movementOf(m.easier);
     if (!before) return true;
-    if (!owns(rules, before)) return earned(rules, history, before);
-    return mastered(history, before.id) && fullyLoaded(history, before);
+    if (!owns(rules, before)) return !m.gated && earned(rules, history, before);
+    return passed(history, before);
   }
+  var passed = (history, m) => mastered(history, m.id) && slowStepDone(history, m) && fullyLoaded(history, m);
   var fullyLoaded = (history, m) => !m.equipment.includes("backpack") || (lastLoad(history, m.id) ?? 0) >= LOAD_MAX_KG;
   var patternUsable = (rules, history, pattern) => MOVEMENTS.some((m) => m.pattern === pattern && blockOf(rules, history, m.id) === null);
   var isNew = (rules, history, m) => !m.entry && !doneBefore(history, m.id) && rules.movements[m.id] !== "can" && !(m.easier && !owns(rules, movementOf(m.easier)));
@@ -3967,11 +4028,11 @@
     }
     return pick;
   }
-  var repSeconds = (m) => m.tempo ? m.tempo.down + m.tempo.hold + m.tempo.up : 3;
+  var repSeconds = (m, slow) => m.tempo ? m.tempo.down + m.tempo.hold + m.tempo.up + (slow ? SLOW_EXTRA_SECONDS : 0) : 3;
   var middle = ([lo, hi]) => (lo + hi) / 2;
   function itemSeconds(item) {
     const m = movementOf(item.movementId);
-    const work = item.reps ? middle(item.reps) * repSeconds(m) : middle(item.seconds);
+    const work = item.reps ? middle(item.reps) * repSeconds(m, item.slow === true) : middle(item.seconds);
     return item.sets * work * m.sides + Math.max(0, item.sets - 1) * item.rest + SETUP_SECONDS;
   }
   var sessionMinutes = (items) => Math.ceil(items.reduce((sum, i) => sum + itemSeconds(i), 0) / 60);
@@ -3979,21 +4040,19 @@
     const times = history.filter((h) => h.movementId === id && h.load !== null);
     return times.length ? times[times.length - 1].load : null;
   }
-  function toppedLastTime(history, m) {
-    const last = history.filter((h) => h.movementId === m.id).at(-1);
-    return Boolean(last) && last.sets.length >= m.dose.sets && last.sets.every((n) => n >= top(m));
+  var clampLoad = (kg) => Math.min(LOAD_MAX_KG, Math.max(1, kg));
+  function loadFor(m, history, loads) {
+    if (Number.isFinite(loads[m.id])) return clampLoad(loads[m.id]);
+    const last = lastLoad(history, m.id);
+    const up = last !== null && toppedLastTime(history, m) && slowStepDone(history, m);
+    return clampLoad((last ?? m.load ?? 2) + (up ? LOAD_STEP_KG : 0));
   }
   function itemFor(m, history, loads, sets) {
     const item = { movementId: m.id, sets, rest: m.rest, isNew: false };
     if (m.dose.reps) item.reps = [...m.dose.reps];
     else item.seconds = [...m.dose.seconds];
-    if (m.equipment.includes("backpack")) {
-      const set = Number.isFinite(loads[m.id]) ? loads[m.id] : null;
-      const last = lastLoad(history, m.id);
-      let load = set ?? last ?? m.load ?? 2;
-      if (set === null && last !== null && toppedLastTime(history, m)) load += LOAD_STEP_KG;
-      item.load = Math.min(LOAD_MAX_KG, Math.max(1, load));
-    }
+    if (m.equipment.includes("backpack")) item.load = loadFor(m, history, loads);
+    if (nextIsSlow(history, m)) item.slow = true;
     return item;
   }
   function readSessionRequest(a) {
@@ -4016,28 +4075,27 @@
       sessionId: typeof a.sessionId === "string" ? a.sessionId : null
     };
   }
+  var sessionSets = (req, m) => req.easeOff || req.deload ? Math.max(1, m.dose.sets - 1) : m.dose.sets;
+  var sessionItem = (req, m) => ({ ...itemFor(m, req.history, req.loads, sessionSets(req, m)), isNew: isNew(req.rules, req.history, m) });
+  function pickForSlot(req, slot, used, allowNew) {
+    for (const root of [slot, ...STAND_INS[slot] ?? []]) {
+      if (used.has(root)) continue;
+      const pick = pickInChain(req.rules, req.history, root, allowNew);
+      if (pick) {
+        used.add(root);
+        return pick;
+      }
+    }
+    return null;
+  }
   function buildSession(req) {
-    const { rules, history, focus, loads } = req;
-    const slots = SLOTS[focus].map((s) => s === "core" ? CORE[req.turn % CORE.length] : s);
+    const slots = SLOTS[req.focus].map((s) => s === "core" ? CORE[req.turn % CORE.length] : s);
     const items = [];
-    let newOnes = 0;
     const used = /* @__PURE__ */ new Set();
     for (const slot of slots) {
-      let pick = null;
-      for (const root of [slot, ...STAND_INS[slot] ?? []]) {
-        if (used.has(root)) continue;
-        pick = pickInChain(rules, history, root, newOnes < MAX_NEW);
-        if (pick) {
-          used.add(root);
-          break;
-        }
-      }
+      const pick = pickForSlot(req, slot, used, items.filter((i) => i.isNew).length < MAX_NEW);
       if (!pick || items.some((i) => i.movementId === pick.id)) continue;
-      const fresh = isNew(rules, history, pick);
-      if (fresh) newOnes += 1;
-      let sets = pick.dose.sets;
-      if (req.easeOff || req.deload) sets = Math.max(1, sets - 1);
-      items.push({ ...itemFor(pick, history, loads, sets), isNew: fresh });
+      items.push(sessionItem(req, pick));
     }
     fitTime(items, req.minutes);
     return items;
@@ -4067,45 +4125,50 @@
     if (!a || !Array.isArray(a.sessions)) throw new InputError("bad_content");
     const reqs = a.sessions.map((s, turn) => readSessionRequest({ ...a, ...s, turn }));
     const contents = reqs.map((r) => contentOf(r, buildSession(r)));
+    fillPatterns(contents, reqs);
+    const sets = setsByPattern(contents);
+    return { contents, setsByPattern: sets, target: WEEK_TARGET_SETS, note: weekNote(contents, reqs, sets) };
+  }
+  function fillPatterns(contents, reqs) {
     for (const pattern of MAIN_PATTERNS) if (contents.length > 1 && setsByPattern(contents)[pattern] === 0) addItem(contents, reqs, pattern);
     for (const pattern of MAIN_PATTERNS) {
-      let guard = 0;
-      while (setsByPattern(contents)[pattern] < WEEK_FLOOR_SETS && guard++ < 8) {
+      for (let guard = 0; guard < 8 && setsByPattern(contents)[pattern] < WEEK_FLOOR_SETS; guard += 1) {
         if (!addSet(contents, reqs, pattern)) break;
       }
     }
-    const sets = setsByPattern(contents);
-    const history = reqs[0]?.history ?? [];
-    const none = MAIN_PATTERNS.filter((p) => contents.length > 0 && sets[p] === 0 && reqs[0] && !patternUsable(reqs[0].rules, history, p));
-    const short = MAIN_PATTERNS.filter((p) => contents.length > 0 && sets[p] < WEEK_TARGET_SETS[0] && !none.includes(p));
+  }
+  function weekNote(contents, reqs, sets) {
+    if (!contents.length) return null;
+    const none = MAIN_PATTERNS.filter((p) => sets[p] === 0 && !patternUsable(reqs[0].rules, reqs[0].history, p));
+    const short = MAIN_PATTERNS.filter((p) => sets[p] < WEEK_TARGET_SETS[0] && !none.includes(p));
     const notes = [];
     if (short.length) notes.push(`This week has ${short.map((p) => `${sets[p]} sets of ${PATTERN_WORDS[p]}`).join(", ")}, below the ${WEEK_TARGET_SETS[0]} to ${WEEK_TARGET_SETS[1]} aimed for.`);
     if (none.length) notes.push(`No movement for ${none.map((p) => PATTERN_WORDS[p]).join(" or ")} fits your equipment and the movements you left out.`);
-    const note = notes.length ? notes.join(" ") : null;
-    return { contents, setsByPattern: sets, target: WEEK_TARGET_SETS, note };
+    return notes.length ? notes.join(" ") : null;
   }
   var patternOf = (item) => movementOf(item.movementId).pattern;
   var withSets = (items, item, sets) => items.map((x) => x === item ? { ...x, sets } : x);
+  var floorOf = (pattern) => MAIN_PATTERNS.includes(pattern) ? WEEK_FLOOR_SETS : 0;
   function addSet(contents, reqs, pattern) {
-    const spots = contents.flatMap((c, k) => c.items.filter((i) => patternOf(i) === pattern && i.sets < 6).map((i) => ({ c, k, i })));
+    const spots = contents.flatMap((c, k) => c.items.filter((i) => patternOf(i) === pattern && i.sets < MAX_SETS).map((i) => ({ c, k, i })));
     const fits = spots.filter(({ c, k, i }) => sessionMinutes(withSets(c.items, i, i.sets + 1)) <= reqs[k].minutes).sort((x, y) => x.c.minutes - y.c.minutes)[0];
     if (fits) {
       fits.i.sets += 1;
       fits.c.minutes = sessionMinutes(fits.c.items);
       return true;
     }
+    return spots.some((spot) => swapSet(contents, reqs, spot));
+  }
+  function swapSet(contents, reqs, { c, k, i }) {
     const sets = setsByPattern(contents);
-    for (const { c, k, i } of spots) {
-      const donor = c.items.filter((d) => d !== i && d.sets > 1 && (sets[patternOf(d)] ?? 0) - 1 >= (MAIN_PATTERNS.includes(patternOf(d)) ? WEEK_FLOOR_SETS : 0)).sort((a, b) => (sets[patternOf(b)] ?? 99) - (sets[patternOf(a)] ?? 99))[0];
-      if (!donor) continue;
-      const items = c.items.map((x) => x === i ? { ...x, sets: x.sets + 1 } : x === donor ? { ...x, sets: x.sets - 1 } : x);
-      if (sessionMinutes(items) > reqs[k].minutes) continue;
-      i.sets += 1;
-      donor.sets -= 1;
-      c.minutes = sessionMinutes(c.items);
-      return true;
-    }
-    return false;
+    const donor = c.items.filter((d) => d !== i && d.sets > 1 && (sets[patternOf(d)] ?? 0) - 1 >= floorOf(patternOf(d))).sort((a, b) => (sets[patternOf(b)] ?? 99) - (sets[patternOf(a)] ?? 99))[0];
+    if (!donor) return false;
+    const items = c.items.map((x) => x === i ? { ...x, sets: x.sets + 1 } : x === donor ? { ...x, sets: x.sets - 1 } : x);
+    if (sessionMinutes(items) > reqs[k].minutes) return false;
+    i.sets += 1;
+    donor.sets -= 1;
+    c.minutes = sessionMinutes(c.items);
+    return true;
   }
   var PATTERN_ROOTS = {
     lower_push: ["sit_to_stand", "wall_split_squat", "calf_raise"],
@@ -4116,40 +4179,45 @@
   function addItem(contents, reqs, pattern) {
     const order = contents.map((c, k) => k).sort((x, y) => contents[x].minutes - contents[y].minutes);
     for (const k of order) {
-      const c = contents[k];
-      const req = reqs[k];
-      const newOnes = c.items.filter((i) => i.isNew).length;
-      const taken = new Set(c.items.map((i) => chainOf(i.movementId)));
-      let pick = null;
-      for (const root of PATTERN_ROOTS[pattern]) {
-        if (taken.has(root)) continue;
-        pick = pickInChain(req.rules, req.history, root, newOnes < MAX_NEW);
-        if (pick) break;
-      }
-      if (!pick) continue;
-      const sets = req.easeOff || req.deload ? Math.max(1, pick.dose.sets - 1) : pick.dose.sets;
-      const item = { ...itemFor(pick, req.history, req.loads, sets), isNew: isNew(req.rules, req.history, pick) };
-      const tries = [[...c.items, item]];
-      const counts = setsByPattern(contents);
-      const swaps = c.items.filter((i) => !MAIN_PATTERNS.includes(patternOf(i)) || counts[patternOf(i)] - i.sets >= WEEK_FLOOR_SETS).sort((a, b) => (counts[patternOf(b)] ?? 99) - (counts[patternOf(a)] ?? 99));
-      for (const out of swaps) tries.push(c.items.map((i) => i === out ? item : i));
-      for (const items of tries) {
-        const fitted = items.map((i) => ({ ...i }));
-        if (fitted.length > MAX_ITEMS) continue;
-        if (sessionMinutes(fitted) > req.minutes) {
-          for (const i of fitted.filter((x) => x.movementId !== item.movementId).sort((a, b) => b.sets - a.sets)) {
-            while (i.sets > 1 && sessionMinutes(fitted) > req.minutes) i.sets -= 1;
-          }
-        }
-        if (sessionMinutes(fitted) > req.minutes) continue;
-        c.items = fitted;
-        c.minutes = sessionMinutes(fitted);
-        return true;
-      }
+      const item = itemOfPattern(contents[k], reqs[k], pattern);
+      if (item && placeItem(contents, k, reqs[k], item)) return true;
     }
     return false;
   }
+  function itemOfPattern(c, req, pattern) {
+    const allowNew = c.items.filter((i) => i.isNew).length < MAX_NEW;
+    const taken = new Set(c.items.map((i) => chainOf(i.movementId)));
+    for (const root of PATTERN_ROOTS[pattern]) {
+      if (taken.has(root)) continue;
+      const pick = pickInChain(req.rules, req.history, root, allowNew);
+      if (pick) return sessionItem(req, pick);
+    }
+    return null;
+  }
+  function placeItem(contents, k, req, item) {
+    const c = contents[k];
+    const counts = setsByPattern(contents);
+    const swaps = c.items.filter((i) => counts[patternOf(i)] === void 0 || counts[patternOf(i)] - i.sets >= WEEK_FLOOR_SETS).sort((a, b) => (counts[patternOf(b)] ?? 99) - (counts[patternOf(a)] ?? 99));
+    const tries = [[...c.items, item], ...swaps.map((out) => c.items.map((i) => i === out ? item : i))];
+    for (const items of tries) {
+      const fitted = trimToFit(items, item, req.minutes);
+      if (!fitted) continue;
+      c.items = fitted;
+      c.minutes = sessionMinutes(fitted);
+      return true;
+    }
+    return false;
+  }
+  function trimToFit(items, keep, minutes) {
+    if (items.length > MAX_ITEMS) return null;
+    const fitted = items.map((i) => ({ ...i }));
+    for (const i of fitted.filter((x) => x.movementId !== keep.movementId).sort((a, b) => b.sets - a.sets)) {
+      while (i.sets > 1 && sessionMinutes(fitted) > minutes) i.sets -= 1;
+    }
+    return sessionMinutes(fitted) > minutes ? null : fitted;
+  }
   var PATTERN_WORDS = { lower_push: "legs pushing", lower_pull: "hips and the back of the legs", upper_push: "upper-body pushing", upper_pull: "upper-body pulling", core: "the middle of the body", snack: "short pieces" };
+  var validSets = (sets) => Number.isInteger(sets) && sets >= 1 && sets <= MAX_SETS;
   function checkContent(a) {
     if (!a || !a.content || !Array.isArray(a.content.items)) throw new InputError("bad_content");
     const rules = readRules(a.rules ?? {});
@@ -4157,34 +4225,142 @@
     const minutes = Number.isInteger(a.minutes) ? a.minutes : rules.session.max;
     const violations = [];
     const add = (code, text, movementId) => violations.push(movementId ? { code, text, movementId } : { code, text });
+    itemViolations(a.content.items, rules, history, add);
+    const length = sessionMinutes(timedItems(a.content.items));
+    if (length > minutes) add("session_too_long", `The session takes about ${length} minutes; the person's sessions are at most ${minutes}.`);
+    if (Array.isArray(a.week)) weekViolations(a.week, rules, history, add, readFloor(a.floor));
+    return { pass: violations.length === 0, violations };
+  }
+  function readFloor(raw) {
+    const out = Object.fromEntries(MAIN_PATTERNS.map((p) => [p, WEEK_FLOOR_SETS]));
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+    for (const p of MAIN_PATTERNS) if (Number.isInteger(raw[p]) && raw[p] >= 0) out[p] = Math.min(WEEK_FLOOR_SETS, raw[p]);
+    return out;
+  }
+  function itemViolations(items, rules, history, add) {
     let fresh = 0;
-    for (const item of a.content.items) {
-      const m = movementOf(item.movementId);
+    for (const item of items) {
+      const id = item && typeof item.movementId === "string" ? item.movementId : null;
+      const m = movementOf(id);
       if (!m) {
-        add("unknown_movement", `${item.movementId} is not in the movement library.`, item.movementId);
+        add("unknown_movement", `${id && ID2.test(id) ? id : "A movement"} is not in the movement library.`, id && ID2.test(id) ? id : void 0);
         continue;
       }
-      if (!Number.isInteger(item.sets) || item.sets < 1 || item.sets > 6) add("bad_dose", `${m.name} needs between 1 and 6 sets.`, m.id);
-      const block = blockOf(rules, history, m.id);
-      if (block === "equipment_not_owned") add(block, `${m.name} needs ${m.equipment.join(" and ")}, which the person doesn't have.`, m.id);
-      else if (block === "avoided_movement" || block === "cannot_do") add("avoided_movement", `${m.name} is on the person's list to leave out.`, m.id);
-      else if (block === "gated_movement") add(block, `${m.name} comes only after ${movementOf(m.easier).name} is done at the top of its range twice${movementOf(m.easier).equipment.includes("backpack") ? `, with ${LOAD_MAX_KG} litres of water in the backpack` : ""}.`, m.id);
+      if (!validSets(item.sets)) add("bad_dose", `${m.name} needs between 1 and ${MAX_SETS} sets.`, m.id);
+      if (item.slow !== void 0 && typeof item.slow !== "boolean") add("bad_dose", `${m.name} is either slow or not.`, m.id);
+      blockViolation(rules, history, m, add);
       if (isNew(rules, history, m)) fresh += 1;
     }
     if (fresh > MAX_NEW) add("too_many_new", `The session has ${fresh} movements the person hasn't done yet; at most ${MAX_NEW}.`);
-    const valid = a.content.items.filter((i) => movementOf(i.movementId) && Number.isInteger(i.sets) && i.sets >= 1);
-    const length = sessionMinutes(valid.map((i) => ({
-      ...i,
-      rest: Number.isFinite(i.rest) ? i.rest : movementOf(i.movementId).rest,
-      reps: i.reps ?? movementOf(i.movementId).dose.reps,
-      seconds: i.seconds ?? movementOf(i.movementId).dose.seconds
-    })));
-    if (length > minutes) add("session_too_long", `The session takes about ${length} minutes; the person's sessions are at most ${minutes}.`);
-    if (Array.isArray(a.week)) {
-      const sets = setsByPattern(a.week.filter((c) => c && Array.isArray(c.items)));
-      for (const p of MAIN_PATTERNS) if (sets[p] < WEEK_FLOOR_SETS && patternUsable(rules, history, p)) add("sets_below_floor", `The week has ${sets[p]} sets of ${PATTERN_WORDS[p]}; at least ${WEEK_FLOOR_SETS}.`);
+  }
+  function blockViolation(rules, history, m, add) {
+    const block = blockOf(rules, history, m.id);
+    const before = m.easier && movementOf(m.easier);
+    if (block === "equipment_not_owned") add(block, `${m.name} needs ${m.equipment.join(" and ")}, which the person doesn't have.`, m.id);
+    else if (block === "avoided_movement" || block === "cannot_do") add("avoided_movement", `${m.name} is on the person's list to leave out.`, m.id);
+    else if (block === "gated_movement") add(block, `${m.name} comes only after ${before.name} is done at the top of its range twice${before.equipment.includes("backpack") ? `, with ${LOAD_MAX_KG} litres of water in the backpack` : ""}.`, m.id);
+  }
+  function timedItems(items) {
+    return items.filter((i) => movementOf(i?.movementId) && Number.isInteger(i.sets) && i.sets >= 1).map((i) => {
+      const m = movementOf(i.movementId);
+      return { ...i, rest: Number.isFinite(i.rest) ? i.rest : m.rest, reps: i.reps ?? m.dose.reps, seconds: i.seconds ?? m.dose.seconds };
+    });
+  }
+  function weekViolations(week, rules, history, add, floor) {
+    const sets = setsByPattern(week.filter((c) => c && Array.isArray(c.items)));
+    for (const p of MAIN_PATTERNS) {
+      if (sets[p] < floor[p] && patternUsable(rules, history, p)) add("sets_below_floor", `The week has ${sets[p]} sets of ${PATTERN_WORDS[p]}; at least ${floor[p]}.`);
     }
-    return { pass: violations.length === 0, violations };
+  }
+  var fewestItems = (req) => Math.max(1, Math.min(MIN_ITEMS, buildSession(req).length));
+  var doseKey = (m) => m.dose.reps ? "reps" : "seconds";
+  function choiceOf(req, m) {
+    const fresh = isNew(req.rules, req.history, m);
+    return { id: m.id, name: m.name, pattern: m.pattern, level: m.level, isNew: fresh, dose: { sets: sessionSets(req, m), [doseKey(m)]: [...m.dose[doseKey(m)]] } };
+  }
+  function choicesFor(req) {
+    const roots = [...new Set(MOVEMENTS.filter((m) => FOCUS_PATTERNS[req.focus].includes(m.pattern)).map((m) => chainOf(m.id)))];
+    const out = [];
+    for (const root of roots) {
+      const pick = pickInChain(req.rules, req.history, root, true);
+      if (!pick) continue;
+      out.push(choiceOf(req, pick));
+      const known = isNew(req.rules, req.history, pick) ? pickInChain(req.rules, req.history, root, false) : null;
+      if (known) out.push(choiceOf(req, known));
+    }
+    return out;
+  }
+  function briefLines(req, target) {
+    const [lo, hi] = target.items;
+    const lines = [
+      `Choose ${lo} to ${hi} movements from the list for a ${FOCUS_WORDS[req.focus]} session, in the order to do them, and say why in one sentence.`,
+      `The whole session, rests and getting set up included, takes at most ${target.minutes} minutes; code works out the time from the sets and reps.`,
+      `At most ${MAX_NEW} of the movements may be one marked new.`,
+      `Give each movement 1 to ${MAX_SETS} sets and, if you like, a range of reps or seconds inside its own; code sets the rest, the backpack's weight and the tempo.`,
+      `Across the week every main pattern gets at least ${WEEK_FLOOR_SETS} sets, aiming for ${WEEK_TARGET_SETS[0]} to ${WEEK_TARGET_SETS[1]}.`,
+      "Answer with movement ids and numbers only: every word the person reads about a movement comes from the library."
+    ];
+    if (req.deload || req.easeOff) lines.push("This session is lighter: the sets listed are already one fewer than usual.");
+    return lines;
+  }
+  function contentBrief(a) {
+    const req = readSessionRequest(a);
+    const target = { minutes: req.minutes, items: [fewestItems(req), MAX_ITEMS], maxNew: MAX_NEW, sets: [1, MAX_SETS], weekSets: { floor: WEEK_FLOOR_SETS, aim: WEEK_TARGET_SETS } };
+    return { lines: briefLines(req, target), choices: choicesFor(req), target };
+  }
+  function doseOf(m, raw) {
+    const key = doseKey(m);
+    if (raw[key === "reps" ? "seconds" : "reps"] !== void 0) return null;
+    const range = m.dose[key];
+    const v = raw[key] === void 0 ? range : raw[key];
+    const ok = Array.isArray(v) && v.length === 2 && v.every(Number.isInteger) && v[0] <= v[1] && v[0] >= range[0] && v[1] <= range[1];
+    return ok ? { [key]: [...v] } : null;
+  }
+  var rangeWords = (m) => `${m.dose[doseKey(m)].join(" to ")} ${doseKey(m)}`;
+  function proposedItem(req, raw, taken, add) {
+    const id = raw && typeof raw === "object" && typeof raw.movementId === "string" ? raw.movementId : null;
+    const m = movementOf(id);
+    if (!m) {
+      add("unknown_movement", "A proposed movement is not in the movement library.", id && ID2.test(id) ? id : void 0);
+      return null;
+    }
+    if (taken.has(m.id)) {
+      add("duplicate_movement", `${m.name} is in the proposal twice.`, m.id);
+      return null;
+    }
+    const dose = doseOf(m, raw);
+    if (!validSets(raw.sets) || !dose) {
+      add("bad_dose", `${m.name} needs 1 to ${MAX_SETS} sets and at most ${rangeWords(m)}.`, m.id);
+      return null;
+    }
+    taken.add(m.id);
+    return { ...sessionItem(req, m), sets: raw.sets, ...dose };
+  }
+  function readProposal(req, proposal, add) {
+    const list = proposal && typeof proposal === "object" && Array.isArray(proposal.items) ? proposal.items : null;
+    if (!list) {
+      add("bad_proposal", "The proposal has no list of movements.");
+      return [];
+    }
+    if (list.length > MAX_PROPOSED_ITEMS) {
+      add("bad_proposal", `The proposal has ${list.length} movements; at most ${MAX_PROPOSED_ITEMS} are read.`);
+      return [];
+    }
+    const [lo, hi] = [fewestItems(req), MAX_ITEMS];
+    if (list.length < lo || list.length > hi) add("item_count", `A session has ${lo} to ${hi} movements; the proposal has ${list.length}.`);
+    const taken = /* @__PURE__ */ new Set();
+    return list.map((raw) => proposedItem(req, raw, taken, add)).filter(Boolean);
+  }
+  var weekWith = (week, content) => Array.isArray(week) ? [...week.filter((c) => !c || c.sessionId !== content.sessionId || content.sessionId === null), content] : void 0;
+  function proposedContent(a) {
+    const req = readSessionRequest(a);
+    const violations = [];
+    const add = (code, text, movementId) => violations.push(movementId ? { code, text, movementId } : { code, text });
+    const content = contentOf(req, readProposal(req, a.proposal, add));
+    const floor = Array.isArray(a.rulesWeek) ? setsByPattern(a.rulesWeek.filter((c) => c && Array.isArray(c.items))) : void 0;
+    const checked = checkContent({ content, rules: a.rules ?? {}, history: a.history, minutes: req.minutes, week: weekWith(a.week, content), floor });
+    const all = [...violations, ...checked.violations];
+    return { content, pass: all.length === 0, violations: all };
   }
   var movementLibrary = () => ({ version: movements_default.version, movements: MOVEMENTS });
 
@@ -4202,6 +4378,7 @@
     bad_action: "There is no session to explain.",
     bad_rules: "Your rules could not be read.",
     bad_day_kinds: "A day is marked as something other than home, out or rest.",
+    bad_day_offsets: "A day's offset from UTC is not written as +HH:MM or -HH:MM.",
     bad_content: "The workout could not be read.",
     missing_history: "There is no workout history to plan from.",
     internal: "Something went wrong while working this out."
@@ -4230,4 +4407,6 @@
   globalThis.weekContent = tool(weekContent);
   globalThis.checkContent = tool(checkContent);
   globalThis.movementLibrary = tool(movementLibrary);
+  globalThis.contentBrief = tool(contentBrief);
+  globalThis.proposedContent = tool(proposedContent);
 })();

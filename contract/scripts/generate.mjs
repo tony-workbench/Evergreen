@@ -54,14 +54,14 @@ const RULES = {
 };
 // What each person's phone tells the plan engine about the days at home that week (Monday 9 November): written by hand.
 const HOME_DAYS = {
-  sam: { dayKinds: { '2026-11-10': 'out' }, carry: [], queue: {}, doneToday: false },
-  alex: { dayKinds: { '2026-11-12': 'home' }, carry: ['lower'], queue: { '2026-11-11': 'upper', '2026-11-13': 'full' }, doneToday: false },
+  sam: { dayKinds: { '2026-11-10': 'out' }, carry: [], queue: {}, doneToday: false, dayOffsets: Object.fromEntries(Array.from({ length: 7 }, (_, i) => [dayAt(28 + i), OFFSET])) },
+  alex: { dayKinds: { '2026-11-12': 'home' }, carry: ['lower'], queue: { '2026-11-11': 'upper', '2026-11-13': 'full' }, doneToday: false, dayOffsets: { '2026-11-09': OFFSET, '2026-11-10': OFFSET } },
   jordan: { dayKinds: {}, queue: { '2026-11-09': 'full_lower', '2026-11-11': 'full_upper' }, doneToday: true },
 };
 // A home session of each person's: written by hand with movements from the library, as workoutContent returns them.
 const item = (movementId, sets, dose, rest, extra = {}) => ({ movementId, sets, ...dose, rest, isNew: false, ...extra });
 const CONTENT = {
-  sam: { sessionId: null, focus: 'full', minutes: 18, items: [item('sit_to_stand', 3, { reps: [8, 12] }, 60), item('wall_push_up', 3, { reps: [10, 15] }, 60), item('dead_bug', 2, { reps: [8, 12] }, 45)] },
+  sam: { sessionId: null, focus: 'full', minutes: 15, items: [item('sit_to_stand', 3, { reps: [8, 12] }, 60), item('wall_push_up', 3, { reps: [10, 15] }, 60, { slow: true }), item('dead_bug', 2, { reps: [8, 12] }, 45)] },
   alex: { sessionId: 'w1-wed', focus: 'upper', minutes: 24, items: [item('table_push_up', 3, { reps: [8, 12] }, 60), item('backpack_row', 3, { reps: [10, 15] }, 60, { load: 5 }), item('backpack_press', 3, { reps: [8, 12] }, 60, { load: 2 }), item('forearm_plank', 2, { seconds: [20, 40] }, 45, { isNew: true })] },
   jordan: { sessionId: 'w1-sat', focus: 'full_lower', minutes: 35, items: [item('reverse_lunge', 3, { reps: [8, 12] }, 60), item('backpack_hip_hinge', 4, { reps: [8, 12] }, 60, { load: 6 }), item('push_up', 3, { reps: [6, 12] }, 60)] },
 };
@@ -97,6 +97,7 @@ const kinds = {
   response: ['response', 'Early sessions are often skipped.', { about: 'early sessions', pattern: 'skipped 3 of the last 4' }],
   gear: ['gear', 'The daily trainers have 512 km on them.', { item: 'Daily trainers', km: 512, boughtOn: '2026-05-02' }],
   goal: ['goal', 'A half marathon on 6 December.', { what: 'Half marathon', date: '2026-12-06' }],
+  training_place: ['routine', 'You train at home, without gym equipment.', { place: 'home', gymWorkouts: 0, weeks: 8 }],
 };
 for (const [kind, [group, statement, data]] of Object.entries(kinds)) write(`fixtures/valid/kinds/memory-row.${kind}.json`, assertValid('memory-row', { ...base, memoryId: `m-${kind}`, key: `mem:${kind}`, slot: kind, group, kind, statement, data }));
 write('fixtures/valid/kinds/memory-row.other.json', assertValid('memory-row', { ...base, memoryId: 'm-other', key: 'mem:other', slot: 'usual_slot/other/2/19', statement: 'Rowing on Wednesday at 19:00 in 3 of the last 4 weeks.', data: { activity: 'other', label: 'Rowing', weekday: 2, hour: 19, minutes: 40, weeksSeen: 3, weeksTotal: 4 } }));
@@ -129,6 +130,10 @@ const bad = {
     'state-review': change(g['memory-row'], (v) => { v.state = 'review'; }),
     'since-is-a-time-not-a-day': change(g['memory-row'], (v) => { v.since = '2026-11-08T00:00:00-08:00'; }),
     'extra-field': change(g['memory-row'], (v) => { v.text = v.statement; }),
+    'training-place-at-a-gym': change(g['memory-row'], (v) => { v.kind = 'training_place'; v.data = { place: 'gym', gymWorkouts: 0, weeks: 8 }; }),
+    'training-place-with-gym-workouts': change(g['memory-row'], (v) => { v.kind = 'training_place'; v.data = { place: 'home', gymWorkouts: 2, weeks: 8 }; }),
+    'training-place-under-8-weeks': change(g['memory-row'], (v) => { v.kind = 'training_place'; v.data = { place: 'home', gymWorkouts: 0, weeks: 4 }; }),
+    'training-place-with-usual-slot-data': change(g['memory-row'], (v) => { v.kind = 'training_place'; }),
   },
   'memory-table': {
     'rows-missing': without(g['memory-table'], 'rows'),
@@ -234,6 +239,9 @@ const bad = {
     'carry-longer-than-three-days': change(g['home-days'], (v) => { v.carry = ['lower', 'upper', 'full', 'lower']; }),
     'done-today-as-text': change(g['home-days'], (v) => { v.doneToday = 'yes'; }),
     'rules-are-not-a-field': change(g['home-days'], (v) => { v.rules = {}; }),
+    'day-offset-as-hours': change(g['home-days'], (v) => { v.dayOffsets = { '2026-11-09': -8 }; }),
+    'day-offset-without-sign': change(g['home-days'], (v) => { v.dayOffsets = { '2026-11-09': '08:00' }; }),
+    'day-offset-as-zone-name': change(g['home-days'], (v) => { v.dayOffsets = { '2026-11-09': 'America/Los_Angeles' }; }),
   },
   'workout-content': {
     'focus-not-on-the-list': change(g['workout-content'], (v) => { v.focus = 'arms'; }),
@@ -245,6 +253,7 @@ const bad = {
     'load-over-what-a-backpack-holds': change(g['workout-content'], (v) => { v.items[0].load = 20; }),
     'movement-name-instead-of-id': change(g['workout-content'], (v) => { v.items[0].movementId = 'Push-up'; }),
     'words-in-the-item': change(g['workout-content'], (v) => { v.items[0].steps = ['Stand tall.']; }),
+    'slow-as-seconds': change(g['workout-content'], (v) => { v.items[1].slow = 2; }),
   },
   error: {
     'error-is-a-name-not-an-object': { ok: false, error: 'BadJSON' },

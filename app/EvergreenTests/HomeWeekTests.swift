@@ -86,4 +86,18 @@ struct HomeWeekTests {
         for day in [days.out, days.rain] { #expect(![2, 5, 6].contains(UserRules.weekdayIndex(day, calendar: Fixture.calendar))) }
     }
     #endif
+
+    @Test func theBackgroundRefreshCanBeginAtSundayEvening() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "America/Los_Angeles"))
+        let at = { (day: Int, hour: Int, minute: Int) in
+            try #require(calendar.date(from: DateComponents(year: 2026, month: 12, day: day, hour: hour, minute: minute)))
+        }
+        // Sunday 6 December at 19:00: the next refresh may begin at 20:00, not two hours on.
+        #expect(Refresh.nextBegin(after: try at(6, 19, 0), calendar: calendar) == (try at(6, 20, 0)))
+        // A Tuesday: two hours on, as usual.
+        #expect(Refresh.nextBegin(after: try at(1, 10, 0), calendar: calendar) == (try at(1, 12, 0)))
+        // Sunday at 20:30, past the hour: two hours on, since the next Sunday is a week away.
+        #expect(Refresh.nextBegin(after: try at(6, 20, 30), calendar: calendar) == (try at(6, 22, 30)))
+    }
 }

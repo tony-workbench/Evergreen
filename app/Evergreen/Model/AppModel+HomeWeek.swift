@@ -8,8 +8,8 @@ extension AppModel {
     static let checkedDayKey = "home_week_checked_day"
     static let weekAheadKey = "home_week_ahead_day"
     /// Sunday (1 in the Gregorian calendar) at 20:00 the week ahead is ready.
-    static let weekAheadWeekday = 1
-    static let weekAheadHour = 20
+    nonisolated static let weekAheadWeekday = 1
+    nonisolated static let weekAheadHour = 20
 
     /// Monday of this week, YYYY-MM-DD.
     var thisMonday: String {
@@ -44,18 +44,62 @@ extension AppModel {
         await scheduleNotifications()
     }
 
-    /// What each training day of the kept week holds, from the engine's week content.
+    /// What each training day of the kept week holds: the engine's week content, then, with an AI key, the movements the
+    /// AI chose for each day where they passed every content check (ContentAgent). Kept until the week, the rules or the
+    /// log change, so the AI is asked once for each.
     func fillHomeWeek() async {
         await loadMovements()
-        guard let week = homeWeek else { homeWeekContent = [:]; homeWeekNote = nil; return }
-        let sessions = week.days.filter(\.trains).map { (id: "home-\($0.day)", focus: $0.focus ?? "full") }
-        guard !sessions.isEmpty,
-              let filled = await contentEngine.week(sessions, minutes: userRules.sessionMax, rules: userRules, log: workoutLog, lighter: isLighterWeek)
-        else { homeWeekContent = [:]; homeWeekNote = nil; return }
-        homeWeekContent = Dictionary(filled.contents.compactMap { content in
+        guard let week = homeWeek else { clearHomeWeekContent(); return }
+        let days = week.days.filter(\.trains).map { ContentAgent.Day(day: $0.day, id: "home-\($0.day)", focus: $0.focus ?? "full") }
+        let minutes = userRules.sessionMax, lighter = isLighterWeek
+        guard !days.isEmpty,
+              let filled = await contentEngine.week(days.map { (id: $0.id, focus: $0.focus) }, minutes: minutes, rules: userRules, log: workoutLog, lighter: lighter)
+        else { clearHomeWeekContent(); return }
+        var contents = Dictionary(filled.contents.compactMap { content in
             content.sessionId.map { (String($0.dropFirst("home-".count)), content) }
         }, uniquingKeysWith: { first, _ in first })
-        homeWeekNote = filled.note
+        let picked = await aiPicks(days, minutes: minutes, lighter: lighter, rulesWeek: filled.contents)
+        for (day, pick) in picked { contents[day] = pick.content }
+        homeWeekContent = contents
+        homeWeekReasons = picked.mapValues(\.reason)
+        // The note counts the rules' sets; with days the AI chose it may not fit them, so it is left to the rules' week.
+        homeWeekNote = picked.isEmpty ? filled.note : nil
+    }
+
+    private func clearHomeWeekContent() {
+        homeWeekContent = [:]
+        homeWeekNote = nil
+        homeWeekReasons = [:]
+    }
+
+    static let aiPicksKey = "home_week_ai_picks"
+
+    /// The AI's choices for these days, from the last time it was asked when nothing it was asked from has changed since.
+    private func aiPicks(_ days: [ContentAgent.Day], minutes: Int, lighter: Bool, rulesWeek: [WorkoutContent]) async -> [String: ContentAgent.Picked] {
+        guard let model = languageModel else { return [:] }
+        let key = aiPicksCacheKey(days, minutes: minutes, lighter: lighter)
+        if let data = settings.data(forKey: Self.aiPicksKey),
+           let saved = try? JSONDecoder().decode(SavedPicks.self, from: data), saved.key == key { return saved.picks }
+        let agent = ContentAgent(model: model, modelId: AIModels.model(), engine: contentEngine)
+        // No answer (offline, a key problem) is asked again next time; an answer, even one that didn't pass, is kept.
+        guard let picks = await agent.pick(days, minutes: minutes, rules: userRules, log: workoutLog, lighter: lighter, rulesWeek: rulesWeek)
+        else { return [:] }
+        if let data = try? JSONEncoder().encode(SavedPicks(key: key, picks: picks)) { settings.set(data, forKey: Self.aiPicksKey) }
+        return picks
+    }
+
+    private struct SavedPicks: Codable {
+        var key: String
+        var picks: [String: ContentAgent.Picked]
+    }
+
+    /// Everything the AI's choice rests on: the days and what each works, the length, the rules and what was done.
+    private func aiPicksCacheKey(_ days: [ContentAgent.Day], minutes: Int, lighter: Bool) -> String {
+        let log = workoutLog
+        return [days.map { "\($0.day)=\($0.focus)" }.joined(separator: ","), "\(minutes)", lighter ? "lighter" : "",
+                userRules.cacheText, "\(log.entries.count)", log.entries.last?.day ?? "",
+                log.loads.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ","),
+                log.lastPain.map(String.init) ?? "", log.lastFeeling?.rawValue ?? ""].joined(separator: "#")
     }
 
     /// A day's movements as one line: "Lower-body: Sit down and stand up, Hip hinge, Bridge."

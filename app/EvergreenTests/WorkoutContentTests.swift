@@ -103,4 +103,20 @@ struct WorkoutContentTests {
         log.settleLoads([easy], feeling: .easy)
         #expect(log.loads["backpack_row"] == 5, "the end-of-session answer doesn't add two more on top")
     }
+
+    @Test func tooHardAndTooEasyChangeTheBackpackOnTheMovementOnScreen() {
+        let item = WorkoutContent.Item(movementId: "backpack_row", sets: 3, reps: [8, 12], load: 3, rest: 60, isNew: false)
+        var progress = WorkoutProgress(day: "2026-11-19", content: WorkoutContent(sessionId: nil, focus: "upper", minutes: 20, items: [item]),
+                                       results: [WorkoutResult(movementId: "backpack_row")], startedAt: Date())
+        #expect(progress.backpackLoad == 3)
+        #expect(progress.backpackTooHard() == 2 && progress.results[0].tooHard)
+        #expect(progress.backpackTooHard() == 1 && progress.backpackTooHard() == 1, "never below a litre")
+        #expect(progress.backpackTooEasy() == 3 && progress.results[0].tooEasy == true && !progress.results[0].tooHard)
+        progress.results[0].load = 12
+        #expect(progress.backpackTooEasy() == nil && progress.results[0].load == 12, "no more than a backpack holds")
+        var bodyweight = progress
+        bodyweight.content.items[0].load = nil
+        bodyweight.results[0].load = nil
+        #expect(bodyweight.backpackTooHard() == nil)
+    }
 }

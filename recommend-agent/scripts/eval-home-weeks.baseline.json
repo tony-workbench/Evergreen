@@ -1,0 +1,21 @@
+{
+  "total": 30,
+  "checks": {
+    "plan": 30,
+    "days": 30,
+    "movements": 30,
+    "equipment": 30,
+    "length": 30,
+    "new": 30,
+    "sets": 30,
+    "rain": 30,
+    "progress": 30
+  },
+  "knownBad": [
+    "rest_day_rule",
+    "too_many_sessions",
+    "session_on_rest_day",
+    "avoided_movement",
+    "session_too_long"
+  ]
+}

@@ -19,6 +19,19 @@ struct BusyReader: @unchecked Sendable {
             .sorted { $0.start < $1.start }
     }
 
+    /// Events with a place that `busy` leaves out: all-day events and events marked free, on every calendar but the app's
+    /// own. They make no busy time, but an all-day or several-day event away from home still makes each of its days a day
+    /// out (plan 5.B.1). Only start, end and place leave this function.
+    func placed(from start: Date, days: Int, except appCalendar: String) -> [Busy] {
+        let others = store.calendars(for: .event).filter { $0.title != appCalendar }
+        guard !others.isEmpty else { return [] }
+        let end = Calendar.current.date(byAdding: .day, value: days, to: start) ?? start
+        return store.events(matching: store.predicateForEvents(withStart: start, end: end, calendars: others))
+            .filter { ($0.isAllDay || $0.availability == .free) && !CalendarEntry.isAppKey($0.url) }
+            .compactMap { event in Self.place(of: event).map { Busy(start: event.startDate, end: event.endDate, place: $0) } }
+            .sorted { $0.start < $1.start }
+    }
+
     /// The coordinate the calendar kept for the event's place, or the place's text when it has none.
     static func place(of event: EKEvent) -> EventPlace? {
         if let point = event.structuredLocation?.geoLocation?.coordinate {

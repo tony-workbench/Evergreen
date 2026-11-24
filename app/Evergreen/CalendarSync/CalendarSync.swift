@@ -121,6 +121,14 @@ final class CalendarSync {
         return await Task.detached { reader.busy(from: storyDay, days: days, except: title) }.value
     }
 
+    /// All-day and free events that have a place, for telling days out from days at home. The fetch runs off the main thread.
+    func placedEvents(from storyDay: Date) async -> [Busy] {
+        guard prepareStore() else { return [] }
+        let reader = BusyReader(store: store)
+        let days = Self.window, title = Self.calendarTitle
+        return await Task.detached { reader.placed(from: storyDay, days: days, except: title) }.value
+    }
+
     static let testMeetingScheme = "evergreen-demo"
     /// The schemes older builds marked their test meeting with, so one left behind is still cleared.
     static let legacyTestMeetingScheme = "trackerplusplus-demo"

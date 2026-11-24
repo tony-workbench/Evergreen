@@ -69,6 +69,17 @@ struct WorkoutPageTests {
         #expect(earlier.first?.focus == "lower")
     }
 
+    @Test func aSkipTappedOnAReminderAfterMidnightCanBeTakenBack() async throws {
+        let rig = try rig(focus: "full")
+        PlannedDays(days: ["2026-11-18"]).save(to: rig.settings)
+        // Wednesday's last reminder, skipped from the lock screen early on Thursday.
+        await rig.model.handleWorkoutAction(.skipNotToday, day: "2026-11-18")
+        #expect(rig.model.earlierThisWeek.map(\.outcome) == [.skipped])
+        await rig.model.unskipDay("2026-11-18")
+        #expect(!rig.model.workoutLog.didSkip("2026-11-18"))
+        #expect(rig.model.earlierThisWeek.map(\.outcome) == [.missed])
+    }
+
     @Test func aTapOnAReminderOpensTheWorkoutPage() async throws {
         let tap = UNNotificationDefaultActionIdentifier
         #expect(Notifier.route(action: tap, day: "2026-11-19", kind: "now", move: nil) == .workout(.start, day: "2026-11-19"))

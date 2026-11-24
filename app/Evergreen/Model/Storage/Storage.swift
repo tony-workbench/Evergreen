@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 
 /// The store's shape, versioned so a later change can migrate what is saved.
 enum StoreV1: VersionedSchema {
@@ -20,7 +21,8 @@ enum StoreMigration: SchemaMigrationPlan {
 enum Storage {
     static let url = URL.applicationSupportDirectory.appending(path: "Evergreen.store")
     /// True when the saved store couldn't be used and the app began again.
-    nonisolated(unsafe) private(set) static var startedFresh = false
+    static var startedFresh: Bool { fresh.withLock { $0 } }
+    private static let fresh = OSAllocatedUnfairLock(initialState: false)
 
     static func container(at url: URL = Storage.url) -> ModelContainer {
         let schema = Schema(versionedSchema: StoreV1.self)
@@ -29,7 +31,7 @@ enum Storage {
             return container
         }
         // Set the unreadable store aside rather than deleting it.
-        startedFresh = true
+        fresh.withLock { $0 = true }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let stamp = Int(Date().timeIntervalSince1970)
         for suffix in ["", "-shm", "-wal"] {

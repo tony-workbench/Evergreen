@@ -161,27 +161,45 @@ struct UserRules: Codable, Equatable, Sendable {
         guard let profile = try? JSONDecoder().decode(Profile.self, from: data) else { throw ImportError.unreadable }
         var rules = self
         rules.isOn = true
-        if let days = profile.restWeekdays { rules.restWeekdays = Array(Set(days)).sorted() }
-        if let length = profile.sessionMinutes { rules.sessionMin = length.min; rules.sessionMax = length.max }
-        if let window = profile.window { rules.windowFrom = window.from; rules.windowTo = window.to }
-        if let mornings = profile.mornings { rules.mornings = mornings }
-        if let owned = profile.equipment {
-            let known = owned.compactMap(Equipment.init(rawValue:))
-            // Floor and wall are always there; anything else the app doesn't know is refused, not dropped.
-            guard known.count == owned.filter({ !["floor", "wall"].contains($0) }).count else { throw ImportError.outOfRange }
-            rules.equipment = Equipment.allCases.filter(known.contains)
-        }
-        if let avoid = profile.avoid { rules.avoid = Array(Set(avoid)).sorted() }
-        if let states = profile.movements { rules.movements.merge(states) { _, new in new } }
-        if let far = profile.farKilometres {
-            guard far > 0, far <= 500 else { throw ImportError.outOfRange }
-            rules.farKilometres = far
-        }
+        rules.takeSchedule(from: profile)
+        try rules.takeEquipment(from: profile)
+        try rules.takeMovements(from: profile, library: library)
         guard rules.isValid else { throw ImportError.outOfRange }
-        let named = (profile.avoid ?? []) + (profile.movements.map { Array($0.keys) } ?? [])
-        guard library.isEmpty || named.allSatisfy(library.contains) else { throw ImportError.outOfRange }
         return rules
     }
+
+    /// The days, session length, hours and mornings a profile gives.
+    private mutating func takeSchedule(from profile: Profile) {
+        if let days = profile.restWeekdays { restWeekdays = Array(Set(days)).sorted() }
+        if let length = profile.sessionMinutes { sessionMin = length.min; sessionMax = length.max }
+        if let window = profile.window { windowFrom = window.from; windowTo = window.to }
+        if let mornings = profile.mornings { self.mornings = mornings }
+    }
+
+    /// What the person has and how far is "far from home". Floor and wall are always there; anything else the app
+    /// doesn't know is refused, not dropped.
+    private mutating func takeEquipment(from profile: Profile) throws {
+        if let owned = profile.equipment {
+            let known = owned.compactMap(Equipment.init(rawValue:))
+            guard known.count == owned.filter({ !Self.alwaysThere.contains($0) }).count else { throw ImportError.outOfRange }
+            equipment = Equipment.allCases.filter(known.contains)
+        }
+        if let far = profile.farKilometres {
+            guard far > 0, far <= Self.mostFarKilometres else { throw ImportError.outOfRange }
+            farKilometres = far
+        }
+    }
+
+    /// Movements to leave out and each movement's state; every id has to be in the library when it could be read.
+    private mutating func takeMovements(from profile: Profile, library: Set<String>) throws {
+        let named = (profile.avoid ?? []) + (profile.movements.map { Array($0.keys) } ?? [])
+        guard library.isEmpty || named.allSatisfy(library.contains) else { throw ImportError.outOfRange }
+        if let avoid = profile.avoid { self.avoid = Array(Set(avoid)).sorted() }
+        if let states = profile.movements { movements.merge(states) { _, new in new } }
+    }
+
+    private static let alwaysThere: Set<String> = ["floor", "wall"]
+    private static let mostFarKilometres = 500.0
 }
 
 extension UserRules {

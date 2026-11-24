@@ -72,11 +72,22 @@ extension AppModel {
         // "I'm home" said today stands: being far again later the same day doesn't make it a day out again.
         guard onDevice, userRules.isOn, let home = userRules.home, settings.string(forKey: Self.farDayKey) != todayISO,
               !stayingHomeDays.contains(todayISO) else { return }
-        let location = DeviceLocation()
+        let location = deviceLocation(Self.farAccuracyMetres)
         guard location.permission == .allowed, let here = await location.current(),
               home.isFar(here, kilometres: userRules.farKilometres) else { return }
         settings.set(todayISO, forKey: Self.farDayKey)
         await replanForRules()
+    }
+
+    /// "Far from home" needs a kilometre; home is a 200 m circle, so setting it asks for a hundred metres.
+    static let farAccuracyMetres = 1000.0
+    static let homeAccuracyMetres = 100.0
+
+    /// Where the phone is now, as home: asks for location if it hasn't been asked. Nil when location is off or there's no fix.
+    func locateHome() async -> HomePlace? {
+        let location = deviceLocation(Self.homeAccuracyMetres)
+        guard await location.request(), let here = await location.current() else { return nil }
+        return HomePlace(place: here)
     }
 
     // MARK: Working the days out
@@ -84,9 +95,9 @@ extension AppModel {
     /// Each of the next seven days as home, out or rest. Nothing without rules.
     func refreshDayKinds() async {
         guard userRules.isOn else { dayKinds = [:]; return }
-        dayKinds = await DayKinds.classify(rules: userRules, busy: busyNow, goingOut: goingOutDays, stayingHome: stayingHomeDays,
-                                           farToday: settings.string(forKey: Self.farDayKey) == todayISO,
-                                           from: now, calendar: calendar, geocoder: SystemGeocoder())
+        dayKinds = await DayKinds.classify(rules: userRules, busy: busyNow + placedCache, goingOut: goingOutDays,
+                                           stayingHome: stayingHomeDays, farToday: settings.string(forKey: Self.farDayKey) == todayISO,
+                                           from: now, calendar: calendar, geocoder: geocoder, previous: dayKinds)
     }
 
     private func replanForRules() async {

@@ -50,6 +50,14 @@
     "doneToday": {
       "description": "Today's home session is already done: today keeps its own focus and passes none of it on.",
       "type": "boolean"
+    },
+    "dayOffsets": {
+      "description": "Each day's UTC offset at noon, by day, from the phone's time zone, for the days of the home week (today through Sunday, or through next Sunday when today is Sunday). Times on a day it lists use that day's offset, so a clock change mid-week moves nothing; a day it leaves out uses the offset of `now`.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[+-]\\d{2}:\\d{2}$"
+      }
     }
   }
 }

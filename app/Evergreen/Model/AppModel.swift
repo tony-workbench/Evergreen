@@ -34,6 +34,10 @@ final class AppModel {
     @ObservationIgnored let notifier = Notifier()
     /// Writes a finished home workout to Apple Health; tests give one that counts.
     @ObservationIgnored var writeStrength: @Sendable (Date, Date) async -> Bool = { await WorkoutWriter.saveStrength(start: $0, end: $1) }
+    /// Turns an event's typed place into a coordinate, for telling days out; tests give a fake.
+    @ObservationIgnored var geocoder: any PlaceGeocoding = SystemGeocoder()
+    /// Makes the phone's location to the given accuracy in metres, for "far from home" and setting home; tests give a fake.
+    @ObservationIgnored var deviceLocation: @MainActor (Double) -> any LocationProviding = { DeviceLocation(accuracy: $0) }
     /// The memory engine over this phone's memory folder; nil if the folder can't be made.
     @ObservationIgnored let memory: MemoryEngine?
     /// False for the tour's model, which never touches the device or the network.
@@ -52,6 +56,8 @@ final class AppModel {
     var minute = 0
     /// The busy times on the person's other calendars, as last read (on a tick or a calendar change).
     @ObservationIgnored var busyCache: [Busy] = []
+    /// All-day and free events with a place, read with `busyCache`; they only tell days out from days at home.
+    @ObservationIgnored var placedCache: [Busy] = []
     /// The last few things that happened, newest first, for Settings.
     var activity: [String] = []
     /// Notes already shown in the hero on an earlier launch, and the ones shown on this one.
@@ -65,7 +71,7 @@ final class AppModel {
     let earnedTime = EarnedTimeModel()
     /// The rules the person set (Model/UserRules.swift); off until they answer "How you train" or import a profile.
     var userRules = UserRules()
-    /// Each of the next seven days as home, out or rest, worked out on the phone (AppModel+Rules.swift).
+    /// Each of the next eight days as home, out or rest, worked out on the phone (AppModel+Rules.swift).
     var dayKinds: [String: DayKind] = [:]
     /// The week the rules make: each day's kind, focus, time and fallbacks (Model/HomeWeek.swift).
     var homeWeek: HomeWeek?
@@ -73,6 +79,8 @@ final class AppModel {
     var homeWeekContent: [String: WorkoutContent] = [:]
     /// Said at the top of the week table when the week can't reach its aim ("This week has 4 sets of…").
     var homeWeekNote: String?
+    /// The days whose movements the AI chose (and code passed), with its one sentence on why, shown as picked by AI.
+    var homeWeekReasons: [String: String] = [:]
     /// What the person did on the workout page (Model/WorkoutLog.swift).
     var workoutLog = WorkoutLog()
     /// Set by "Start" on a reminder: Today opens the workout page and sets it back.
@@ -140,7 +148,7 @@ final class AppModel {
                           guard let self else { return [] }
                           return await self.calendarSync.busyTimes(from: self.calendar.startOfDay(for: self.now))
                       },
-                      notify: { [notifier] copy, id in await notifier.send(copy, id: id) })
+                      notify: { [weak self] copy, id in await self?.notifyNow(copy, id: id) })
     }
 
     // MARK: The saved plan, as views and the other parts read it
@@ -328,8 +336,7 @@ final class AppModel {
         guard onDevice, deviceUnlocked else { return }
         // A day out has no reminders: the person said they're out, or the phone was far from home when the app opened.
         // A session on a day at home has reminders of its own (AppModel+Reminders.swift), not the one 30 minutes before.
-        let upcoming = plan.filter { completion(for: $0) == nil && !isDayOut($0.slot.start) && !isHomeSession($0) }
-        await notifier.scheduleReminders(for: upcoming)
+        await notifier.scheduleReminders(for: otherReminderItems)
         await scheduleHomeNotifications()
         await notifier.scheduleWeekAhead(userRules.isOn)
     }

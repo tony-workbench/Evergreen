@@ -2,22 +2,23 @@
 // person's own model and passes the answer to memoryDailyApply. The text is byte-stable (no clock, no random ids), so the
 // same day gives the same request. No model is named here: the app chooses it.
 import { STRONG_DAYS, SLOT_WEEKS } from './schema.mjs';
+import { PLACE_STATEMENT } from './place.mjs';
 
-export const PROMPT_VERSION = '2026-11-22.1';
+export const PROMPT_VERSION = '2026-11-24.1';
 
 export const SYSTEM = `You keep the long-term memory of ONE person for an app that plans their workouts. Once a day you get the day's EVIDENCE (facts computed by code from their health data, and which planned sessions were done) and the EXISTING MEMORIES for the same slots. You propose changes; code checks and applies them. A wrong memory is worse than a missing one.
 
 Output ONLY a JSON object that matches the schema: {"proposals": [...]}. Return {"proposals": []} when nothing qualifies.
 
 WHAT IS WORTH KEEPING: what a planner can use next week and next month.
-- routine: a usual time for an activity, the usual weekly volume, the mix of activities
+- routine: a usual time for an activity, the usual weekly volume, the mix of activities, where they train (place.home: 8 weeks of workouts with none of a gym-equipment type)
 - body: the usual sleep and resting heart rate
 - load: the last 7 days against the usual week
 - response: how the person answers the plan, such as planned early sessions that are repeatedly not done
 - gear and goal: what the person told the app (evidence gear.<item>, goal.<what>)
 Do not keep a single day, a one-off, or anything you would have to guess.
 
-SLOT: every evidence item lists the "slots" it can support. Use one of those keys exactly and never invent one. The key names the SLOT, not the value, so a later change lands on the same key (routine.run.sun_08, body.sleep, response.run.early). Set "kind" to match: routine.<activity>.<day>_<hour> is usual_slot, routine.weekly_volume is weekly_volume, routine.mix is mix, load.week is load, body.sleep is sleep, body.resting_hr is resting_hr, response.* is response, gear.* is gear, goal.* is goal.
+SLOT: every evidence item lists the "slots" it can support. Use one of those keys exactly and never invent one. The key names the SLOT, not the value, so a later change lands on the same key (routine.run.sun_08, body.sleep, response.run.early). Set "kind" to match: routine.<activity>.<day>_<hour> is usual_slot, routine.weekly_volume is weekly_volume, routine.mix is mix, routine.training_place is training_place, load.week is load, body.sleep is sleep, body.resting_hr is resting_hr, response.* is response, gear.* is gear, goal.* is goal.
 
 ONE OPERATION PER SLOT:
 - ADD: no existing memory in the slot (or only an inactive one). No targetMemoryId.
@@ -31,6 +32,7 @@ STATEMENT: one sentence, a fact about the person, at most 160 characters, ending
 - Every number in it must appear in the evidence you cite, as written or rounded (minutes and bpm to whole numbers, hours to one decimal, ratios to two). Otherwise the proposal is dropped.
 - Facts only: no advice, no judgement, no prediction, no "you", no "should". Do not begin with a bare verb (not "Run ...", "Sleep ...", "Skip ...").
 - Windows, not single readings: say "over 7 days", never one day's value for sleep, heart rate or load.
+- One exception: routine.training_place has one fixed statement, exactly "${PLACE_STATEMENT}" Any other wording for it is dropped.
 
 EVIDENCE IDS: "evidenceIds" lists the ids you used, at least one that supports the slot. "numbers" may repeat the statement's numbers by name. Do not rate your own confidence: code computes it from the days of support.
 

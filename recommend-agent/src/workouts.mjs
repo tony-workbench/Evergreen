@@ -10,7 +10,7 @@ import { readMemory, slotFor, activityOf, labelOf, readStopped, isStopped } from
 import { readHistory } from './history.mjs';
 import { condition } from './condition.mjs';
 import { readRules, readDayKinds } from './rules.mjs';
-import { homeContext, homeWeek, homeWeekView, FOCUS, FOCUS_WORDS } from './homeweek.mjs';
+import { homeContext, homeWeek, homeWeekView, readDayOffsets, offOf, FOCUS, FOCUS_WORDS } from './homeweek.mjs';
 
 export const DAYS = 7;               // the week is 7 local days starting today
 export const TODAY_LEAD_MIN = 60;    // a session today starts at least this long after now
@@ -162,7 +162,7 @@ export function parseRequest(a) {
   const carry = Array.isArray(a.carry) ? a.carry.filter((f) => FOCUS.includes(f)) : [];
   return {
     now, shoes, newPairArrives: day(a.newPairArrives), raceDate: day(a.raceDate), busy, memory: a.memory ?? null, history: a.history ?? null, stopped: a.stopped ?? null,
-    rules: readRules(a.rules), dayKinds: readDayKinds(a.dayKinds), carry,
+    rules: readRules(a.rules), dayKinds: readDayKinds(a.dayKinds), carry, offsets: readDayOffsets(a.dayOffsets),
   };
 }
 
@@ -170,15 +170,15 @@ const HOME_EFFORT = 5;   // a home strength session counts as steady
 
 /** With rules: one strength session on every day at home, at its first free time, and nothing on rest or out days. */
 function homeBuild(req, base) {
-  const h = homeContext({ now: req.now, calendar: req.busy, rules: req.rules, dayKinds: req.dayKinds, carry: req.carry });
+  const h = homeContext({ now: req.now, calendar: req.busy, rules: req.rules, dayKinds: req.dayKinds, carry: req.carry, offsets: req.offsets });
   const week = homeWeek(h);
   const minutes = req.rules.session.max;
   const sessions = week.days.filter((d) => d.focus !== null).map((d) => {
-    const start = { mic: d.first, off: req.now.off };
+    const start = { mic: d.first, off: offOf(h, d.day) };
     return {
       date: d.day, activityType: 'TraditionalStrengthTraining', usualActivity: 'TraditionalStrengthTraining', minutes, effort: HOME_EFFORT,
       hour: hourOf(start), start, end: addUs(start, minutes * US_MIN), tags: [{ code: 'home_day', focus: d.focus }],
-      fallbacks: d.fallbacks.map((mic) => ({ mic, off: req.now.off })),
+      fallbacks: d.fallbacks.map((mic) => ({ mic, off: start.off })),
     };
   });
   base.sig.plannedLoad = pyRound(pySum(sessions.map((s) => s.effort * s.minutes)));

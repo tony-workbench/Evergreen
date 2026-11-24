@@ -116,3 +116,24 @@ test('the globals without a schema of their own answer { ok: true } in the share
   for (const x of conflicts.conflicts) assert.ok(startPattern.test(x.start) && startPattern.test(x.end));
   assert.equal(call('planBrief', { context: ctx }).ok, true);
 });
+
+test('workoutContent, weekContent and proposedContent fit workout-content.schema.json, slow step included', { skip }, () => {
+  const rules = { equipment: ['backpack', 'chair', 'table', 'sofa', 'book', 'step'] };
+  const history = [{ movementId: 'backpack_row', day: '2026-11-23', sets: [15, 15, 15], load: 4 }];
+  const one = call('workoutContent', { sessionId: 's1', focus: 'upper', rules, history });
+  assert.ok(one.content.items.some((i) => i.slow === true));
+  fits('workout-content', one.content, 'workoutContent');
+  for (const c of call('weekContent', { rules, history, sessions: [{ sessionId: 'a', focus: 'lower' }, { sessionId: 'b', focus: 'upper' }] }).contents) fits('workout-content', c, 'weekContent');
+  const proposed = call('proposedContent', { sessionId: 's1', focus: 'upper', rules, history, proposal: { items: one.content.items.map((i) => ({ movementId: i.movementId, sets: i.sets })) } });
+  assert.equal(proposed.pass, true);
+  fits('workout-content', proposed.content, 'proposedContent');
+});
+
+test('every home-days value in the contract, day offsets included, is read by planContext', { skip }, () => {
+  const values = JSON.parse(readFileSync(new URL('fixtures/swift/home-days.json', home), 'utf8'));
+  assert.ok(values.some((v) => v.dayOffsets));
+  for (const value of values) {
+    fits('home-days', value, 'home-days fixture');
+    assert.equal(call('planContext', { now: '2026-11-09T08:00:00-08:00', memory: { rows: [] }, rules: {}, ...value }).ok, true);
+  }
+});

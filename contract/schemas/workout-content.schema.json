@@ -25,7 +25,8 @@
           "seconds": { "description": "The shortest and longest hold a set aims for.", "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer", "minimum": 5, "maximum": 300 } },
           "load": { "description": "Kilograms in the backpack.", "type": "number", "minimum": 1, "maximum": 12 },
           "rest": { "description": "Seconds of rest between sets.", "type": "integer", "minimum": 0, "maximum": 300 },
-          "isNew": { "description": "The person hasn't done it yet: the page asks first whether they can do one.", "type": "boolean" }
+          "isNew": { "description": "The person hasn't done it yet: the page asks first whether they can do one.", "type": "boolean" },
+          "slow": { "description": "The slow step: every rep's lowering phase takes 2 seconds longer than the library's tempo. Present (true) only on the session that takes it; the history entry of that session carries slow: true too. Absent means the library's tempo.", "type": "boolean" }
         },
         "oneOf": [
           { "required": ["reps"] },

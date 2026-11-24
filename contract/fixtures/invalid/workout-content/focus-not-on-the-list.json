@@ -1,7 +1,7 @@
 {
   "sessionId": null,
   "focus": "arms",
-  "minutes": 18,
+  "minutes": 15,
   "items": [
     {
       "movementId": "sit_to_stand",
@@ -21,7 +21,8 @@
         15
       ],
       "rest": 60,
-      "isNew": false
+      "isNew": false,
+      "slow": true
     },
     {
       "movementId": "dead_bug",

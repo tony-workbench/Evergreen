@@ -13,6 +13,7 @@ function candidate(e) {
   if (e.id === 'body.sleep') return { ...base, kind: 'sleep', moved: (old) => Math.abs(Number(/and (\d+(?:\.\d+)?) h over 28/.exec(old)?.[1] ?? n.average28) - n.average28) >= 0.2 };
   if (e.id === 'body.resting_hr') return { ...base, kind: 'resting_hr', moved: (old) => Math.abs(Number(/and (\d+) bpm over 28/.exec(old)?.[1] ?? n.average28) - n.average28) >= 2 };
   if (e.id === 'mix.count') return { ...base, kind: 'mix' };
+  if (e.id === 'place.home') return { ...base, kind: 'training_place' };
   if (e.id.startsWith('gear.') || e.id.startsWith('goal.')) return { ...base, kind: e.id.slice(0, 4), moved: () => true };
   if (e.id.startsWith('outcomes.') && n.notDone >= 2) return { ...base, kind: 'response', ask: true };
   return null;

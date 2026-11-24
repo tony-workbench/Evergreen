@@ -12,6 +12,7 @@ import {
   VERSIONS_KEPT, SUPERSEDED_KEPT, EVENTS_KEPT, CODE_TEXT, fail,
 } from './schema.mjs';
 import { statementFor } from './statements.mjs';
+import { PLACE_KIND, PLACE_STATEMENT } from './place.mjs';
 import { factEvidence, outcomeEvidence, extraEvidence, allowedNumbers, numbersNotIn, addDays, isDay } from './evidence.mjs';
 
 const REFS_KEPT = 40;
@@ -163,6 +164,16 @@ function sweep(state, ctx) {
 }
 
 /**
+ * The evidence of a day contradicts the memory in a slot (a gym workout under "you train at home"): every open memory
+ * there becomes inactive at once, as an expired one does, and its question is closed. A later day's evidence can ADD it again.
+ */
+export function retireSlot(state, slot, ctx) {
+  let any = false;
+  for (const m of inSlot(state, slot)) if (OPEN.includes(m.state) && move(state, m, INACTIVE, 'system', ctx, 'RETIRE')) { closeReviews(state, m.id); any = true; }
+  return any;
+}
+
+/**
  * Apply the model's proposals for one day. Returns
  *   { ok, day, alreadyDone, applied: [{ index, op, slot, memoryId, version, guard? }], rejected: [{ index, code, text }], review: [...] }
  * `guard` is the code that turned the proposal into a REVIEW. Each (day, evidence) pair is applied once.
@@ -204,7 +215,8 @@ export function applyDaily(state, { day, proposals, at, sha256 }) {
     const allowed = allowedNumbers(cited);
     if (numbersNotIn(p.statement, allowed).length > 0 || Object.values(p.numbers ?? {}).some((v) => v < 0 || !allowed.numbers.has(String(v)))) return drop('number_not_in_evidence');
     // A goal may have no date, so its sentence may have no number; everything else the fact lint asks still holds.
-    if (lintWords(p.statement).filter((x) => !(group === 'goal' && /number/.test(x))).length > 0) return drop('not_a_fact');
+    // Where the person trains has one fixed sentence, written by code (place.mjs); any other wording is dropped.
+    if (p.kind === PLACE_KIND ? p.statement !== PLACE_STATEMENT : lintWords(p.statement).filter((x) => !(group === 'goal' && /number/.test(x))).length > 0) return drop('not_a_fact');
     if (group !== 'response' && supporting.every((c) => c.window === 'day')) return drop('raw_reading');
     if (inSlot(state, p.slot).some((m) => m.state === REJECTED && norm(current(m).statement) === norm(p.statement))) return drop('rejected_before');
 

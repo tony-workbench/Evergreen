@@ -328,6 +328,14 @@ export const SCHEMAS = {
       "doneToday": {
         "description": "Today's home session is already done: today keeps its own focus and passes none of it on.",
         "type": "boolean"
+      },
+      "dayOffsets": {
+        "description": "Each day's UTC offset at noon, by day, from the phone's time zone, for the days of the home week (today through Sunday, or through next Sunday when today is Sunday). Times on a day it lists use that day's offset, so a clock change mid-week moves nothing; a day it leaves out uses the offset of `now`.",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string",
+          "pattern": "^[+-]\\d{2}:\\d{2}$"
+        }
       }
     }
   },
@@ -386,7 +394,8 @@ export const SCHEMAS = {
           "mix",
           "response",
           "gear",
-          "goal"
+          "goal",
+          "training_place"
         ]
       },
       "statement": {
@@ -727,6 +736,39 @@ export const SCHEMAS = {
                   "null"
                 ],
                 "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+              }
+            }
+          }
+        }
+      },
+      {
+        "properties": {
+          "kind": {
+            "const": "training_place"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "place",
+              "gymWorkouts",
+              "weeks"
+            ],
+            "properties": {
+              "place": {
+                "type": "string",
+                "enum": [
+                  "home"
+                ]
+              },
+              "gymWorkouts": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 0
+              },
+              "weeks": {
+                "type": "integer",
+                "minimum": 8
               }
             }
           }
@@ -1250,6 +1292,10 @@ export const SCHEMAS = {
             },
             "isNew": {
               "description": "The person hasn't done it yet: the page asks first whether they can do one.",
+              "type": "boolean"
+            },
+            "slow": {
+              "description": "The slow step: every rep's lowering phase takes 2 seconds longer than the library's tempo. Present (true) only on the session that takes it; the history entry of that session carries slow: true too. Absent means the library's tempo.",
               "type": "boolean"
             }
           },

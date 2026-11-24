@@ -99,6 +99,7 @@ struct WorkoutSessionView: View {
         if let progress, let item, let move = model.movement(item.movementId) {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.md) {
+                    if progress.index == 0, let reason = progress.reason { AIPickedNote(reason: reason) }
                     Text("\(progress.index + 1) of \(progress.content.items.count)")
                         .font(.footnote).foregroundStyle(Theme.textMuted)
                     Text(move.name)
@@ -107,6 +108,10 @@ struct WorkoutSessionView: View {
                         .accessibilityAddTraits(.isHeader)
                     Text(targetLine(item, move))
                         .font(.headline).foregroundStyle(Theme.accent)
+                    if let slow = slowLine(item, move) {
+                        Label(slow, systemImage: "tortoise")
+                            .font(.body).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
+                    }
                     if let swappedNote {
                         Text(swappedNote).font(.footnote).foregroundStyle(Theme.textMuted).fixedSize(horizontal: false, vertical: true)
                     }
@@ -140,6 +145,12 @@ struct WorkoutSessionView: View {
         var line = "Set \(min(setsDone + 1, item.sets)) of \(item.sets) · \(item.target(sides: move.sides))"
         if let load = result?.load ?? item.load { line += " · " + BackpackWater.words(load) }
         return line
+    }
+
+    /// The slow step: the same movement, every rep lowered two seconds slower, before any weight or harder movement.
+    private func slowLine(_ item: WorkoutContent.Item, _ move: Movement) -> String? {
+        guard item.slow == true, let tempo = move.tempo else { return nil }
+        return "Slower this time: lower in \(tempo.down + WorkoutContent.slowExtraSeconds) seconds instead of \(tempo.down)."
     }
 
     private func asksFirst(_ item: WorkoutContent.Item, _ move: Movement) -> Bool {
@@ -247,10 +258,10 @@ struct WorkoutSessionView: View {
     /// harder one goes on the avoid list, and the page says so. With no easier one it stays, marked.
     private func tooHard() {
         guard let item, let move = model.movement(item.movementId) else { return }
-        if move.usesBackpack, let load = result?.load ?? item.load {
-            let lighter = max(BackpackWater.leastKg, load - BackpackWater.harderStepKg)
-            edit { $0.results[$0.index].load = lighter; $0.results[$0.index].tooHard = true; $0.results[$0.index].tooEasy = nil }
-            swappedNote = "One litre less: " + BackpackWater.words(lighter) + "."
+        if move.usesBackpack, progress?.backpackLoad != nil {
+            var lighter: Double?
+            edit { lighter = $0.backpackTooHard() }
+            swappedNote = lighter.map { "One litre less: " + BackpackWater.words($0) + "." }
         } else if let easier = move.easier.flatMap(model.movement) {
             swap(to: easier)
             swappedNote = "Swapped to \(easier.name). \(move.name) is left out from now on; you can bring it back in My rules, Leave out."
@@ -263,11 +274,10 @@ struct WorkoutSessionView: View {
 
     /// A backpack movement that is too easy goes up two kilograms now, for the sets left and for next time.
     private func tooEasy() {
-        guard let item, let load = result?.load ?? item.load else { return }
-        let heavier = min(BackpackWater.maxKg, load + BackpackWater.easierStepKg)
-        guard heavier > load else { swappedNote = "That’s as much as a backpack holds."; return }
-        edit { $0.results[$0.index].load = heavier; $0.results[$0.index].tooEasy = true; $0.results[$0.index].tooHard = false }
-        swappedNote = "Two litres more: " + BackpackWater.words(heavier) + "."
+        guard progress?.backpackLoad != nil else { return }
+        var heavier: Double?
+        edit { heavier = $0.backpackTooEasy() }
+        swappedNote = heavier.map { "Two litres more: " + BackpackWater.words($0) + "." } ?? "That’s as much as a backpack holds."
     }
 
     /// Puts another movement in this one's place. Sets already done stay with the first movement.
@@ -419,5 +429,20 @@ private struct RestCountdown: View {
             if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
             if !Task.isCancelled { onDone() }
         }
+    }
+}
+
+/// Says that the AI chose these movements, and why in its own sentence, so its work is never shown as the app's own.
+/// Code checked the choice against every rule before it got here.
+struct AIPickedNote: View {
+    let reason: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Label("Movements picked by AI", systemImage: "sparkles")
+                .font(.footnote.weight(.semibold)).foregroundStyle(Theme.textMuted)
+            Text(reason).font(.footnote).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
     }
 }

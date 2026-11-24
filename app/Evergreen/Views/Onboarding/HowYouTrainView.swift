@@ -12,6 +12,8 @@ struct HowYouTrainView: View {
     @State private var rules = UserRules()
     @State private var atHome = true
     @State private var pickingAvoid = false
+    @State private var settingHome = false
+    @State private var homeLine: String?
 
     private static let lengths: [(min: Int, max: Int)] = [(15, 20), (20, 25), (30, 40)]
 
@@ -32,6 +34,15 @@ struct HowYouTrainView: View {
                         .pickerStyle(.segmented)
                     }
                     if atHome {
+                        question("Where is home?") {
+                            Button(settingHome ? "Finding where you are…" : rules.home == nil ? "I’m home now: use this place" : "Home is set. Move it here") {
+                                Task { await setHome() }
+                            }
+                            .buttonStyle(TapTargetButtonStyle())
+                            .disabled(settingHome)
+                            Text(homeLine ?? "A day with an event somewhere else is a day out, with no workout. Your location stays on this phone.")
+                                .font(.footnote).foregroundStyle(Theme.textMuted)
+                        }
                         question("What do you have?") {
                             Text("No gym equipment needed. Floor and wall are always there.")
                                 .font(.footnote).foregroundStyle(Theme.textMuted)
@@ -101,6 +112,17 @@ struct HowYouTrainView: View {
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { pickingAvoid = false } } }
             }
         }
+    }
+
+    private func setHome() async {
+        settingHome = true
+        defer { settingHome = false }
+        guard let home = await model.locateHome() else {
+            homeLine = "Location is off for Evergreen, so home isn’t set. You can set it later in Settings › My rules."
+            return
+        }
+        rules.home = home
+        homeLine = "Home is set to where you are now."
     }
 
     private func question(_ title: String, @ViewBuilder content: () -> some View) -> some View {

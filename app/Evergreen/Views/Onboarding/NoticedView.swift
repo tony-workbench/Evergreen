@@ -2,7 +2,9 @@ import SwiftUI
 
 /// Onboarding screen 3, "What I noticed": the buddy beside the person's real
 /// last 4 weeks, and at most three short lines from memory's first roll. The
-/// moment the person sees Evergreen already knows them.
+/// moment the person sees Evergreen already knows them. A line that comes
+/// from a memory row ("You train at home, without gym equipment.") has
+/// "Not true for me", which rejects that row.
 struct NoticedView: View {
     let onContinue: () -> Void
 
@@ -25,11 +27,23 @@ struct NoticedView: View {
                     RecentWeeksGrid(weeks: model.recentWeeks)
                 }
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(model.memoryBrief.noticed, id: \.self) { line in
-                        Text(line)
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(Theme.text)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    ForEach(model.memoryBrief.noticedLines(rows: model.memoryRows)) { line in
+                        HStack(alignment: .firstTextBaseline, spacing: Theme.md) {
+                            Text(line.text)
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(Theme.text)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: Theme.sm)
+                            // A line from a memory row (where the person trains) can be said no to, as anywhere else.
+                            if let key = line.key {
+                                Button("Not true for me") { Task { await model.stop(key: key) } }
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.textMuted)
+                                    .frame(minHeight: 44)
+                                    .accessibilityLabel("Not true for me: \(line.text)")
+                            }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         Rectangle().fill(Theme.rule).frame(height: 1)
                     }
                 }
