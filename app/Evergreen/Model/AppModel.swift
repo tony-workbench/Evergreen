@@ -31,7 +31,7 @@ final class AppModel {
     @ObservationIgnored let clock: (@Sendable () -> Date)?
     /// Whether the phone is unlocked, instead of asking the device (tests).
     @ObservationIgnored var unlocked: (@MainActor () -> Bool)?
-    @ObservationIgnored private let notifier = Notifier()
+    @ObservationIgnored let notifier = Notifier()
     /// The memory engine over this phone's memory folder; nil if the folder can't be made.
     @ObservationIgnored let memory: MemoryEngine?
     /// False for the tour's model, which never touches the device or the network.
