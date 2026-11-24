@@ -918,8 +918,28 @@
   var SPLIT_DAYS = 4;
   var FOCUS = ["full", "lower", "upper", "full_lower", "full_upper"];
   var FOCUS_WORDS = { full: "full-body", lower: "lower-body", upper: "upper-body", full_lower: "full-body, more legs", full_upper: "full-body, more upper body" };
-  function homeContext({ now, calendar, rules, dayKinds, carry = [] }) {
-    return { now, today: dayOf(now), off: now.off, calendar: [...calendar].sort((x, y) => x.start.mic - y.start.mic), rules, given: dayKinds, carry };
+  function homeContext({ now, calendar, rules, dayKinds, carry = [], queue = /* @__PURE__ */ new Map() }) {
+    return {
+      now,
+      today: dayOf(now),
+      off: now.off,
+      calendar: [...calendar].sort((x, y) => x.start.mic - y.start.mic),
+      rules,
+      given: dayKinds,
+      carry,
+      queue: new Map([...queue].filter(([, f]) => FOCUS.includes(f)))
+    };
+  }
+  function readQueue(raw) {
+    const out = /* @__PURE__ */ new Map();
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+    for (const [iso, focus] of Object.entries(raw)) {
+      try {
+        if (FOCUS.includes(focus)) out.set(parseDay(iso), focus);
+      } catch {
+      }
+    }
+    return out;
   }
   function stretchesOn(h, day) {
     if (kindOf(h.rules, h.given, day) !== "home") return [];
@@ -987,6 +1007,30 @@
     }
     return [...missed, ...focus].slice(0, days.length);
   }
+  function thisWeekFocus(h, rows, sunday) {
+    const fresh = withCarry(rows.map((r) => r.day), splitOf(rows.map((r) => r.day)), h.carry);
+    if (!h.queue.size) {
+      rows.forEach((r, i) => {
+        r.focus = fresh[i];
+      });
+      return;
+    }
+    const waiting = h.carry.filter((f) => FOCUS.includes(f));
+    let row = 0;
+    for (let day = h.today; day <= sunday && row < rows.length; day += 1) {
+      if (h.queue.has(day)) waiting.push(h.queue.get(day));
+      if (rows[row].day !== day) continue;
+      rows[row].focus = waiting.shift() ?? fresh[row];
+      row += 1;
+    }
+  }
+  function nextWeekFocus(h, rows, monday) {
+    if (!rows.length) return;
+    const last = h.today + 6;
+    const days = Array.from({ length: 7 }, (_, i) => monday + i).filter((d) => d <= last ? rows.some((r) => r.day === d) : kindOf(h.rules, h.given, d) === "home");
+    const focus = splitOf(days);
+    for (const r of rows) r.focus = focus[days.indexOf(r.day)];
+  }
   function homeWeek(h, days = 7) {
     const rows = [];
     for (let i = 0; i < days; i += 1) {
@@ -994,11 +1038,11 @@
       const kind = kindOf(h.rules, h.given, day);
       rows.push({ day, kind, focus: null, ...kind === "home" ? startsOn(h, day) : { first: null, fallbacks: [] } });
     }
+    const sunday = h.today + 6 - weekdayOf(h.today);
     const training = rows.filter((r) => r.first !== null);
-    const focus = withCarry(training.map((r) => r.day), splitOf(training.map((r) => r.day)), h.carry);
-    training.forEach((r, i) => {
-      r.focus = focus[i];
-    });
+    const thisWeek = training.filter((r) => r.day <= sunday);
+    thisWeekFocus(h, thisWeek, sunday);
+    nextWeekFocus(h, training.filter((r) => r.day > sunday), sunday + 1);
     const homeDays = rows.filter((r) => r.kind === "home").length;
     let note = null;
     if (training.length === 0) note = "There is no day at home with time to train this week, so nothing is planned.";
@@ -1667,7 +1711,14 @@
     s.rules = readRules(ctx.rules);
     if (!s.rules) return;
     s.dayKinds = readDayKinds(ctx.dayKinds);
-    s.home = homeContext({ now: s.now, calendar: s.calendar, rules: s.rules, dayKinds: s.dayKinds, carry: Array.isArray(ctx.carry) ? ctx.carry : [] });
+    s.home = homeContext({
+      now: s.now,
+      calendar: s.calendar,
+      rules: s.rules,
+      dayKinds: s.dayKinds,
+      carry: Array.isArray(ctx.carry) ? ctx.carry : [],
+      queue: readQueue(ctx.queue)
+    });
     s.homeWeek = homeWeek(s.home);
     const n = s.homeWeek.trainingDays;
     const minutes = n * s.rules.session.max;
@@ -4110,7 +4161,7 @@
       const block = blockOf(rules, history, m.id);
       if (block === "equipment_not_owned") add(block, `${m.name} needs ${m.equipment.join(" and ")}, which the person doesn't have.`, m.id);
       else if (block === "avoided_movement" || block === "cannot_do") add("avoided_movement", `${m.name} is on the person's list to leave out.`, m.id);
-      else if (block === "gated_movement") add(block, `${m.name} comes only after ${movementOf(m.easier).name} is done at the top of its range twice${movementOf(m.easier).equipment.includes("backpack") ? `, with ${LOAD_MAX_KG} kg in the backpack` : ""}.`, m.id);
+      else if (block === "gated_movement") add(block, `${m.name} comes only after ${movementOf(m.easier).name} is done at the top of its range twice${movementOf(m.easier).equipment.includes("backpack") ? `, with ${LOAD_MAX_KG} litres of water in the backpack` : ""}.`, m.id);
       if (isNew(rules, history, m)) fresh += 1;
     }
     if (fresh > MAX_NEW) add("too_many_new", `The session has ${fresh} movements the person hasn't done yet; at most ${MAX_NEW}.`);

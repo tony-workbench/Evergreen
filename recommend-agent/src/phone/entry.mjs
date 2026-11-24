@@ -13,7 +13,7 @@
 //   movementLibrary({})                                                                               -> { ok, version, movements }   every word the workout page shows
 //
 // Every context may also carry the person's `rules` ({ restWeekdays, sessionMinutes, window, mornings, equipment, avoid,
-// movements }), `dayKinds` ({ "YYYY-MM-DD": "home" | "out" | "rest" }) and `carry` (what a missed session worked). With
+// movements }), `dayKinds` ({ "YYYY-MM-DD": "home" | "out" | "rest" }) and `carry` (what a missed session worked), and `queue` ({ "YYYY-MM-DD": focus }, what this week's days at home left were planned to work). With
 // `rules`, every day at home with time to train gets one strength session and the context carries `homeWeek`.
 import { recommendWeek } from '../workouts.mjs';
 import { planContext, checkPlan, explainAction, checkWeek, planBrief } from '../plan.mjs';

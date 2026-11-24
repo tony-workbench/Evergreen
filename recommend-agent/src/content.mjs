@@ -345,7 +345,7 @@ export function checkContent(a) {
     const block = blockOf(rules, history, m.id);
     if (block === 'equipment_not_owned') add(block, `${m.name} needs ${m.equipment.join(' and ')}, which the person doesn't have.`, m.id);
     else if (block === 'avoided_movement' || block === 'cannot_do') add('avoided_movement', `${m.name} is on the person's list to leave out.`, m.id);
-    else if (block === 'gated_movement') add(block, `${m.name} comes only after ${movementOf(m.easier).name} is done at the top of its range twice${movementOf(m.easier).equipment.includes('backpack') ? `, with ${LOAD_MAX_KG} kg in the backpack` : ''}.`, m.id);
+    else if (block === 'gated_movement') add(block, `${m.name} comes only after ${movementOf(m.easier).name} is done at the top of its range twice${movementOf(m.easier).equipment.includes('backpack') ? `, with ${LOAD_MAX_KG} litres of water in the backpack` : ''}.`, m.id);
     if (isNew(rules, history, m)) fresh += 1;
   }
   if (fresh > MAX_NEW) add('too_many_new', `The session has ${fresh} movements the person hasn't done yet; at most ${MAX_NEW}.`);

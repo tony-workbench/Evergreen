@@ -50,6 +50,11 @@ extension AppModel {
         settings.set(going.sorted(), forKey: Self.goingOutKey)
         settings.set(staying.sorted(), forKey: Self.stayingHomeKey)
         if !out, day == todayISO, settings.string(forKey: Self.farDayKey) == day { settings.removeObject(forKey: Self.farDayKey) }
+        // "I'm home" takes back a "Skip today: I'm out" too, so the day trains with its reminders again.
+        if !out, workoutLog.skipped?[day] == "out" {
+            workoutLog.skipped?.removeValue(forKey: day)
+            workoutLog.save(to: settings)
+        }
         await replanForRules()
     }
 
@@ -85,7 +90,8 @@ extension AppModel {
     var rulesCacheText: String {
         guard userRules.isOn else { return "" }
         let kinds = dayKinds.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value.rawValue)" }.joined(separator: ",")
-        return userRules.cacheText + "#" + kinds + "#" + carry.joined(separator: ",")
+        let planned = queue.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ",")
+        return userRules.cacheText + "#" + kinds + "#" + carry.joined(separator: ",") + "#" + planned
     }
 
     // MARK: Carrying a missed session
@@ -125,6 +131,21 @@ extension AppModel {
             guard let wanted = focus[day], !trainedStrength(on: day), !workoutLog.didHomeSession(on: day) else { return nil }
             return wanted
         }
+    }
+
+    /// What each day at home from today to Sunday was last planned to work, so the week's split stays as it was planned
+    /// and a day that drops out passes its focus on. Today is left out once it's done.
+    var queue: [String: String] {
+        guard userRules.isOn else { return [:] }
+        let today = todayISO
+        let sunday = dayISO(offset: Self.daysToSunday(now, calendar: calendar))
+        let doneToday = trainedStrength(on: today) || workoutLog.didHomeSession(on: today)
+        return homeFocus.filter { $0.key >= today && $0.key <= sunday && !($0.key == today && doneToday) }
+    }
+
+    /// Days from `date` to the Sunday that ends its Monday-to-Sunday week: 0 on a Sunday, 6 on a Monday.
+    nonisolated static func daysToSunday(_ date: Date, calendar: Calendar) -> Int {
+        (8 - calendar.component(.weekday, from: date)) % 7
     }
 
     /// A strength workout in Apple Health (or logged here) on that day.

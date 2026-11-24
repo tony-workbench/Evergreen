@@ -19,6 +19,8 @@ struct BundlePlanRules: PlanRules {
     var dayKinds: [String: DayKind] = [:]
     /// What each session missed since the last plan worked ("lower", "upper", "full"…), so the week picks it up again.
     var carry: [String] = []
+    /// What each day at home left this week was last planned to work, by day, so the split stays as planned.
+    var queue: [String: String] = [:]
 
     /// What every call is given: `planContext`'s input, which `checkPlan` takes as its `context`.
     func input(rows: [MemoryRow], now: Date) -> JSONValue {
@@ -41,6 +43,7 @@ struct BundlePlanRules: PlanRules {
             fields["rules"] = rules.engineValue
             fields["dayKinds"] = DayKinds.engineValue(dayKinds)
             if !carry.isEmpty { fields["carry"] = .array(carry.map { .string($0) }) }
+            if !queue.isEmpty { fields["queue"] = .object(queue.mapValues { .string($0) }) }
             input = .object(fields)
         }
         return input

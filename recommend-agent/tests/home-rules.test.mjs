@@ -126,3 +126,20 @@ test('rules that cannot be read are an input error, not a guess', () => {
   }
   assert.throws(() => planContext(base({ dayKinds: { [MONDAY]: 'away' } })), (e) => e.code === 'bad_day_kinds');
 });
+
+test('the split stays as planned later in the week: Tuesday is still upper body after Monday', () => {
+  const tuesday = base({ now: at(DAYS[1], '08:00'), queue: { [DAYS[1]]: 'upper', [DAYS[3]]: 'lower', [DAYS[4]]: 'upper' } });
+  assert.deepEqual(weekOf(tuesday).filter((d) => d.focus).map((d) => [d.day, d.focus]),
+    [[DAYS[1], 'upper'], [DAYS[3], 'lower'], [DAYS[4], 'upper'], ['2026-12-07', 'lower']]);
+});
+
+test('a day at home that turns into a day out passes its focus on to the next day at home', () => {
+  const out = base({ now: at(DAYS[1], '08:00'), queue: { [DAYS[1]]: 'upper', [DAYS[3]]: 'lower', [DAYS[4]]: 'upper' }, dayKinds: { [DAYS[1]]: 'out' } });
+  assert.deepEqual(weekOf(out).filter((d) => d.focus && d.day <= DAYS[6]).map((d) => d.focus), ['upper', 'lower']);
+});
+
+test('next week seen from midweek takes its place in that whole week’s split', () => {
+  const thursday = base({ now: at(DAYS[3], '08:00') });
+  const monday = weekOf(thursday).find((d) => d.day === '2026-12-07');
+  assert.equal(monday.focus, 'lower');
+});

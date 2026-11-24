@@ -1,7 +1,7 @@
 // A week of home strength sessions from the person's rules: one session on every day at home, at the first free time in
 // the hours the rules allow, with one or two later times the same day to fall back to, and what each day works.
 // Code decides all of it; the model may only reorder what goes into a session (content.mjs), never which days train.
-import { atDay, dayOf, dayISO, isoDT, weekdayOf, US_MIN, WEEKDAY_NAMES } from './pytime.mjs';
+import { atDay, dayOf, dayISO, isoDT, parseDay, weekdayOf, US_MIN, WEEKDAY_NAMES } from './pytime.mjs';
 import { kindOf, SLOT_MIN } from './rules.mjs';
 
 export const LEAD_MIN = 60;            // a session today starts at least this long after now (as the usual week)
@@ -13,9 +13,24 @@ export const SPLIT_DAYS = 4;           // from this many days at home, lower and
 export const FOCUS = ['full', 'lower', 'upper', 'full_lower', 'full_upper'];
 export const FOCUS_WORDS = { full: 'full-body', lower: 'lower-body', upper: 'upper-body', full_lower: 'full-body, more legs', full_upper: 'full-body, more upper body' };
 
-/** What the week is built from: { now, calendar: [{ start, end }], rules, dayKinds: Map, carry: [focus] }. */
-export function homeContext({ now, calendar, rules, dayKinds, carry = [] }) {
-  return { now, today: dayOf(now), off: now.off, calendar: [...calendar].sort((x, y) => x.start.mic - y.start.mic), rules, given: dayKinds, carry };
+/**
+ * What the week is built from: { now, calendar: [{ start, end }], rules, dayKinds: Map, carry: [focus], queue: Map }.
+ * `queue` holds what each day at home left in this Monday-to-Sunday week was last planned to work (day number -> focus),
+ * so the split stays as it was planned and a day that drops out passes its focus on to the next day at home.
+ */
+export function homeContext({ now, calendar, rules, dayKinds, carry = [], queue = new Map() }) {
+  return { now, today: dayOf(now), off: now.off, calendar: [...calendar].sort((x, y) => x.start.mic - y.start.mic), rules, given: dayKinds, carry,
+    queue: new Map([...queue].filter(([, f]) => FOCUS.includes(f))) };
+}
+
+/** Reads `queue` ({ "YYYY-MM-DD": focus }); a day or focus it can't read is left out, since the week works without it. */
+export function readQueue(raw) {
+  const out = new Map();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [iso, focus] of Object.entries(raw)) {
+    try { if (FOCUS.includes(focus)) out.set(parseDay(iso), focus); } catch { /* not a day */ }
+  }
+  return out;
 }
 
 /** The free stretches of a day at home within the rules' hours, at least 30 minutes long, as { a, b } in microseconds. */
@@ -93,6 +108,32 @@ function withCarry(days, focus, carry) {
   return [...missed, ...focus].slice(0, days.length);
 }
 
+// Each day at home left this week takes what was planned for it, or what an earlier day that dropped out was planned to
+// work; a missed session (carry) goes first. A day with nothing planned yet takes the split of the days left.
+function thisWeekFocus(h, rows, sunday) {
+  const fresh = withCarry(rows.map((r) => r.day), splitOf(rows.map((r) => r.day)), h.carry);
+  if (!h.queue.size) { rows.forEach((r, i) => { r.focus = fresh[i]; }); return; }
+  const waiting = h.carry.filter((f) => FOCUS.includes(f));
+  let row = 0;
+  for (let day = h.today; day <= sunday && row < rows.length; day += 1) {
+    if (h.queue.has(day)) waiting.push(h.queue.get(day));
+    if (rows[row].day !== day) continue;
+    rows[row].focus = waiting.shift() ?? fresh[row];
+    row += 1;
+  }
+}
+
+// The days of next week seen from here take their place in that whole week's split, so the split doesn't change as more
+// of the week comes into view: a day past the seven is taken as at home unless the rules rest it or the phone said out.
+function nextWeekFocus(h, rows, monday) {
+  if (!rows.length) return;
+  const last = h.today + 6;
+  const days = Array.from({ length: 7 }, (_, i) => monday + i)
+    .filter((d) => (d <= last ? rows.some((r) => r.day === d) : kindOf(h.rules, h.given, d) === 'home'));
+  const focus = splitOf(days);
+  for (const r of rows) r.focus = focus[days.indexOf(r.day)];
+}
+
 /**
  * Every day of the 7 from today: its kind, and for a day at home with time to train, what it works and when.
  * -> { days: [{ day, kind, focus, first, fallbacks }], homeDays, note }, with day numbers and times in microseconds.
@@ -104,9 +145,11 @@ export function homeWeek(h, days = 7) {
     const kind = kindOf(h.rules, h.given, day);
     rows.push({ day, kind, focus: null, ...(kind === 'home' ? startsOn(h, day) : { first: null, fallbacks: [] }) });
   }
+  const sunday = h.today + 6 - weekdayOf(h.today);
   const training = rows.filter((r) => r.first !== null);
-  const focus = withCarry(training.map((r) => r.day), splitOf(training.map((r) => r.day)), h.carry);
-  training.forEach((r, i) => { r.focus = focus[i]; });
+  const thisWeek = training.filter((r) => r.day <= sunday);
+  thisWeekFocus(h, thisWeek, sunday);
+  nextWeekFocus(h, training.filter((r) => r.day > sunday), sunday + 1);
   const homeDays = rows.filter((r) => r.kind === 'home').length;
   let note = null;
   if (training.length === 0) note = 'There is no day at home with time to train this week, so nothing is planned.';

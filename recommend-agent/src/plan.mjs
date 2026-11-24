@@ -12,7 +12,7 @@ import {
   DAYS, LOAD_GROWTH, ACWR_MAX, SLEEP_DROP_MIN, RHR_RISE, TAPER_DAYS, WORN_RUN_MAX_MIN, BREAK_IN_MIN, MIN_SESSION, HARD_EFFORT, EASY_EFFORT,
 } from './workouts.mjs';
 import { readRules, readDayKinds, rulesView, kindOf, dayKindsView } from './rules.mjs';
-import { homeContext, homeWeek, homeWeekView, stretchesOn, FOCUS_WORDS } from './homeweek.mjs';
+import { homeContext, homeWeek, homeWeekView, readQueue, stretchesOn, FOCUS_WORDS } from './homeweek.mjs';
 
 export const MIN_MINUTES = 10;
 export const MAX_MINUTES = 180;
@@ -122,7 +122,8 @@ function applyRules(s, ctx) {
   s.rules = readRules(ctx.rules);
   if (!s.rules) return;
   s.dayKinds = readDayKinds(ctx.dayKinds);
-  s.home = homeContext({ now: s.now, calendar: s.calendar, rules: s.rules, dayKinds: s.dayKinds, carry: Array.isArray(ctx.carry) ? ctx.carry : [] });
+  s.home = homeContext({ now: s.now, calendar: s.calendar, rules: s.rules, dayKinds: s.dayKinds, carry: Array.isArray(ctx.carry) ? ctx.carry : [],
+    queue: readQueue(ctx.queue) });
   s.homeWeek = homeWeek(s.home);
   const n = s.homeWeek.trainingDays;
   const minutes = n * s.rules.session.max;

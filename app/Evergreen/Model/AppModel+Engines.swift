@@ -24,7 +24,7 @@ extension AppModel {
         Optional(Self.planBundle).map {
             BundlePlanRules(bundle: $0, history: HistoryPayload(workouts: workouts, days: health.days, cal: calendar),
                             busy: busyNow, timeZone: calendar.timeZone,
-                            rules: userRules.isOn ? userRules : nil, dayKinds: dayKinds, carry: carry)
+                            rules: userRules.isOn ? userRules : nil, dayKinds: dayKinds, carry: carry, queue: queue)
         }
     }
 
