@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "calendar-intent.schema.json",
+  "title": "Calendar intent",
+  "description": "One change to the workout plan, sent to calendarPlan instead of a sentence. `add` needs `activity`. `exact` means start exactly at `after`, and needs `after`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "add",
+        "move",
+        "resize",
+        "cancel",
+        "race"
+      ]
+    },
+    "activity": {
+      "$ref": "activity.schema.json"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+    },
+    "minutes": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 240
+    },
+    "sessionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "targetWorkoutId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "day": {
+      "type": "string",
+      "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+    },
+    "after": {
+      "type": "string",
+      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+    },
+    "exact": {
+      "type": "boolean"
+    },
+    "before": {
+      "type": "string",
+      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+    },
+    "partOfDay": {
+      "type": "string",
+      "enum": [
+        "morning",
+        "afternoon",
+        "evening"
+      ]
+    },
+    "raceDate": {
+      "type": "string",
+      "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+    },
+    "distanceKm": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 100
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "kind": {
+          "const": "add"
+        }
+      },
+      "required": [
+        "activity"
+      ]
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "move"
+        }
+      },
+      "required": [
+        "targetWorkoutId"
+      ]
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "resize"
+        }
+      },
+      "required": [
+        "targetWorkoutId"
+      ]
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "cancel"
+        }
+      },
+      "required": [
+        "targetWorkoutId"
+      ]
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "race"
+        }
+      },
+      "required": [
+        "raceDate"
+      ]
+    }
+  ],
+  "dependentRequired": {
+    "exact": [
+      "after"
+    ]
+  }
+}

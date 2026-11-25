@@ -1,0 +1,13 @@
+{
+  "id": "s-2026-11-09-run-1800",
+  "day": "2026-11-09",
+  "start": "2026-11-09T18:30:00-08:00",
+  "minutes": 30,
+  "activity": "run",
+  "intensity": "easy",
+  "reason": "You usually do this on Monday at 18:00.",
+  "basedOn": [
+    "mem:78adab0d",
+    "mem:841dfc5d"
+  ]
+}

@@ -1,0 +1,19 @@
+diff --git a/src/content.mjs b/src/content.mjs
+--- a/src/content.mjs
++++ b/src/content.mjs
+@@ -159,12 +159,12 @@
+ 
+ const repSeconds = (m, slow) => (m.tempo ? m.tempo.down + m.tempo.hold + m.tempo.up + (slow ? SLOW_EXTRA_SECONDS : 0) : 3);
+ 
+-const middle = ([lo, hi]) => (lo + hi) / 2;
++const topOf = ([, hi]) => hi;
+ 
+-/** Seconds one item takes: every set at the middle of its range on each side, the rests between sets, and getting set up. */
++/** Seconds one item takes at worst: every set at the top of its range on each side, the rests between sets, and getting set up. */
+ export function itemSeconds(item) {
+   const m = movementOf(item.movementId);
+-  const work = item.reps ? middle(item.reps) * repSeconds(m, item.slow === true) : middle(item.seconds);
++  const work = item.reps ? topOf(item.reps) * repSeconds(m, item.slow === true) : topOf(item.seconds);
+   return item.sets * work * m.sides + Math.max(0, item.sets - 1) * item.rest + SETUP_SECONDS;
+ }
+ 

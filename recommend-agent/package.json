@@ -1,0 +1,16 @@
+{
+  "name": "recommend-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The week planner as plain rules that run on the phone, with no server and no model.",
+  "scripts": {
+    "test": "node --test",
+    "build": "node scripts/build-phone.mjs",
+    "sample": "node scripts/sample.mjs",
+    "eval:home": "node scripts/eval-home-weeks.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

@@ -1,0 +1,51 @@
+[
+  {
+    "id": "s-2026-11-09-run-1800",
+    "day": "2026-11-09",
+    "start": "2026-11-09T18:30:00-08:00",
+    "minutes": 30,
+    "activity": "run",
+    "intensity": "easy",
+    "reason": "You usually do this on Monday at 18:00.",
+    "basedOn": [
+      "mem:78adab0d",
+      "mem:841dfc5d"
+    ]
+  },
+  {
+    "id": "s-2026-11-09-run-1800",
+    "day": "2026-11-09",
+    "start": "2026-11-09T19:00:00-08:00",
+    "minutes": 45,
+    "activity": "run",
+    "intensity": "easy",
+    "reason": "You usually do this on Monday at 18:00.",
+    "basedOn": [
+      "mem:78adab0d",
+      "mem:841dfc5d"
+    ]
+  },
+  {
+    "id": "s-2026-11-14-rest",
+    "day": "2026-11-14",
+    "start": "2026-11-14T00:00:00-08:00",
+    "minutes": 0,
+    "activity": "rest",
+    "intensity": "easy",
+    "reason": "The day before the long run.",
+    "basedOn": []
+  },
+  {
+    "id": "s-2026-11-09-walk-1200",
+    "day": "2026-11-09",
+    "start": "2026-11-09T13:00:00-08:00",
+    "minutes": 30,
+    "activity": "walk",
+    "intensity": "easy",
+    "reason": "You usually do this on Monday at 12:00.",
+    "basedOn": [
+      "mem:9cbb98b9",
+      "mem:841dfc5d"
+    ]
+  }
+]

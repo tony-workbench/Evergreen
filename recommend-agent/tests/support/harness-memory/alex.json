@@ -1,0 +1,264 @@
+{
+ "persona": "alex",
+ "asOf": "2026-11-18T00:00:00-08:00",
+ "facts": [
+  {
+   "file": "profile",
+   "cls": "fact",
+   "kind": "body",
+   "text": "Average resting heart rate over the last 7 days: 58.14 bpm (from 7 days with a reading), 0.04 bpm above the 28-day average of 58.11 bpm (from 28 days with a reading).",
+   "key": "computed:body.resting_hr",
+   "range": [
+    "0000-01-01",
+    "9999-12-31"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "profile",
+   "cls": "fact",
+   "kind": "body",
+   "text": "Average sleep over the last 7 days: 7.67 h (from 7 nights), 0.05 h below the 28-day average of 7.71 h (from 28 nights).",
+   "key": "computed:body.sleep",
+   "range": [
+    "0000-01-01",
+    "9999-12-31"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "profile",
+   "cls": "fact",
+   "kind": "load",
+   "text": "The minutes-based 7-day load is 249.85 minutes, ratio 1.16 to the 28-day weekly average of 214.78 minutes (28 logged days, 16.3% above).",
+   "key": "computed:load.ratio",
+   "range": [
+    "0000-01-01",
+    "9999-12-31"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "profile",
+   "cls": "fact",
+   "kind": "mix",
+   "text": "Last 4 weeks by type: Cycling 2, HIIT 1, Running 3, Strength training 4, Walking 4, Yoga 4 (as of 2026-11-17)",
+   "key": "mix",
+   "asOf": "2026-11-17",
+   "range": [
+    "2026-10-21",
+    "2026-11-17"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0,
+   "items": [
+    {
+     "activity": "Cycling",
+     "count": 2
+    },
+    {
+     "activity": "HIIT",
+     "count": 1
+    },
+    {
+     "activity": "Running",
+     "count": 3
+    },
+    {
+     "activity": "Strength training",
+     "count": 4
+    },
+    {
+     "activity": "Walking",
+     "count": 4
+    },
+    {
+     "activity": "Yoga",
+     "count": 4
+    }
+   ],
+   "activities": [
+    "Cycling",
+    "HIIT",
+    "Running",
+    "Strength training",
+    "Walking",
+    "Yoga"
+   ]
+  },
+  {
+   "file": "profile",
+   "cls": "fact",
+   "kind": "profile",
+   "text": "4-week average: 4.5 workouts per week (as of 2026-11-17, valid until 2026-11-18)",
+   "key": "profile",
+   "range": [
+    "2026-10-21",
+    "2026-11-17"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "profile",
+   "cls": "fact",
+   "kind": "regularity",
+   "text": "Days since the last counted workout (10 minutes or more) as of 2026-11-17: 0 (2026-11-17); 18 counted workouts in the last 28 days.",
+   "key": "computed:regularity.days_since_last",
+   "range": [
+    "0000-01-01",
+    "9999-12-31"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "rolling",
+   "cls": "fact",
+   "kind": "weekly",
+   "text": "[weekly] Week of 2026-10-19: 4 workouts, 150 min",
+   "key": "weekly:2026-10-19",
+   "range": [
+    "2026-10-19",
+    "2026-10-25"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "rolling",
+   "cls": "fact",
+   "kind": "weekly",
+   "text": "[weekly] Week of 2026-10-26: 5 workouts, 222 min",
+   "key": "weekly:2026-10-26",
+   "range": [
+    "2026-10-26",
+    "2026-11-01"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "rolling",
+   "cls": "fact",
+   "kind": "weekly",
+   "text": "[weekly] Week of 2026-11-02: 4 workouts, 220 min",
+   "key": "weekly:2026-11-02",
+   "range": [
+    "2026-11-02",
+    "2026-11-08"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "rolling",
+   "cls": "fact",
+   "kind": "weekly",
+   "text": "[weekly] Week of 2026-11-09: 5 workouts, 249 min",
+   "key": "weekly:2026-11-09",
+   "range": [
+    "2026-11-09",
+    "2026-11-15"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "rolling",
+   "cls": "fact",
+   "kind": "coverage",
+   "text": "Workouts logged on 18 of the 28 days ending 2026-11-17",
+   "key": "coverage:28",
+   "range": [
+    "2026-10-21",
+    "2026-11-17"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "rolling",
+   "cls": "fact",
+   "kind": "today",
+   "text": "45.94 workout minutes on 2026-11-17, ratio 1.58 to the daily average of 29.04 minutes over the previous 28 days (28 logged days, 58.2% above).",
+   "key": "computed:past.today_vs_avg",
+   "range": [
+    "0000-01-01",
+    "9999-12-31"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "rolling",
+   "cls": "fact",
+   "kind": "today",
+   "text": "On 2026-11-17: 1 counted workout (10 minutes or more) and 45.94 workout minutes.",
+   "key": "computed:volume.today",
+   "range": [
+    "0000-01-01",
+    "9999-12-31"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "rolling",
+   "cls": "fact",
+   "kind": "week",
+   "text": "5 counted workouts (10 minutes or more) in the last 7 days; the baseline is 4.26 counted workouts per week over the 28 days before this week (23 logged days), a ratio of 1.17.",
+   "key": "computed:goal.workouts_per_week",
+   "range": [
+    "0000-01-01",
+    "9999-12-31"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "rolling",
+   "cls": "fact",
+   "kind": "week",
+   "text": "This week's workout minutes (249.85) rank 1 of 4 complete 7-day weeks in the last 12 weeks, where 1 is the highest.",
+   "key": "computed:past.week_rank",
+   "range": [
+    "0000-01-01",
+    "9999-12-31"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "rolling",
+   "cls": "fact",
+   "kind": "week",
+   "text": "249.85 workout minutes in the last 7 days, ratio 1.29 to the 4-week average of 194.04 minutes per week (23 logged days before this week, 28.8% above).",
+   "key": "computed:past.week_vs_avg",
+   "range": [
+    "0000-01-01",
+    "9999-12-31"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  },
+  {
+   "file": "rolling",
+   "cls": "fact",
+   "kind": "week",
+   "text": "Counted in the last 7 days (2026-11-11 to 2026-11-17; workouts of 10 minutes or more): 5 workouts and 249.85 workout minutes on 7 logged days (0 unlogged days).",
+   "key": "computed:volume.week",
+   "range": [
+    "0000-01-01",
+    "9999-12-31"
+   ],
+   "excludedDays": [],
+   "excludedCount": 0
+  }
+ ],
+ "plannerText": "Memory facts (counts and dates only)\n## about-user/profile.md (6 facts)\n- Average resting heart rate over the last 7 days: 58.14 bpm (from 7 days with a reading), 0.04 bpm above the 28-day average of 58.11 bpm (from 28 days with a reading).\n- Average sleep over the last 7 days: 7.67 h (from 7 nights), 0.05 h below the 28-day average of 7.71 h (from 28 nights).\n- The minutes-based 7-day load is 249.85 minutes, ratio 1.16 to the 28-day weekly average of 214.78 minutes (28 logged days, 16.3% above).\n- Last 4 weeks by type: Cycling 2, HIIT 1, Running 3, Strength training 4, Walking 4, Yoga 4 (as of 2026-11-17)\n- 4-week average: 4.5 workouts per week (as of 2026-11-17, valid until 2026-11-18)\n- Days since the last counted workout (10 minutes or more) as of 2026-11-17: 0 (2026-11-17); 18 counted workouts in the last 28 days.\n## health/rolling.md (29 facts)\n- [weekly] Week of 2026-10-19: 4 workouts, 150 min\n- [weekly] Week of 2026-10-26: 5 workouts, 222 min\n- [weekly] Week of 2026-11-02: 4 workouts, 220 min\n- [weekly] Week of 2026-11-09: 5 workouts, 249 min\n- [daily] 2026-11-08: Walking 48 min\n- [daily] 2026-11-10: Yoga 45 min\n- [daily] 2026-11-11: Strength training 43 min\n- [daily] 2026-11-13: Running 53 min\n- [daily] 2026-11-14: HIIT 24 min\n- [daily] 2026-11-15: Cycling 84 min\n- [daily] 2026-11-17: Running 46 min\n- Workouts logged on 18 of the 28 days ending 2026-11-17\n- 45.94 workout minutes on 2026-11-17, ratio 1.58 to the daily average of 29.04 minutes over the previous 28 days (28 logged days, 58.2% above).\n- On 2026-11-17: 1 counted workout (10 minutes or more) and 45.94 workout minutes.\n- 5 counted workouts (10 minutes or more) in the last 7 days; the baseline is 4.26 counted workouts per week over the 28 days before this week (23 logged days), a ratio of 1.17.\n- This week's workout minutes (249.85) rank 1 of 4 complete 7-day weeks in the last 12 weeks, where 1 is the highest.\n- 249.85 workout minutes in the last 7 days, ratio 1.29 to the 4-week average of 194.04 minutes per week (23 logged days before this week, 28.8% above).\n- Counted in the last 7 days (2026-11-11 to 2026-11-17; workouts of 10 minutes or more): 5 workouts and 249.85 workout minutes on 7 logged days (0 unlogged days).\n- health/rolling.md: 11 earlier daily lines and 0 earlier weekly lines not shown",
+ "words": 411
+}

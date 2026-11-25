@@ -1,0 +1,350 @@
+{
+  "persona": "sam",
+  "user": "usr_5a17c0de",
+  "name": "Sam",
+  "now": "2026-11-09T00:05:00-08:00",
+  "planNow": "2026-11-09T08:00:00-08:00",
+  "tzOffsetMinutes": -480,
+  "snapshot": {
+    "exportDate": "2026-11-09T00:05:00-08:00",
+    "persona": {
+      "key": "sam",
+      "name": "Sam"
+    },
+    "dailySummaries": [
+      {
+        "date": "2026-10-12",
+        "restingHeartRate": 71,
+        "steps": 4000,
+        "sleepMinutes": {
+          "totalAsleep": 370
+        }
+      },
+      {
+        "date": "2026-10-13",
+        "restingHeartRate": 72,
+        "steps": 4739,
+        "sleepMinutes": {
+          "totalAsleep": 407
+        }
+      },
+      {
+        "date": "2026-10-14",
+        "restingHeartRate": 73,
+        "steps": 5478,
+        "sleepMinutes": {
+          "totalAsleep": 394
+        }
+      },
+      {
+        "date": "2026-10-15",
+        "restingHeartRate": 71,
+        "steps": 6217,
+        "sleepMinutes": {
+          "totalAsleep": 381
+        }
+      },
+      {
+        "date": "2026-10-16",
+        "restingHeartRate": 72,
+        "steps": 6956,
+        "sleepMinutes": {
+          "totalAsleep": 418
+        }
+      },
+      {
+        "date": "2026-10-17",
+        "restingHeartRate": 73,
+        "steps": 7695,
+        "sleepMinutes": {
+          "totalAsleep": 405
+        }
+      },
+      {
+        "date": "2026-10-18",
+        "restingHeartRate": 71,
+        "steps": 8434,
+        "sleepMinutes": {
+          "totalAsleep": 392
+        }
+      },
+      {
+        "date": "2026-10-19",
+        "restingHeartRate": 72,
+        "steps": 4173,
+        "sleepMinutes": {
+          "totalAsleep": 379
+        }
+      },
+      {
+        "date": "2026-10-20",
+        "restingHeartRate": 73,
+        "steps": 4912,
+        "sleepMinutes": {
+          "totalAsleep": 416
+        }
+      },
+      {
+        "date": "2026-10-21",
+        "restingHeartRate": 71,
+        "steps": 5651,
+        "sleepMinutes": {
+          "totalAsleep": 403
+        }
+      },
+      {
+        "date": "2026-10-22",
+        "restingHeartRate": 72,
+        "steps": 6390,
+        "sleepMinutes": {
+          "totalAsleep": 390
+        }
+      },
+      {
+        "date": "2026-10-23",
+        "restingHeartRate": 73,
+        "steps": 7129,
+        "sleepMinutes": {
+          "totalAsleep": 377
+        }
+      },
+      {
+        "date": "2026-10-24",
+        "restingHeartRate": 71,
+        "steps": 7868,
+        "sleepMinutes": {
+          "totalAsleep": 414
+        }
+      },
+      {
+        "date": "2026-10-25",
+        "restingHeartRate": 72,
+        "steps": 8607,
+        "sleepMinutes": {
+          "totalAsleep": 401
+        }
+      },
+      {
+        "date": "2026-10-26",
+        "restingHeartRate": 73,
+        "steps": 4346,
+        "sleepMinutes": {
+          "totalAsleep": 388
+        }
+      },
+      {
+        "date": "2026-10-27",
+        "restingHeartRate": 71,
+        "steps": 5085,
+        "sleepMinutes": {
+          "totalAsleep": 375
+        }
+      },
+      {
+        "date": "2026-10-28",
+        "restingHeartRate": 72,
+        "steps": 5824,
+        "sleepMinutes": {
+          "totalAsleep": 412
+        }
+      },
+      {
+        "date": "2026-10-29",
+        "restingHeartRate": 73,
+        "steps": 6563,
+        "sleepMinutes": {
+          "totalAsleep": 399
+        }
+      },
+      {
+        "date": "2026-10-30",
+        "restingHeartRate": 71,
+        "steps": 7302,
+        "sleepMinutes": {
+          "totalAsleep": 386
+        }
+      },
+      {
+        "date": "2026-10-31",
+        "restingHeartRate": 72,
+        "steps": 8041,
+        "sleepMinutes": {
+          "totalAsleep": 373
+        }
+      },
+      {
+        "date": "2026-11-01",
+        "restingHeartRate": 73,
+        "steps": 8780,
+        "sleepMinutes": {
+          "totalAsleep": 410
+        }
+      },
+      {
+        "date": "2026-11-02",
+        "restingHeartRate": 71,
+        "steps": 4519,
+        "sleepMinutes": {
+          "totalAsleep": 397
+        }
+      },
+      {
+        "date": "2026-11-03",
+        "restingHeartRate": 72,
+        "steps": 5258,
+        "sleepMinutes": {
+          "totalAsleep": 384
+        }
+      },
+      {
+        "date": "2026-11-04",
+        "restingHeartRate": 73,
+        "steps": 5997,
+        "sleepMinutes": {
+          "totalAsleep": 371
+        }
+      },
+      {
+        "date": "2026-11-05",
+        "restingHeartRate": 71,
+        "steps": 6736,
+        "sleepMinutes": {
+          "totalAsleep": 408
+        }
+      },
+      {
+        "date": "2026-11-06",
+        "restingHeartRate": 72,
+        "steps": 7475,
+        "sleepMinutes": {
+          "totalAsleep": 395
+        }
+      },
+      {
+        "date": "2026-11-07",
+        "restingHeartRate": 73,
+        "steps": 8214,
+        "sleepMinutes": {
+          "totalAsleep": 382
+        }
+      },
+      {
+        "date": "2026-11-08",
+        "restingHeartRate": 71,
+        "steps": 8953,
+        "sleepMinutes": {
+          "totalAsleep": 419
+        }
+      }
+    ],
+    "workouts": [
+      {
+        "activityType": "Walking",
+        "start": "2026-10-12T12:05:00-08:00",
+        "end": "2026-10-12T12:35:00-08:00",
+        "durationMin": 30
+      },
+      {
+        "activityType": "Walking",
+        "start": "2026-10-14T18:05:00-08:00",
+        "end": "2026-10-14T18:35:00-08:00",
+        "durationMin": 30
+      },
+      {
+        "activityType": "Yoga",
+        "start": "2026-10-17T09:05:00-08:00",
+        "end": "2026-10-17T09:35:00-08:00",
+        "durationMin": 30
+      },
+      {
+        "activityType": "Walking",
+        "start": "2026-10-19T12:05:00-08:00",
+        "end": "2026-10-19T12:35:00-08:00",
+        "durationMin": 30
+      },
+      {
+        "activityType": "Walking",
+        "start": "2026-10-23T17:05:00-08:00",
+        "end": "2026-10-23T17:25:00-08:00",
+        "durationMin": 20
+      },
+      {
+        "activityType": "Yoga",
+        "start": "2026-10-24T09:05:00-08:00",
+        "end": "2026-10-24T09:35:00-08:00",
+        "durationMin": 30
+      },
+      {
+        "activityType": "Walking",
+        "start": "2026-10-26T12:05:00-08:00",
+        "end": "2026-10-26T12:35:00-08:00",
+        "durationMin": 30
+      },
+      {
+        "activityType": "Walking",
+        "start": "2026-10-28T18:05:00-08:00",
+        "end": "2026-10-28T18:35:00-08:00",
+        "durationMin": 30
+      },
+      {
+        "activityType": "Walking",
+        "start": "2026-10-30T17:05:00-08:00",
+        "end": "2026-10-30T17:25:00-08:00",
+        "durationMin": 20
+      },
+      {
+        "activityType": "Yoga",
+        "start": "2026-10-31T09:05:00-08:00",
+        "end": "2026-10-31T09:35:00-08:00",
+        "durationMin": 30
+      },
+      {
+        "activityType": "Walking",
+        "start": "2026-11-02T12:05:00-08:00",
+        "end": "2026-11-02T12:35:00-08:00",
+        "durationMin": 30
+      },
+      {
+        "activityType": "Walking",
+        "start": "2026-11-04T18:05:00-08:00",
+        "end": "2026-11-04T18:35:00-08:00",
+        "durationMin": 30
+      },
+      {
+        "activityType": "Walking",
+        "start": "2026-11-06T17:05:00-08:00",
+        "end": "2026-11-06T17:25:00-08:00",
+        "durationMin": 20
+      },
+      {
+        "activityType": "Yoga",
+        "start": "2026-11-07T09:05:00-08:00",
+        "end": "2026-11-07T09:35:00-08:00",
+        "durationMin": 30
+      }
+    ]
+  },
+  "events": [
+    {
+      "id": "e1",
+      "title": "Lunch with a friend",
+      "start": "2026-11-09T12:00:00-08:00",
+      "end": "2026-11-09T13:00:00-08:00",
+      "fixed": true
+    },
+    {
+      "id": "e2",
+      "title": "Dentist",
+      "start": "2026-11-11T15:00:00-08:00",
+      "end": "2026-11-11T16:00:00-08:00",
+      "fixed": true
+    },
+    {
+      "id": "e3",
+      "title": "School meeting",
+      "start": "2026-11-12T09:00:00-08:00",
+      "end": "2026-11-12T10:00:00-08:00",
+      "fixed": true
+    }
+  ]
+}

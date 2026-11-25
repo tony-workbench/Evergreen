@@ -1,0 +1,21 @@
+{
+  "memoryId": "m-other",
+  "key": "mem:other",
+  "slot": "usual_slot/other/2/19",
+  "group": "routine",
+  "kind": "usual_slot",
+  "statement": "Rowing on Wednesday at 19:00 in 3 of the last 4 weeks.",
+  "data": {
+    "activity": "other",
+    "label": "Rowing",
+    "weekday": 2,
+    "hour": 19,
+    "minutes": 40,
+    "weeksSeen": 3,
+    "weeksTotal": 4
+  },
+  "state": "saved",
+  "confidence": 0.8,
+  "since": "2026-11-08",
+  "updated": "2026-11-08"
+}

@@ -1,0 +1,24 @@
+FORMAT: this continues @Video1 from its last frame as the SAME continuous shot by the same camera. No cuts, no dissolves, no fades, no transitions of any kind: the camera only moves physically and slowly. Real-time motion; the characters keep moving the whole time, the picture never freezes. Handmade stop-motion miniature look: needle-felted wool and clay, shallow depth of field. No text, no speech.
+
+REFERENCES:
+@Video1 is the film so far: same room, same woman, same tree, same camera, same objects. Continue it; do not restart or replay it.
+@Image1 defines only the TREE puppet: cream-white felt in three scalloped tiers, thin green stitched outline, bead eyes, pink cheeks, thin wire arms, orange sneakers.
+@Image2 defines only the WOMAN puppet: black ponytail with an orange tie, pale cream felt face, small black bead eyes, no eyebrows, grey t-shirt, dark shorts.
+
+SIZES: the tree is 30 cm tall and the woman 120 cm: the top of the tree is level with her knee and with the chair seat, never higher, in every second of the film, also when they stand side by side at the door.
+
+ROOM, fixed: a short dark wooden desk against the far wall under a wooden window with an orange sunset; on the desk one stack of paper, a shut laptop, one coffee cup with a white lid, one phone; a plain four-legged wooden chair; one closed dark wooden door with a round knob in the right-hand wall. Dim cold blue light; the only warm colour is the sunset.
+
+FIRST FRAME: the last frame of @Video1: wide view of the room; she sits on the turned chair facing the door with both white running shoes on; the tree stands on the floor beside her.
+
+TIMELINE (one action and at most one slow camera move in each range):
+0-3s: Camera dollies slowly forward and turns gently right to follow. She stands up and walks to the door; the tree skips at her left foot. The door stays in frame.
+3-4s: Camera keeps the same slow forward drift. She stops in front of the door, reaches out, and closes her right hand around the round door knob.
+4-5s: Camera holds still, facing the door from just behind her. She turns the knob; her body leans a little toward the door and she pauses for half a beat.
+5-7s: Camera holds still. She steps back with one foot and shifts her weight backward; her arm goes straight and the door swings open toward her, into the room. Warm orange sunset light pours through the widening gap over her, the tree and the floor.
+7-9.5s: Camera holds still. She lets go of the knob, steps around the edge of the open door, and jogs out through the doorway with the tree running at her left side holding her finger; they are seen from behind, running, as in @Image3.
+9.5-11s: Camera holds still on the open doorway with the two of them a few steps outside in the warm light, still running. The shot ends here.
+
+AUDIO: continue the sound of @Video1 without a break; every sound soft and close. 0-3s her footsteps and the tree's tiny skipping steps. 4.5s the knob turning with a small click. 5.5s the door creaking open, and evening birdsong fading in. 8s two pairs of light running footsteps going away. The solo felt-piano melody opens up warmly from 5s and ends on one long note at 11s.
+
+CONSTRAINTS: one continuous shot, no cuts, no dissolves. The door opens only because she pulls it. The tree is always cream-white, never green, always knee-high, also beside her in the doorway. No extra characters. No text on screen.

@@ -1,0 +1,22 @@
+{
+  "restWeekdays": [
+    4
+  ],
+  "sessionMinutes": {
+    "min": 30,
+    "max": 40
+  },
+  "window": {
+    "from": "06:00",
+    "to": "20:00"
+  },
+  "mornings": true,
+  "equipment": [
+    "backpack",
+    "step"
+  ],
+  "avoid": [],
+  "movements": {
+    "pike_push_up": "cannot"
+  }
+}

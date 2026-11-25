@@ -1,0 +1,59 @@
+A 30-second photoreal live-action period short film. One continuous night, one room, two people, nine shots joined by simple hard cuts. Every person and object keeps the exact position described below for the whole film unless a shot says it moves. Do not add people, objects, effects, text or events that are not written here.
+
+STYLE
+35mm film, fine grain, shallow depth of field, natural skin with pores and freckles. Painterly Dutch Golden Age light, like a Vermeer interior at night. Aspect 16:9. English. No music. No subtitles, captions, letters or logos anywhere. Natural hands, five fingers each, no warping when touching objects. Faces, hair and clothes match the reference images exactly from first frame to last.
+
+PEOPLE (only these two exist in the film; nobody else, not even in the background or in a reflection)
+@Element1 = Wren, the daughter, a young woman. Restless and stubborn. Bare head, long glossy dark auburn hair in one loose braid, a few strands framing her face, light freckles, hazel-green eyes. Unbleached cream linen shirt with sleeves rolled to the elbow, a faded rust-red wool bodice laced up the front, an off-white linen apron. Light, warm colours.
+@Element2 = the Mother, middle-aged. Sturdy, broad-shouldered, weathered face, calm grey eyes, tired but kind. Hair completely hidden under a close white linen coif. Charcoal-black wool jacket, a faded indigo-blue work apron with one deep patch pocket on the front, a brown wool shawl over her shoulders, raw red work-worn hands, a brass thimble on her right middle finger. Dark, cool colours. She never speaks.
+
+THE ROOM (a poor one-room Dutch home, about 1636; fixed geography, described from the main camera position)
+- The camera always stays on the same side of the room, facing the back wall. Screen-left is the window side; screen-right is the table side. Never cross this line; the Mother is always screen-left of Wren.
+- Back wall, screen-left: one small window of diamond-shaped, slightly green, uneven leaded glass panes. Cold blue moonlight falls through it.
+- Directly under the window: the Mother's low wooden chair with a rush seat, facing screen-right toward Wren. A wicker sewing basket on the floor beside the chair. She mends a dark wool stocking in her lap by moonlight.
+- About one arm's length to the right of the Mother's chair: a small, scarred oak table. Wren sits at it on a three-legged wooden stool, her left shoulder toward her mother, facing the table and the camera at three-quarters.
+- On the table, from Wren's left to right: a short ivory-yellow tallow candle in a small dull brass socket candlestick with a wide drip pan (centre of the table, directly in front of her); then the hand mirror lying FACE DOWN, its back up.
+- Right wall, screen-right edge: a Dutch box bed (a wooden cupboard bed with closed dark curtains), partly visible.
+- Left wall, screen-left edge: a cold, dark stone hearth with grey ash and no fire, no embers, no glow.
+- Floor: worn bare boards. A diamond-patterned patch of moonlight lies on the floor between the chair and the table at the start.
+- Walls: rough limewashed plaster, greyish white. No other furniture, no shelves of candles, no lanterns.
+
+THE MIRROR (one side only)
+A palm-sized rectangular hand mirror, about 12 by 9 cm, no handle. FRONT: flat, slightly hazy old mirror glass with tiny dark flecks at the edges, in a raised silver rim. BACK: mottled amber-brown tortoiseshell in thin silver mounts, scratched with use. When it lies face down only the tortoiseshell back is visible. The glass is the only part that ever reflects or glows. It never floats, changes shape or size, or reflects on its back.
+
+CONTINUITY (must hold)
+- Candle: UNLIT, cold black wick, no flame, no glow, no smoke except one tiny wisp in shot 1, until shot 8. Lit from shot 8 to the end. No other fire exists anywhere in the room.
+- Mirror: face down on the table at the start of shot 1; in Wren's right hand, glass toward her, shots 2 and 4; face down on the table again in shot 5; handed over in shot 6; inside the Mother's apron pocket from shot 6 to the end. It is never seen again after it goes into the pocket.
+- Mother: in her chair under the window for the entire film. She never stands, never walks, never leaves. Awake and mending in shots 3 and 6; asleep in the chair, chin dropped, right hand resting on the apron pocket, in shots 7 to 9.
+- Wren: on her stool for the entire film. She only turns on the stool in shot 6.
+- Light: night, moonlight only, plus a soft warm glow from the mirror glass while it is face up, in shots 1 to 6. The moonlight patch on the floor moves between shot 3 and shot 4. The window slowly brightens from night blue to grey to pale gold during shot 7. Shots 8 and 9: dawn light plus the small warm candle flame.
+
+REFERENCE VIDEOS (use only for motion and light; never copy their objects, rooms or any text)
+@Video1: how window light slowly brightens from dark (shot 7).
+@Video2: how a candle wick catches and the flame grows and steadies (shot 8).
+
+SHOT 1 (0-3 s) THE FAILURE. Medium shot, main camera position, Wren at the table, the Mother softly out of focus in the background at screen-left. Wren holds her right hand flat, palm toward the cold wick, about a hand's width away, brow furrowed. Nothing happens; at most one tiny wisp of smoke curls up and vanishes. She lowers her hand and lets out a small frustrated breath. Sound: quiet room, faint wind at the window, her breath.
+
+SHOT 2 (3-7 s) THE ESCAPE. Close-up of Wren's hands and face. She picks up the face-down mirror from the table with her right hand and turns it over, glass toward her. Insert of the glass: in it is Wren herself, the same face and auburn braid, but dressed in a fine white robe with gold trim, smiling with confidence, raising her open palm on which a small steady flame blooms. Cut back: the real Wren's face is lit softly from below by the warm glow of the glass; her lips part, her eyes go still, absorbed. Sound: a very faint, high shimmer from the mirror.
+
+SHOT 3 (7-9 s) THE MOTHER WATCHES. Wide shot from the main camera position showing the whole geography: the window and the Mother's chair at screen-left, the moonlight patch on the floor between them, Wren at the table at screen-right, her face glowing from the mirror. The Mother, mending, pauses her needle, looks across at her daughter, gives a small worried sigh, and goes back to her mending. Sound: the soft pull of thread, her sigh.
+
+SHOT 4 (9-12 s) TIME HAS GONE. A distant church bell strikes three slow times, off screen. Close-up of Wren: at the third stroke she blinks and looks up toward the window. Cut to the floor: the diamond patch of moonlight that lay between the chair and the table now lies far over on the right wall near the box bed; hours have passed. Back on Wren: a flash of alarm.
+
+SHOT 5 (12-15 s) THE PULL. Close-up of the table top, the unlit candle in frame. Wren lays the mirror face down on the table beside the candle and takes her hand away. A beat. Her right hand drifts back on its own; her fingertips touch the tortoiseshell back. She stops, pulls her fingers back and closes them into a fist. Sound: a soft tap of the mirror on wood, silence.
+
+SHOT 6 (15-20 s) THE HANDOVER. Medium two-shot from the main camera position. Wren picks up the face-down mirror without looking into it, turns on her stool toward her mother at screen-left, and holds it out across the short gap with her right hand. The Mother looks up from her mending. Wren, with a small rueful half-smile at herself, says quietly: "Don't give it back." Natural, small mouth movements. The Mother pauses, surprised; then her face softens with relief and a little pride. She takes the mirror with her red, work-worn hand, slides it into the deep pocket of her indigo apron, and gives the pocket one pat. She does not speak. Wren turns back to the table.
+
+SHOT 7 (20-25 s) THE NIGHT OF WORK. Wide shot from the main camera position, static, the same framing as shot 3. Wren at the table holds her hand toward the cold candle again and again; nothing happens; she shakes out her hand, rubs her eyes once, straightens and tries again. Under the window the Mother has fallen asleep in her chair, chin dropped, the half-mended stocking in her lap, her right hand resting over the apron pocket. Through the window the light slowly turns from night blue to grey to pale gold; the room gradually brightens. Sound: Wren's breathing, the Mother's slow breathing, the first birds near the end.
+
+SHOT 8 (25-27 s) IT CATCHES. Extreme close-up of the wick in the brass candlestick, Wren's open palm a hand's width away, not touching. A single tiny spark, then a small, real, steady candle flame catches and holds. No magical glow or burst. Sound: a soft whoosh.
+
+SHOT 9 (27-30 s) THE QUIET SMILE. Close-up of Wren, three-quarter, lit warmly on one side by the real candle flame and softly by pale dawn light from the window. She looks at the flame and a small, quiet, proud smile slowly spreads. Behind her, softly out of focus at screen-left, the Mother still sleeps in the chair with her hand over the pocket. Hold to the end. Sound: the candle's faint flutter, birdsong.
+
+DO NOT
+- No third person, no reflection of anyone but Wren, never the Mother in the mirror.
+- No flame anywhere before shot 8, no fire in the hearth, no lantern, no second candle.
+- The Mother never stands, walks or speaks. Wren never stands or walks.
+- The mirror never reflects on its back, never floats, and is not seen after it goes into the pocket.
+- Never flip the room: the window and the Mother stay screen-left, the table and Wren screen-right, the box bed at the screen-right edge.
+- No text, no logos, no watermarks, no exaggerated mouth movements.

@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "pass": false,
+  "violations": [
+    {
+      "code": "stopped_slot",
+      "text": "A session is at a usual time the person stopped.",
+      "sessionId": "s-2026-11-11-strength-1200"
+    },
+    {
+      "code": "unknown_memory_key",
+      "text": "A session is based on a memory that is not in the table.",
+      "sessionId": "s-2026-11-11-strength-1200"
+    },
+    {
+      "code": "too_many_minutes",
+      "text": "This week adds up to 145 minutes, and 100 is the most that fits."
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "calendar-planner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The Plan Calendar planner as a phone bundle: one sentence in, proposed workout blocks out.",
+  "scripts": {
+    "test": "node --test",
+    "demo": "node scripts/demo.mjs",
+    "build": "node scripts/build-phone.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

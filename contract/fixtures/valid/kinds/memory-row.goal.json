@@ -1,0 +1,16 @@
+{
+  "memoryId": "m-goal",
+  "key": "mem:goal",
+  "slot": "goal",
+  "group": "goal",
+  "kind": "goal",
+  "statement": "A half marathon on 6 December.",
+  "data": {
+    "what": "Half marathon",
+    "date": "2026-12-06"
+  },
+  "state": "saved",
+  "confidence": 0.8,
+  "since": "2026-11-08",
+  "updated": "2026-11-08"
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "home-days.schema.json",
+  "title": "Home days",
+  "description": "What the app tells the plan engine about the days at home, beside `rules` (planContext, recommendWeek and checkPlan take these fields at the top of their input). Days are local YYYY-MM-DD. Every field is optional; a missing one is empty, or false.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "dayKinds": {
+      "description": "Each day's kind from the phone: a day out from an event or \"I'm going out\", or a day at home after all. Rest weekdays come from the rules.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "home",
+          "out",
+          "rest"
+        ]
+      }
+    },
+    "carry": {
+      "description": "What each missed session of the last three days was planned to work, oldest first, so the next day at home picks it up. Passed on once.",
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "enum": [
+          "full",
+          "lower",
+          "upper",
+          "full_lower",
+          "full_upper"
+        ]
+      }
+    },
+    "queue": {
+      "description": "What each day at home from today to Sunday was last planned to work, by day, so the split stays as planned.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "full",
+          "lower",
+          "upper",
+          "full_lower",
+          "full_upper"
+        ]
+      }
+    },
+    "doneToday": {
+      "description": "Today's home session is already done: today keeps its own focus and passes none of it on.",
+      "type": "boolean"
+    },
+    "dayOffsets": {
+      "description": "Each day's UTC offset at noon, by day, from the phone's time zone, for the days of the home week (today through Sunday, or through next Sunday when today is Sunday). Times on a day it lists use that day's offset, so a clock change mid-week moves nothing; a day it leaves out uses the offset of `now`.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[+-]\\d{2}:\\d{2}$"
+      }
+    }
+  }
+}

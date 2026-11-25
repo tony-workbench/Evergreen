@@ -1,0 +1,10 @@
+{
+  "kind": "add",
+  "activity": "walk",
+  "minutes": 30,
+  "sessionId": "s-2026-11-09-walk-1200",
+  "day": "2026-11-09",
+  "after": "13:00",
+  "exact": true,
+  "title": "A very long name for a workout that nobody could read on a phone"
+}

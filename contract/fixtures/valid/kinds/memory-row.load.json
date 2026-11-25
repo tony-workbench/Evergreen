@@ -1,0 +1,16 @@
+{
+  "memoryId": "m-load",
+  "key": "mem:load",
+  "slot": "load",
+  "group": "load",
+  "kind": "load",
+  "statement": "This week had 215 active minutes, 1.1 times the usual.",
+  "data": {
+    "minutes7d": 215,
+    "ratioToUsual": 1.1
+  },
+  "state": "saved",
+  "confidence": 0.8,
+  "since": "2026-11-08",
+  "updated": "2026-11-08"
+}

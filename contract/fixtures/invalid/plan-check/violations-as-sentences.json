@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "pass": false,
+  "violations": [
+    "A session is based on a memory that is not in the table."
+  ]
+}

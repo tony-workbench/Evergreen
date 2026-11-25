@@ -1,0 +1,38 @@
+{
+  "sessionId": "w1-sat",
+  "focus": "full_lower",
+  "minutes": 35,
+  "items": [
+    {
+      "movementId": "reverse_lunge",
+      "sets": 3,
+      "reps": [
+        8,
+        12
+      ],
+      "rest": 60,
+      "isNew": false
+    },
+    {
+      "movementId": "backpack_hip_hinge",
+      "sets": 4,
+      "reps": [
+        8,
+        12
+      ],
+      "rest": 60,
+      "isNew": false,
+      "load": 6
+    },
+    {
+      "movementId": "push_up",
+      "sets": 3,
+      "reps": [
+        6,
+        12
+      ],
+      "rest": 60,
+      "isNew": false
+    }
+  ]
+}

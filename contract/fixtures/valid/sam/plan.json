@@ -1,0 +1,58 @@
+{
+  "ok": true,
+  "sessions": [
+    {
+      "id": "s-2026-11-09-walk-1200",
+      "day": "2026-11-09",
+      "start": "2026-11-09T13:00:00-08:00",
+      "minutes": 30,
+      "activity": "walk",
+      "intensity": "easy",
+      "reason": "You usually do this on Monday at 12:00.",
+      "basedOn": [
+        "mem:9cbb98b9",
+        "mem:841dfc5d"
+      ]
+    },
+    {
+      "id": "s-2026-11-11-walk-1800",
+      "day": "2026-11-11",
+      "start": "2026-11-11T18:00:00-08:00",
+      "minutes": 30,
+      "activity": "walk",
+      "intensity": "easy",
+      "reason": "You usually do this on Wednesday at 18:00.",
+      "basedOn": [
+        "mem:7f0033ad",
+        "mem:841dfc5d"
+      ]
+    },
+    {
+      "id": "s-2026-11-13-walk-1700",
+      "day": "2026-11-13",
+      "start": "2026-11-13T17:00:00-08:00",
+      "minutes": 20,
+      "activity": "walk",
+      "intensity": "easy",
+      "reason": "You usually do this on Friday at 17:00.",
+      "basedOn": [
+        "mem:d22dbaf6",
+        "mem:841dfc5d"
+      ]
+    },
+    {
+      "id": "s-2026-11-14-yoga-0900",
+      "day": "2026-11-14",
+      "start": "2026-11-14T09:00:00-08:00",
+      "minutes": 30,
+      "activity": "yoga",
+      "intensity": "easy",
+      "reason": "You usually do this on Saturday at 09:00.",
+      "basedOn": [
+        "mem:016fb23b",
+        "mem:841dfc5d"
+      ]
+    }
+  ],
+  "summary": "4 sessions at your usual times."
+}

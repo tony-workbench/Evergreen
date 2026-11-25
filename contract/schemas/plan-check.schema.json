@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plan-check.schema.json",
+  "title": "Plan check",
+  "description": "What checkPlan returns. `pass` is true only with no violations. May carry more fields.",
+  "type": "object",
+  "required": [
+    "ok",
+    "pass",
+    "violations"
+  ],
+  "properties": {
+    "ok": {
+      "const": true
+    },
+    "pass": {
+      "type": "boolean"
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "text"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "pass": {
+          "const": true
+        },
+        "violations": {
+          "maxItems": 0
+        }
+      },
+      "required": [
+        "pass"
+      ]
+    },
+    {
+      "properties": {
+        "pass": {
+          "const": false
+        },
+        "violations": {
+          "minItems": 1
+        }
+      },
+      "required": [
+        "pass"
+      ]
+    }
+  ]
+}

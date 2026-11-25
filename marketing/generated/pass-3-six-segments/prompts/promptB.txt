@@ -1,0 +1,31 @@
+FORMAT: this continues @Video1 from its last frame as the SAME continuous shot by the same camera. 30 seconds. No cuts, no dissolves, no fades, no transitions of any kind, anywhere: every change of framing is the camera physically moving, slowly. Real-time motion; the characters keep moving the whole time, the picture never freezes. The camera always moves perfectly smoothly at constant speed. Handmade stop-motion miniature look: needle-felted wool and clay, shallow depth of field. No text, no speech.
+
+SCENE: the small tree gently shuts the sleeping woman's laptop, fetches her running shoes from beside the door, she puts them on, and the two of them go out the door to run.
+
+REFERENCES:
+@Video1 is the film so far: same room, same woman, same tree, same camera position, same objects on the desk. Continue it; do not restart or replay it.
+@Image1 defines only the TREE puppet: cream-white felt in three scalloped tiers, thin green stitched outline, bead eyes, pink cheeks, thin wire arms, orange sneakers.
+@Image2 defines only the WOMAN puppet: black ponytail with an orange tie, pale cream felt face, small black bead eyes, no eyebrows, grey t-shirt, dark shorts, white socks.
+@Image3 defines the whole room seen wide: desk under the sunset window on the far wall, her chair, the closed dark wooden door in the right-hand wall, one pair of white running shoes on the floor beside the door.
+@Image4 defines how she sits sideways on the chair and how the tree drags the shoes by their laces.
+@Image5 defines how she ties a shoe: heel on the front edge of the seat, knee up, both hands at the laces.
+@Image6 defines the last frame.
+
+SIZES: the tree is 30 cm tall, the woman 120 cm: the tree's top is level with her knee and with the chair seat, never higher. These sizes never change.
+
+FIRST FRAME: the last frame of @Video1: over her right shoulder; she sleeps with her head on her arms; the tree stands on the desk beside the glowing phone.
+
+TIMELINE (one action and at most one slow camera move in each range):
+0-4s: Camera holds still. The tree walks to the right side of the laptop, puts both hands on the top edge of the screen and gently lowers it on its hinge over two full seconds until the laptop is closed and its light fades out. No slam, no bounce.
+4-6s: Camera holds still. The woman lifts her head from her arms, blinks, and stares at the tree, mouth a small round O. The tree waves one arm at her.
+6-11s: Camera dollies slowly straight back and a little lower for 5 full seconds at constant speed, never jumping, until it reaches the wide view of @Image3 with the chair left of centre and the door on the right. During the move the tree hops down from the desk to the floor and walks toward the door; she watches it go.
+11-14s: Camera holds still on the wide view. The tree takes the laces of the white running shoes over its shoulder and drags the pair across the floor to her chair, as in @Image4.
+14-16s: Camera holds still. She swivels a quarter turn to her right on the seat, whole body together, until she sits sideways with both legs out over the right side of the chair, socked feet on the floor. The chair does not move.
+16-19s: Camera holds still. The tree throws both arms up and bounces. She smiles for the first time. She slips her right foot into a shoe, lifts that knee, rests the heel on the front edge of the seat and ties the lace with both hands, as in @Image5. Her back leans forward only slightly; she never folds down to the floor.
+19-22s: Camera holds still. She lowers that foot and does the same with the left shoe.
+22-25s: Camera dollies slowly forward and turns gently right to follow her as she stands up and walks to the door, the tree skipping at her left foot. The door stays in frame the whole time.
+25-30s: Camera keeps the same slow forward drift toward the door, without any jump. She closes her right hand around the round knob, turns it, and pulls the door open into the room. Warm orange sunset light pours over them and across the floor. She and the tree run out side by side into the street, seen from behind, and the shot ends looking out through the open doorway, as in @Image6.
+
+AUDIO: continue the sound of @Video1 without a break: the same quiet room tone and the same soft solo felt-piano melody, never restarting. Every sound is soft and close; nothing loud or sharp. 3s one very soft muffled click as the laptop closes, quieter than typing. 7s a tiny felt thump as the tree lands on the floor. 11-14s laces dragging on wood. 17s and 20s soft tugs of laces. 23s her chair creaking, footsteps. 26s the knob turning, the door creaking open, then evening birdsong and two pairs of light running footsteps. The piano grows warmer from 16s and ends on one long note at 30s.
+
+CONSTRAINTS: one continuous shot, no cuts, no dissolves; the picture never freezes. Exactly one coffee cup, one phone, one stack of paper, one pair of running shoes. The tree is always cream-white, never green, always knee-high. No extra characters. No text on screen.

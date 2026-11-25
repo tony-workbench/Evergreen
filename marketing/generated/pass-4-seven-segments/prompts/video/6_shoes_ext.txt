@@ -1,0 +1,24 @@
+Extend @Video1 forward by 10 seconds as the same shot, same camera, same lens, same height. Handmade stop-motion miniature, needle-felted wool and clay, shallow depth of field. Real-time motion; the picture never freezes. One continuous shot: no cuts, no dissolves, no fades. No text, no speech.
+
+STARTS ON the last frame of @Video1: wide view; she sits on the chair turned toward the door, socked feet on the floor; the two small white running shoes stand at her feet; the tree stands beside them. For the first half second keep exactly this framing and this pose while the characters keep breathing and moving slightly; then the new action begins.
+
+REFERENCES: @Video1: the film so far; continue it, do not replay it. @Image1: the tree puppet, one view, look only. @Image2: the woman puppet, one view, look only. @Image3: the woman, the tree and one running shoe side by side, sizes only. @Image4: sliding the first foot in. @Image5: tying the first shoe. @Image6: first shoe tied, picking up the second.
+
+SIZES, the same in every second: the woman is 120 cm tall. The tree is 32 cm: knee-high to her, its tip just below the seat of her chair, three coffee cups tall when it stands on the desk. Each running shoe is 18 cm, exactly her foot's length; the shoes never change size.
+
+FIXED: the short wooden desk under the sunset window, the stack of paper left of the laptop, one coffee cup with a white lid right of the laptop, one phone lying screen-up in front of the cup, the closed dark door in the right-hand wall. Nothing on the desk moves or turns unless a line below says so. Dim cold blue light.
+
+CAMERA: completely still.
+
+TIMELINE:
+0.5-2s: She holds the right shoe open with both hands and slides her right foot in, toes first, then the heel, as in @Image4.
+2-5s: She lifts that knee, heel on the front edge of the seat, and ties the lace as in @Image5: pulls both ends up and apart, crosses them, makes a loop, pulls the bow tight.
+5-6.5s: She puts that foot down, picks up the left shoe as in @Image6 and slides her left foot in.
+6.5-9.5s: She lifts the left knee and ties this lace the same way: ends up and apart, cross, loop, tight.
+9.5-10s: Both feet on the floor, both shoes on. She smiles at the tree; it throws both arms up.
+
+AUDIO: continue @Video1's sound without a break. 1.5s and 6s a soft slide as each foot goes in. Small tugs of laces. The piano grows a little warmer.
+
+ALWAYS: exactly two shoes, the same size before and after she puts them on; each lace is pulled out, crossed, looped and tightened in view.
+
+Keep the exact look of the woman from @Image2 and of the tree from @Image1 for the whole clip. Keep the same colour grade, the same dusk light and the same light direction as @Video1 from the first frame to the last.

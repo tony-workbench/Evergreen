@@ -1,0 +1,1511 @@
+{
+ "exportDate": "2026-11-18T07:30:00-08:00",
+ "persona": {
+  "key": "half_marathon",
+  "name": "Jordan",
+  "description": "Training for a half marathon (race 2026-12-06, goal 1:45). 6 days/week, ~45-55 km/week, weekly long run building from 13 to 19 km"
+ },
+ "profile": {
+  "goals": {
+   "moveKcal": 900,
+   "exerciseMin": 45,
+   "standHours": 12,
+   "steps": 15000
+  }
+ },
+ "dailySummaries": [
+  {
+   "date": "2026-10-19",
+   "rings": {
+    "move": {
+     "value": 322,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 8,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 10,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 8013,
+   "restingHeartRate": 47,
+   "sleepMinutes": {
+    "core": 278,
+    "deep": 61,
+    "rem": 163,
+    "awake": 6,
+    "totalAsleep": 502
+   }
+  },
+  {
+   "date": "2026-10-20",
+   "rings": {
+    "move": {
+     "value": 1135,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 63,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 15,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 22861,
+   "restingHeartRate": 49,
+   "sleepMinutes": {
+    "core": 246,
+    "deep": 66,
+    "rem": 109,
+    "awake": 0,
+    "totalAsleep": 421
+   }
+  },
+  {
+   "date": "2026-10-21",
+   "rings": {
+    "move": {
+     "value": 871,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 43,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 14,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 19501,
+   "restingHeartRate": 51,
+   "sleepMinutes": {
+    "core": 234,
+    "deep": 58,
+    "rem": 105,
+    "awake": 9,
+    "totalAsleep": 397
+   }
+  },
+  {
+   "date": "2026-10-22",
+   "rings": {
+    "move": {
+     "value": 989,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 53,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 13,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 18709,
+   "restingHeartRate": 50,
+   "sleepMinutes": {
+    "core": 248,
+    "deep": 74,
+    "rem": 94,
+    "awake": 5,
+    "totalAsleep": 416
+   }
+  },
+  {
+   "date": "2026-10-23",
+   "rings": {
+    "move": {
+     "value": 651,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 43,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 10,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 10439,
+   "restingHeartRate": 50,
+   "sleepMinutes": {
+    "core": 289,
+    "deep": 57,
+    "rem": 147,
+    "awake": 11,
+    "totalAsleep": 493
+   }
+  },
+  {
+   "date": "2026-10-24",
+   "rings": {
+    "move": {
+     "value": 612,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 30,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 10,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 13533,
+   "restingHeartRate": 46,
+   "sleepMinutes": {
+    "core": 333,
+    "deep": 47,
+    "rem": 185,
+    "awake": 4,
+    "totalAsleep": 565
+   }
+  },
+  {
+   "date": "2026-10-25",
+   "rings": {
+    "move": {
+     "value": 1213,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 72,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 11,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 22590,
+   "restingHeartRate": 45,
+   "sleepMinutes": {
+    "core": 333,
+    "deep": 41,
+    "rem": 189,
+    "awake": 7,
+    "totalAsleep": 563
+   }
+  },
+  {
+   "date": "2026-10-26",
+   "rings": {
+    "move": {
+     "value": 315,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 9,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 11,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 7940,
+   "restingHeartRate": 49,
+   "sleepMinutes": {
+    "core": 266,
+    "deep": 70,
+    "rem": 156,
+    "awake": 7,
+    "totalAsleep": 492
+   }
+  },
+  {
+   "date": "2026-10-27",
+   "rings": {
+    "move": {
+     "value": 1145,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 69,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 10,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 22345,
+   "restingHeartRate": 49,
+   "sleepMinutes": {
+    "core": 294,
+    "deep": 60,
+    "rem": 133,
+    "awake": 5,
+    "totalAsleep": 487
+   }
+  },
+  {
+   "date": "2026-10-28",
+   "rings": {
+    "move": {
+     "value": 746,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 39,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 9,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 14901,
+   "restingHeartRate": 49,
+   "sleepMinutes": {
+    "core": 323,
+    "deep": 47,
+    "rem": 201,
+    "awake": 11,
+    "totalAsleep": 571
+   }
+  },
+  {
+   "date": "2026-10-29",
+   "rings": {
+    "move": {
+     "value": 947,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 48,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 7,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 18217,
+   "restingHeartRate": 48,
+   "sleepMinutes": {
+    "core": 305,
+    "deep": 42,
+    "rem": 158,
+    "awake": 5,
+    "totalAsleep": 505
+   }
+  },
+  {
+   "date": "2026-10-30",
+   "rings": {
+    "move": {
+     "value": 491,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 17,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 13,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 11569,
+   "restingHeartRate": 48,
+   "sleepMinutes": {
+    "core": 284,
+    "deep": 54,
+    "rem": 195,
+    "awake": 14,
+    "totalAsleep": 533
+   }
+  },
+  {
+   "date": "2026-10-31",
+   "rings": {
+    "move": {
+     "value": 498,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 27,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 9,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 11481,
+   "restingHeartRate": 45,
+   "sleepMinutes": {
+    "core": 333,
+    "deep": 54,
+    "rem": 203,
+    "awake": 18,
+    "totalAsleep": 590
+   }
+  },
+  {
+   "date": "2026-11-01",
+   "rings": {
+    "move": {
+     "value": 1376,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 86,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 12,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 26872,
+   "restingHeartRate": 46,
+   "sleepMinutes": {
+    "core": 313,
+    "deep": 79,
+    "rem": 210,
+    "awake": 7,
+    "totalAsleep": 602
+   }
+  },
+  {
+   "date": "2026-11-02",
+   "rings": {
+    "move": {
+     "value": 446,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 33,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 11,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 9065,
+   "restingHeartRate": 49,
+   "sleepMinutes": {
+    "core": 245,
+    "deep": 53,
+    "rem": 134,
+    "awake": 5,
+    "totalAsleep": 432
+   }
+  },
+  {
+   "date": "2026-11-03",
+   "rings": {
+    "move": {
+     "value": 991,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 57,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 12,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 20160,
+   "restingHeartRate": 46,
+   "sleepMinutes": {
+    "core": 321,
+    "deep": 83,
+    "rem": 170,
+    "awake": 2,
+    "totalAsleep": 574
+   }
+  },
+  {
+   "date": "2026-11-04",
+   "rings": {
+    "move": {
+     "value": 820,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 43,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 14,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 17371,
+   "restingHeartRate": 49,
+   "sleepMinutes": {
+    "core": 233,
+    "deep": 61,
+    "rem": 101,
+    "awake": 10,
+    "totalAsleep": 395
+   }
+  },
+  {
+   "date": "2026-11-05",
+   "rings": {
+    "move": {
+     "value": 930,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 48,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 7,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 16833,
+   "restingHeartRate": 48,
+   "sleepMinutes": {
+    "core": 290,
+    "deep": 63,
+    "rem": 147,
+    "awake": 5,
+    "totalAsleep": 500
+   }
+  },
+  {
+   "date": "2026-11-06",
+   "rings": {
+    "move": {
+     "value": 543,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 43,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 8,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 6285,
+   "restingHeartRate": 49,
+   "sleepMinutes": {
+    "core": 325,
+    "deep": 40,
+    "rem": 193,
+    "awake": 11,
+    "totalAsleep": 558
+   }
+  },
+  {
+   "date": "2026-11-07",
+   "rings": {
+    "move": {
+     "value": 691,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 37,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 11,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 14531,
+   "restingHeartRate": 48,
+   "sleepMinutes": {
+    "core": 294,
+    "deep": 56,
+    "rem": 162,
+    "awake": 0,
+    "totalAsleep": 512
+   }
+  },
+  {
+   "date": "2026-11-08",
+   "rings": {
+    "move": {
+     "value": 1138,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 68,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 11,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 21660,
+   "restingHeartRate": 47,
+   "sleepMinutes": {
+    "core": 293,
+    "deep": 86,
+    "rem": 143,
+    "awake": 19,
+    "totalAsleep": 522
+   }
+  },
+  {
+   "date": "2026-11-09",
+   "rings": {
+    "move": {
+     "value": 332,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 2,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 10,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 8575,
+   "restingHeartRate": 50,
+   "sleepMinutes": {
+    "core": 282,
+    "deep": 98,
+    "rem": 155,
+    "awake": 5,
+    "totalAsleep": 535
+   }
+  },
+  {
+   "date": "2026-11-10",
+   "rings": {
+    "move": {
+     "value": 1032,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 55,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 11,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 20171,
+   "restingHeartRate": 50,
+   "sleepMinutes": {
+    "core": 235,
+    "deep": 89,
+    "rem": 138,
+    "awake": 6,
+    "totalAsleep": 462
+   }
+  },
+  {
+   "date": "2026-11-11",
+   "rings": {
+    "move": {
+     "value": 790,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 37,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 10,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 16425,
+   "restingHeartRate": 49,
+   "sleepMinutes": {
+    "core": 273,
+    "deep": 71,
+    "rem": 123,
+    "awake": 7,
+    "totalAsleep": 467
+   }
+  },
+  {
+   "date": "2026-11-12",
+   "rings": {
+    "move": {
+     "value": 856,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 45,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 13,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 18078,
+   "restingHeartRate": 48,
+   "sleepMinutes": {
+    "core": 276,
+    "deep": 70,
+    "rem": 133,
+    "awake": 6,
+    "totalAsleep": 479
+   }
+  },
+  {
+   "date": "2026-11-13",
+   "rings": {
+    "move": {
+     "value": 421,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 17,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 12,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 7688,
+   "restingHeartRate": 50,
+   "sleepMinutes": {
+    "core": 290,
+    "deep": 73,
+    "rem": 166,
+    "awake": 2,
+    "totalAsleep": 529
+   }
+  },
+  {
+   "date": "2026-11-14",
+   "rings": {
+    "move": {
+     "value": 669,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 37,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 8,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 13995,
+   "restingHeartRate": 47,
+   "sleepMinutes": {
+    "core": 350,
+    "deep": 77,
+    "rem": 197,
+    "awake": 3,
+    "totalAsleep": 624
+   }
+  },
+  {
+   "date": "2026-11-15",
+   "rings": {
+    "move": {
+     "value": 1589,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 109,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 14,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 31010,
+   "restingHeartRate": 49,
+   "sleepMinutes": {
+    "core": 328,
+    "deep": 58,
+    "rem": 156,
+    "awake": 0,
+    "totalAsleep": 542
+   }
+  },
+  {
+   "date": "2026-11-16",
+   "rings": {
+    "move": {
+     "value": 489,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 28,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 15,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 9953,
+   "restingHeartRate": 51,
+   "sleepMinutes": {
+    "core": 302,
+    "deep": 62,
+    "rem": 146,
+    "awake": 7,
+    "totalAsleep": 510
+   }
+  },
+  {
+   "date": "2026-11-17",
+   "rings": {
+    "move": {
+     "value": 1089,
+     "goal": 900,
+     "unit": "kcal"
+    },
+    "exercise": {
+     "value": 66,
+     "goal": 45,
+     "unit": "min"
+    },
+    "stand": {
+     "value": 13,
+     "goal": 12,
+     "unit": "hr"
+    }
+   },
+   "steps": 21753,
+   "restingHeartRate": 49,
+   "sleepMinutes": {
+    "core": 262,
+    "deep": 56,
+    "rem": 163,
+    "awake": 16,
+    "totalAsleep": 481
+   }
+  }
+ ],
+ "workouts": [
+  {
+   "activityType": "Running",
+   "start": "2026-10-20T06:41:00-08:00",
+   "end": "2026-10-20T07:35:22-08:00",
+   "durationMin": 54.37,
+   "indoor": false,
+   "activeEnergyKcal": 710.18,
+   "heartRate": {
+    "avg": 155,
+    "min": 123,
+    "max": 185
+   },
+   "distanceKm": 9.816
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-10-21T18:12:00-08:00",
+   "end": "2026-10-21T18:53:17-08:00",
+   "durationMin": 41.29,
+   "indoor": false,
+   "activeEnergyKcal": 463.35,
+   "heartRate": {
+    "avg": 144,
+    "min": 112,
+    "max": 156
+   },
+   "distanceKm": 6.959
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-10-22T06:13:00-08:00",
+   "end": "2026-10-22T07:01:26-08:00",
+   "durationMin": 48.44,
+   "indoor": false,
+   "activeEnergyKcal": 680.09,
+   "heartRate": {
+    "avg": 163,
+    "min": 136,
+    "max": 178
+   },
+   "distanceKm": 9.207
+  },
+  {
+   "activityType": "FunctionalStrengthTraining",
+   "start": "2026-10-23T06:58:39.044-08:00",
+   "end": "2026-10-23T07:41:57.044-08:00",
+   "durationMin": 43.31,
+   "indoor": true,
+   "activeEnergyKcal": 267.25,
+   "heartRate": {
+    "avg": 112,
+    "min": 72,
+    "max": 127
+   }
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-10-24T08:24:05.701-08:00",
+   "end": "2026-10-24T08:54:27.701-08:00",
+   "durationMin": 30.37,
+   "indoor": false,
+   "activeEnergyKcal": 312.09,
+   "heartRate": {
+    "avg": 133,
+    "min": 102,
+    "max": 151
+   },
+   "distanceKm": 4.993
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-10-25T08:43:47.119-08:00",
+   "end": "2026-10-25T10:11:38.119-08:00",
+   "durationMin": 87.86,
+   "indoor": false,
+   "activeEnergyKcal": 1128.63,
+   "heartRate": {
+    "avg": 142,
+    "min": 104,
+    "max": 167
+   },
+   "distanceKm": 14.44
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-10-27T18:07:00-08:00",
+   "end": "2026-10-27T18:59:28-08:00",
+   "durationMin": 52.47,
+   "indoor": false,
+   "activeEnergyKcal": 727.22,
+   "heartRate": {
+    "avg": 160,
+    "min": 129,
+    "max": 186
+   },
+   "distanceKm": 9.459
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-10-28T18:01:00-08:00",
+   "end": "2026-10-28T18:40:57-08:00",
+   "durationMin": 39.96,
+   "indoor": false,
+   "activeEnergyKcal": 492.48,
+   "heartRate": {
+    "avg": 137,
+    "min": 111,
+    "max": 153
+   },
+   "distanceKm": 6.859
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-10-29T06:52:40.195-08:00",
+   "end": "2026-10-29T07:42:53.195-08:00",
+   "durationMin": 50.22,
+   "indoor": false,
+   "activeEnergyKcal": 723.13,
+   "heartRate": {
+    "avg": 163,
+    "min": 128,
+    "max": 184
+   },
+   "distanceKm": 9.591
+  },
+  {
+   "activityType": "FunctionalStrengthTraining",
+   "start": "2026-10-30T07:32:49.711-08:00",
+   "end": "2026-10-30T08:10:49.711-08:00",
+   "durationMin": 38.02,
+   "indoor": true,
+   "activeEnergyKcal": 243.55,
+   "heartRate": {
+    "avg": 118,
+    "min": 82,
+    "max": 144
+   }
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-10-31T09:48:35.717-08:00",
+   "end": "2026-10-31T10:20:36.717-08:00",
+   "durationMin": 32.03,
+   "indoor": false,
+   "activeEnergyKcal": 325.51,
+   "heartRate": {
+    "avg": 127,
+    "min": 95,
+    "max": 140
+   },
+   "distanceKm": 5.2
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-11-01T08:52:33.509-08:00",
+   "end": "2026-11-01T10:23:06.509-08:00",
+   "durationMin": 90.56,
+   "indoor": false,
+   "activeEnergyKcal": 1131.03,
+   "heartRate": {
+    "avg": 149,
+    "min": 110,
+    "max": 166
+   },
+   "distanceKm": 15.62
+  },
+  {
+   "activityType": "Yoga",
+   "start": "2026-11-02T06:02:00-08:00",
+   "end": "2026-11-02T06:26:59-08:00",
+   "durationMin": 25.0,
+   "indoor": true,
+   "activeEnergyKcal": 82.72,
+   "heartRate": {
+    "avg": 85,
+    "min": 49,
+    "max": 104
+   }
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-11-03T18:00:00-08:00",
+   "end": "2026-11-03T18:51:31-08:00",
+   "durationMin": 51.52,
+   "indoor": false,
+   "activeEnergyKcal": 668.11,
+   "heartRate": {
+    "avg": 160,
+    "min": 127,
+    "max": 184
+   },
+   "distanceKm": 9.83
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-11-04T06:40:00-08:00",
+   "end": "2026-11-04T07:19:38-08:00",
+   "durationMin": 39.64,
+   "indoor": false,
+   "activeEnergyKcal": 475.55,
+   "heartRate": {
+    "avg": 136,
+    "min": 105,
+    "max": 151
+   },
+   "distanceKm": 6.959
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-11-05T17:45:00-08:00",
+   "end": "2026-11-05T18:33:40-08:00",
+   "durationMin": 48.67,
+   "indoor": false,
+   "activeEnergyKcal": 684.38,
+   "heartRate": {
+    "avg": 167,
+    "min": 131,
+    "max": 189
+   },
+   "distanceKm": 9.46
+  },
+  {
+   "activityType": "FunctionalStrengthTraining",
+   "start": "2026-11-06T17:55:00-08:00",
+   "end": "2026-11-06T18:38:33-08:00",
+   "durationMin": 43.55,
+   "indoor": true,
+   "activeEnergyKcal": 272.89,
+   "heartRate": {
+    "avg": 121,
+    "min": 90,
+    "max": 133
+   }
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-11-07T08:07:55.115-08:00",
+   "end": "2026-11-07T08:45:40.115-08:00",
+   "durationMin": 37.76,
+   "indoor": false,
+   "activeEnergyKcal": 405.46,
+   "heartRate": {
+    "avg": 129,
+    "min": 92,
+    "max": 151
+   },
+   "distanceKm": 6.056
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-11-08T07:58:09.177-08:00",
+   "end": "2026-11-08T09:08:24.177-08:00",
+   "durationMin": 70.25,
+   "indoor": false,
+   "activeEnergyKcal": 866.43,
+   "heartRate": {
+    "avg": 143,
+    "min": 115,
+    "max": 159
+   },
+   "distanceKm": 11.76
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-11-10T06:44:00-08:00",
+   "end": "2026-11-10T07:37:29-08:00",
+   "durationMin": 53.49,
+   "indoor": false,
+   "activeEnergyKcal": 719.49,
+   "heartRate": {
+    "avg": 162,
+    "min": 127,
+    "max": 184
+   },
+   "distanceKm": 10.049
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-11-11T06:57:48.765-08:00",
+   "end": "2026-11-11T07:37:18.765-08:00",
+   "durationMin": 39.5,
+   "indoor": false,
+   "activeEnergyKcal": 482.88,
+   "heartRate": {
+    "avg": 140,
+    "min": 104,
+    "max": 158
+   },
+   "distanceKm": 6.756
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-11-12T06:43:00-08:00",
+   "end": "2026-11-12T07:36:26-08:00",
+   "durationMin": 53.45,
+   "indoor": false,
+   "activeEnergyKcal": 730.79,
+   "heartRate": {
+    "avg": 156,
+    "min": 116,
+    "max": 182
+   },
+   "distanceKm": 10.444
+  },
+  {
+   "activityType": "FunctionalStrengthTraining",
+   "start": "2026-11-13T07:34:32.284-08:00",
+   "end": "2026-11-13T08:17:34.284-08:00",
+   "durationMin": 43.05,
+   "indoor": true,
+   "activeEnergyKcal": 271.43,
+   "heartRate": {
+    "avg": 114,
+    "min": 81,
+    "max": 132
+   }
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-11-14T09:55:13.354-08:00",
+   "end": "2026-11-14T10:33:33.354-08:00",
+   "durationMin": 38.33,
+   "indoor": false,
+   "activeEnergyKcal": 476.37,
+   "heartRate": {
+    "avg": 135,
+    "min": 106,
+    "max": 150
+   },
+   "distanceKm": 6.555
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-11-15T08:28:21.169-08:00",
+   "end": "2026-11-15T10:18:48.169-08:00",
+   "durationMin": 110.46,
+   "indoor": false,
+   "activeEnergyKcal": 1292.59,
+   "heartRate": {
+    "avg": 141,
+    "min": 108,
+    "max": 155
+   },
+   "distanceKm": 18.65
+  },
+  {
+   "activityType": "Yoga",
+   "start": "2026-11-16T18:09:00-08:00",
+   "end": "2026-11-16T18:37:52-08:00",
+   "durationMin": 28.87,
+   "indoor": true,
+   "activeEnergyKcal": 113.73,
+   "heartRate": {
+    "avg": 87,
+    "min": 57,
+    "max": 112
+   }
+  },
+  {
+   "activityType": "Running",
+   "start": "2026-11-17T18:14:00-08:00",
+   "end": "2026-11-17T19:08:25-08:00",
+   "durationMin": 54.43,
+   "indoor": false,
+   "activeEnergyKcal": 715.38,
+   "heartRate": {
+    "avg": 153,
+    "min": 123,
+    "max": 179
+   },
+   "distanceKm": 9.993
+  }
+ ],
+ "calendar": {
+  "events": [
+   {
+    "title": "Standup",
+    "start": "2026-10-19T09:00:00-08:00",
+    "end": "2026-10-19T09:15:00-08:00"
+   },
+   {
+    "title": "Sprint planning",
+    "start": "2026-10-19T10:00:00-08:00",
+    "end": "2026-10-19T11:00:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-10-20T09:00:00-08:00",
+    "end": "2026-10-20T09:15:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-10-21T09:00:00-08:00",
+    "end": "2026-10-21T09:15:00-08:00"
+   },
+   {
+    "title": "Client sync",
+    "start": "2026-10-21T13:00:00-08:00",
+    "end": "2026-10-21T14:00:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-10-22T09:00:00-08:00",
+    "end": "2026-10-22T09:15:00-08:00"
+   },
+   {
+    "title": "Team retro",
+    "start": "2026-10-22T16:00:00-08:00",
+    "end": "2026-10-22T16:45:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-10-23T09:00:00-08:00",
+    "end": "2026-10-23T09:15:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-10-26T09:00:00-08:00",
+    "end": "2026-10-26T09:15:00-08:00"
+   },
+   {
+    "title": "Sprint planning",
+    "start": "2026-10-26T10:00:00-08:00",
+    "end": "2026-10-26T11:00:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-10-27T09:00:00-08:00",
+    "end": "2026-10-27T09:15:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-10-28T09:00:00-08:00",
+    "end": "2026-10-28T09:15:00-08:00"
+   },
+   {
+    "title": "Client sync",
+    "start": "2026-10-28T13:00:00-08:00",
+    "end": "2026-10-28T14:00:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-10-29T09:00:00-08:00",
+    "end": "2026-10-29T09:15:00-08:00"
+   },
+   {
+    "title": "Team retro",
+    "start": "2026-10-29T16:00:00-08:00",
+    "end": "2026-10-29T16:45:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-10-30T09:00:00-08:00",
+    "end": "2026-10-30T09:15:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-02T09:00:00-08:00",
+    "end": "2026-11-02T09:15:00-08:00"
+   },
+   {
+    "title": "Sprint planning",
+    "start": "2026-11-02T10:00:00-08:00",
+    "end": "2026-11-02T11:00:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-03T09:00:00-08:00",
+    "end": "2026-11-03T09:15:00-08:00"
+   },
+   {
+    "title": "Physio",
+    "start": "2026-11-03T19:30:00-08:00",
+    "end": "2026-11-03T20:15:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-04T09:00:00-08:00",
+    "end": "2026-11-04T09:15:00-08:00"
+   },
+   {
+    "title": "Client sync",
+    "start": "2026-11-04T13:00:00-08:00",
+    "end": "2026-11-04T14:00:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-05T09:00:00-08:00",
+    "end": "2026-11-05T09:15:00-08:00"
+   },
+   {
+    "title": "Team retro",
+    "start": "2026-11-05T16:00:00-08:00",
+    "end": "2026-11-05T16:45:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-06T09:00:00-08:00",
+    "end": "2026-11-06T09:15:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-09T09:00:00-08:00",
+    "end": "2026-11-09T09:15:00-08:00"
+   },
+   {
+    "title": "Sprint planning",
+    "start": "2026-11-09T10:00:00-08:00",
+    "end": "2026-11-09T11:00:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-10T09:00:00-08:00",
+    "end": "2026-11-10T09:15:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-11T09:00:00-08:00",
+    "end": "2026-11-11T09:15:00-08:00"
+   },
+   {
+    "title": "Client sync",
+    "start": "2026-11-11T13:00:00-08:00",
+    "end": "2026-11-11T14:00:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-12T09:00:00-08:00",
+    "end": "2026-11-12T09:15:00-08:00"
+   },
+   {
+    "title": "Team retro",
+    "start": "2026-11-12T16:00:00-08:00",
+    "end": "2026-11-12T16:45:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-13T09:00:00-08:00",
+    "end": "2026-11-13T09:15:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-16T09:00:00-08:00",
+    "end": "2026-11-16T09:15:00-08:00"
+   },
+   {
+    "title": "Sprint planning",
+    "start": "2026-11-16T10:00:00-08:00",
+    "end": "2026-11-16T11:00:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-17T09:00:00-08:00",
+    "end": "2026-11-17T09:15:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-18T09:00:00-08:00",
+    "end": "2026-11-18T09:15:00-08:00"
+   },
+   {
+    "title": "Client sync",
+    "start": "2026-11-18T13:00:00-08:00",
+    "end": "2026-11-18T14:00:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-19T09:00:00-08:00",
+    "end": "2026-11-19T09:15:00-08:00"
+   },
+   {
+    "title": "Team retro",
+    "start": "2026-11-19T16:00:00-08:00",
+    "end": "2026-11-19T16:45:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-20T09:00:00-08:00",
+    "end": "2026-11-20T09:15:00-08:00"
+   },
+   {
+    "title": "Shoe fitting",
+    "start": "2026-11-21T11:00:00-08:00",
+    "end": "2026-11-21T11:30:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-23T09:00:00-08:00",
+    "end": "2026-11-23T09:15:00-08:00"
+   },
+   {
+    "title": "Sprint planning",
+    "start": "2026-11-23T10:00:00-08:00",
+    "end": "2026-11-23T11:00:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-24T09:00:00-08:00",
+    "end": "2026-11-24T09:15:00-08:00"
+   },
+   {
+    "title": "Standup",
+    "start": "2026-11-25T09:00:00-08:00",
+    "end": "2026-11-25T09:15:00-08:00"
+   },
+   {
+    "title": "Client sync",
+    "start": "2026-11-25T13:00:00-08:00",
+    "end": "2026-11-25T14:00:00-08:00"
+   },
+   {
+    "title": "Race packet pickup",
+    "start": "2026-11-28T10:00:00-08:00",
+    "end": "2026-11-28T11:00:00-08:00"
+   },
+   {
+    "title": "Half marathon",
+    "start": "2026-11-29T07:00:00-08:00",
+    "end": "2026-11-29T10:00:00-08:00"
+   }
+  ]
+ }
+}

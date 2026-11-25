@@ -1,0 +1,356 @@
+{
+  "persona": "jordan",
+  "user": "usr_107da9c0de",
+  "name": "Jordan",
+  "now": "2026-11-09T00:05:00-08:00",
+  "planNow": "2026-11-09T08:00:00-08:00",
+  "tzOffsetMinutes": -480,
+  "snapshot": {
+    "exportDate": "2026-11-09T00:05:00-08:00",
+    "persona": {
+      "key": "jordan",
+      "name": "Jordan"
+    },
+    "dailySummaries": [
+      {
+        "date": "2026-10-12",
+        "restingHeartRate": 48,
+        "steps": 4000,
+        "sleepMinutes": {
+          "totalAsleep": 500
+        }
+      },
+      {
+        "date": "2026-10-13",
+        "restingHeartRate": 49,
+        "steps": 4739,
+        "sleepMinutes": {
+          "totalAsleep": 537
+        }
+      },
+      {
+        "date": "2026-10-14",
+        "restingHeartRate": 50,
+        "steps": 5478,
+        "sleepMinutes": {
+          "totalAsleep": 524
+        }
+      },
+      {
+        "date": "2026-10-15",
+        "restingHeartRate": 48,
+        "steps": 6217,
+        "sleepMinutes": {
+          "totalAsleep": 511
+        }
+      },
+      {
+        "date": "2026-10-16",
+        "restingHeartRate": 49,
+        "steps": 6956,
+        "sleepMinutes": {
+          "totalAsleep": 548
+        }
+      },
+      {
+        "date": "2026-10-17",
+        "restingHeartRate": 50,
+        "steps": 7695,
+        "sleepMinutes": {
+          "totalAsleep": 535
+        }
+      },
+      {
+        "date": "2026-10-18",
+        "restingHeartRate": 48,
+        "steps": 8434,
+        "sleepMinutes": {
+          "totalAsleep": 522
+        }
+      },
+      {
+        "date": "2026-10-19",
+        "restingHeartRate": 49,
+        "steps": 4173,
+        "sleepMinutes": {
+          "totalAsleep": 509
+        }
+      },
+      {
+        "date": "2026-10-20",
+        "restingHeartRate": 50,
+        "steps": 4912,
+        "sleepMinutes": {
+          "totalAsleep": 546
+        }
+      },
+      {
+        "date": "2026-10-21",
+        "restingHeartRate": 48,
+        "steps": 5651,
+        "sleepMinutes": {
+          "totalAsleep": 533
+        }
+      },
+      {
+        "date": "2026-10-22",
+        "restingHeartRate": 49,
+        "steps": 6390,
+        "sleepMinutes": {
+          "totalAsleep": 520
+        }
+      },
+      {
+        "date": "2026-10-23",
+        "restingHeartRate": 50,
+        "steps": 7129,
+        "sleepMinutes": {
+          "totalAsleep": 507
+        }
+      },
+      {
+        "date": "2026-10-24",
+        "restingHeartRate": 48,
+        "steps": 7868,
+        "sleepMinutes": {
+          "totalAsleep": 544
+        }
+      },
+      {
+        "date": "2026-10-25",
+        "restingHeartRate": 49,
+        "steps": 8607,
+        "sleepMinutes": {
+          "totalAsleep": 531
+        }
+      },
+      {
+        "date": "2026-10-26",
+        "restingHeartRate": 50,
+        "steps": 4346,
+        "sleepMinutes": {
+          "totalAsleep": 518
+        }
+      },
+      {
+        "date": "2026-10-27",
+        "restingHeartRate": 48,
+        "steps": 5085,
+        "sleepMinutes": {
+          "totalAsleep": 505
+        }
+      },
+      {
+        "date": "2026-10-28",
+        "restingHeartRate": 49,
+        "steps": 5824,
+        "sleepMinutes": {
+          "totalAsleep": 542
+        }
+      },
+      {
+        "date": "2026-10-29",
+        "restingHeartRate": 50,
+        "steps": 6563,
+        "sleepMinutes": {
+          "totalAsleep": 529
+        }
+      },
+      {
+        "date": "2026-10-30",
+        "restingHeartRate": 48,
+        "steps": 7302,
+        "sleepMinutes": {
+          "totalAsleep": 516
+        }
+      },
+      {
+        "date": "2026-10-31",
+        "restingHeartRate": 49,
+        "steps": 8041,
+        "sleepMinutes": {
+          "totalAsleep": 503
+        }
+      },
+      {
+        "date": "2026-11-01",
+        "restingHeartRate": 50,
+        "steps": 8780,
+        "sleepMinutes": {
+          "totalAsleep": 540
+        }
+      },
+      {
+        "date": "2026-11-02",
+        "restingHeartRate": 48,
+        "steps": 4519,
+        "sleepMinutes": {
+          "totalAsleep": 527
+        }
+      },
+      {
+        "date": "2026-11-03",
+        "restingHeartRate": 49,
+        "steps": 5258,
+        "sleepMinutes": {
+          "totalAsleep": 514
+        }
+      },
+      {
+        "date": "2026-11-04",
+        "restingHeartRate": 50,
+        "steps": 5997,
+        "sleepMinutes": {
+          "totalAsleep": 501
+        }
+      },
+      {
+        "date": "2026-11-05",
+        "restingHeartRate": 48,
+        "steps": 6736,
+        "sleepMinutes": {
+          "totalAsleep": 538
+        }
+      },
+      {
+        "date": "2026-11-06",
+        "restingHeartRate": 49,
+        "steps": 7475,
+        "sleepMinutes": {
+          "totalAsleep": 525
+        }
+      },
+      {
+        "date": "2026-11-07",
+        "restingHeartRate": 50,
+        "steps": 8214,
+        "sleepMinutes": {
+          "totalAsleep": 512
+        }
+      },
+      {
+        "date": "2026-11-08",
+        "restingHeartRate": 48,
+        "steps": 8953,
+        "sleepMinutes": {
+          "totalAsleep": 549
+        }
+      }
+    ],
+    "workouts": [
+      {
+        "activityType": "Running",
+        "start": "2026-10-12T18:05:00-08:00",
+        "end": "2026-10-12T18:50:00-08:00",
+        "durationMin": 45
+      },
+      {
+        "activityType": "Running",
+        "start": "2026-10-13T06:05:00-08:00",
+        "end": "2026-10-13T06:55:00-08:00",
+        "durationMin": 50
+      },
+      {
+        "activityType": "FunctionalStrengthTraining",
+        "start": "2026-10-15T18:05:00-08:00",
+        "end": "2026-10-15T18:45:00-08:00",
+        "durationMin": 40
+      },
+      {
+        "activityType": "Running",
+        "start": "2026-10-18T07:05:00-08:00",
+        "end": "2026-10-18T08:45:00-08:00",
+        "durationMin": 100
+      },
+      {
+        "activityType": "Running",
+        "start": "2026-10-19T18:05:00-08:00",
+        "end": "2026-10-19T18:50:00-08:00",
+        "durationMin": 45
+      },
+      {
+        "activityType": "Running",
+        "start": "2026-10-20T06:05:00-08:00",
+        "end": "2026-10-20T06:55:00-08:00",
+        "durationMin": 50
+      },
+      {
+        "activityType": "FunctionalStrengthTraining",
+        "start": "2026-10-22T18:05:00-08:00",
+        "end": "2026-10-22T18:45:00-08:00",
+        "durationMin": 40
+      },
+      {
+        "activityType": "Running",
+        "start": "2026-10-25T07:05:00-08:00",
+        "end": "2026-10-25T08:45:00-08:00",
+        "durationMin": 100
+      },
+      {
+        "activityType": "Running",
+        "start": "2026-10-26T18:05:00-08:00",
+        "end": "2026-10-26T18:50:00-08:00",
+        "durationMin": 45
+      },
+      {
+        "activityType": "Running",
+        "start": "2026-10-27T06:05:00-08:00",
+        "end": "2026-10-27T06:55:00-08:00",
+        "durationMin": 50
+      },
+      {
+        "activityType": "FunctionalStrengthTraining",
+        "start": "2026-10-29T18:05:00-08:00",
+        "end": "2026-10-29T18:45:00-08:00",
+        "durationMin": 40
+      },
+      {
+        "activityType": "Running",
+        "start": "2026-11-01T07:05:00-08:00",
+        "end": "2026-11-01T08:45:00-08:00",
+        "durationMin": 100
+      },
+      {
+        "activityType": "Running",
+        "start": "2026-11-02T18:05:00-08:00",
+        "end": "2026-11-02T18:50:00-08:00",
+        "durationMin": 45
+      },
+      {
+        "activityType": "FunctionalStrengthTraining",
+        "start": "2026-11-05T18:05:00-08:00",
+        "end": "2026-11-05T18:45:00-08:00",
+        "durationMin": 40
+      },
+      {
+        "activityType": "Running",
+        "start": "2026-11-08T07:05:00-08:00",
+        "end": "2026-11-08T08:45:00-08:00",
+        "durationMin": 100
+      }
+    ]
+  },
+  "events": [
+    {
+      "id": "e1",
+      "title": "Dinner with family",
+      "start": "2026-11-09T18:00:00-08:00",
+      "end": "2026-11-09T19:00:00-08:00",
+      "fixed": true
+    },
+    {
+      "id": "e2",
+      "title": "Evening class",
+      "start": "2026-11-11T19:00:00-08:00",
+      "end": "2026-11-11T20:00:00-08:00",
+      "fixed": true
+    },
+    {
+      "id": "e3",
+      "title": "Lunch talk",
+      "start": "2026-11-13T12:00:00-08:00",
+      "end": "2026-11-13T13:00:00-08:00",
+      "fixed": true
+    }
+  ]
+}

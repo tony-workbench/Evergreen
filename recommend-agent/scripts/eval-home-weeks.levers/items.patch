@@ -1,0 +1,59 @@
+diff --git a/src/content.mjs b/src/content.mjs
+--- a/src/content.mjs
++++ b/src/content.mjs
+@@ -30,7 +30,7 @@
+ export const LOAD_MAX_KG = 12;             // what a backpack holds safely
+ export const SLOW_EXTRA_SECONDS = 2;       // the slow step: each rep's lowering phase takes this much longer
+ export const MAX_ITEMS = 5;
+-export const MIN_ITEMS = 3;
++export const MIN_ITEMS = 4;                // a session holds 4 to 5 movements, fewer only when no 4 fit
+ export const MAX_SETS = 6;
+ export const MAX_PROPOSED_ITEMS = 8;       // a proposal longer than this is not read past it
+ // Words that describe a feeling, not something the person can see or count. A movement's `pass` may use none of them.
+@@ -230,20 +230,43 @@
+     if (!pick || items.some((i) => i.movementId === pick.id)) continue;
+     items.push(sessionItem(req, pick));
+   }
++  fillToFewest(req, items, used);
+   fitTime(items, req.minutes);
+   return items;
+ }
+ 
+-// Over the time: drop the last movement while more than the fewest remain, then take a set off the longest one.
++const allowsNew = (items) => items.filter((i) => i.isNew).length < MAX_NEW;
++
++// The chains of the focus's patterns, main patterns first (in the focus's order), then core.
++const chainsFor = (focus) => [...new Set(FOCUS_PATTERNS[focus].flatMap((p) => MOVEMENTS.filter((m) => m.pattern === p).map((m) => chainOf(m.id))))];
++
++// Fewer than MIN_ITEMS after the slots: any other chain of the focus's patterns the person can use goes in.
++function fillToFewest(req, items, used) {
++  for (const root of chainsFor(req.focus)) {
++    if (items.length >= MIN_ITEMS) return;
++    if (used.has(root)) continue;
++    const pick = pickInChain(req.rules, req.history, root, allowsNew(items));
++    if (!pick) continue;
++    used.add(root);
++    items.push(sessionItem(req, pick));
++  }
++}
++
++// Over the time: drop the last movement while more than MIN_ITEMS remain, then take sets off the longest; only then do
++// movements below MIN_ITEMS go, the last first, so a session never runs past its minutes.
+ function fitTime(items, minutes) {
+-  while (sessionMinutes(items) > minutes && items.length > MIN_ITEMS) items.pop();
+-  while (sessionMinutes(items) > minutes) {
++  dropOver(items, minutes, MIN_ITEMS);
++  for (;;) {
++    if (sessionMinutes(items) <= minutes) return;
+     const longest = items.filter((i) => i.sets > 1).sort((a, b) => itemSeconds(b) - itemSeconds(a))[0];
+     if (!longest) break;
+     longest.sets -= 1;
+   }
++  dropOver(items, minutes, 1);
+ }
+ 
++const dropOver = (items, minutes, fewest) => { while (sessionMinutes(items) > minutes && items.length > fewest) items.pop(); };
++
+ const contentOf = (req, items) => ({ sessionId: req.sessionId, focus: req.focus, minutes: sessionMinutes(items), items });
+ 
+ /**

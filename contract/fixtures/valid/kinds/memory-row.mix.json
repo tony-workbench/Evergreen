@@ -1,0 +1,19 @@
+{
+  "memoryId": "m-mix",
+  "key": "mem:mix",
+  "slot": "mix",
+  "group": "routine",
+  "kind": "mix",
+  "statement": "The last four weeks were mostly runs.",
+  "data": {
+    "byActivity": {
+      "run": 7,
+      "long_run": 4,
+      "strength": 4
+    }
+  },
+  "state": "saved",
+  "confidence": 0.8,
+  "since": "2026-11-08",
+  "updated": "2026-11-08"
+}
